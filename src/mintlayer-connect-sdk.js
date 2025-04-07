@@ -169,12 +169,13 @@
       }
 
       if(type === 'IssueFungibleToken') {
-        fee = 1 * Math.pow(10, 11);
-        const { tokenData } = params;
+        console.log('params', params);
+        // fee = 1 * Math.pow(10, 11);
+        // const { tokenData } = params;
         // assuming that token data is exactly as IssueFungibleToken output
         outputs.push({
           type: 'IssueFungibleToken',
-          ...tokenData,
+          ...params,
         });
       }
 
@@ -212,6 +213,42 @@
       return client.signTransaction(tx);
     },
 
+    mintToken: async ({ destination, amount, token_id }) => {
+      const tx = await client.buildTransaction({ type: 'MintToken', params: { destination, amount, token_id } });
+      return client.signTransaction(tx);
+    },
+
+    createOrder: async ({ conclude_destination, ask_currency, ask_amount, give_currency, give_amount }) => {
+      const tx = await client.buildTransaction({ type: 'CreateOrder', params: { conclude_destination, ask_currency, ask_amount, give_currency, give_amount } });
+      return client.signTransaction(tx);
+    },
+
+    fillOrder: async ({ order, amount }) => {
+      const tx = await client.buildTransaction({ type: 'FillOrder', params: { order, amount } });
+      return client.signTransaction(tx);
+    },
+
+    getAccountOrders: async () => {
+      const allOrders = await client.getAvailableOrders();
+      const { address } = await client.request({ method: 'checkConnection' });
+      const currentAddress = address[network];
+      const addressList = [...currentAddress.receiving, ...currentAddress.change];
+      const orders = allOrders.filter((order) => {
+        return addressList.includes(order.conclude_destination);
+      });
+      return orders;
+    },
+
+    concludeOrder: async ({ order }) => {
+      const tx = await client.buildTransaction({ type: 'ConcludeOrder', params: { order } });
+      return client.signTransaction(tx);
+    },
+
+    bridgeRequest: async ({ destination, amount, token_id, intent }) => {
+      const tx = await client.buildTransaction({ type: 'Transfer', params: { destination, amount, token_id } });
+      return client.signTransaction({...tx, intent});
+    },
+
     // Send transaction to wallet for signing
     signTransaction: async (tx) => {
       return client.request({
@@ -234,6 +271,16 @@
           callback(event.data.data);
         }
       });
+    },
+
+    // Common api calls not related to account
+    getAvailableOrders: async () => {
+      const response = await fetch(`${getApiServer()}/order`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch orders');
+      }
+      const data = await response.json();
+      return data;
     },
   };
 

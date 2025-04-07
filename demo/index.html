@@ -37,14 +37,20 @@
             <button onclick="getBalance()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Balance</button>
             <button onclick="getDelegations()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Delegations</button>
             <button onclick="getDelegationsTotal()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Delegations Total</button>
+            <button onclick="getAccountOrders()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Account Orders</button>
+            <button onclick="getAvailableOrders()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Available Orders</button>
         </div>
 
         <div class="space-y-4">
             <!-- Toggle Buttons -->
-            <div class="flex justify-between">
+            <div class="grid grid-cols-3 gap-4">
                 <button onclick="toggleSection('transfer')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Transfer</button>
-                <button onclick="toggleSection('signTx')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Sign Transaction</button>
+                <button onclick="toggleSection('signTx')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Sign Tx</button>
                 <button onclick="toggleSection('issueToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Issue Token</button>
+                <button onclick="toggleSection('mintToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Mint Token</button>
+                <button onclick="toggleSection('createOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Create Order</button>
+                <button onclick="toggleSection('fillOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Fill Order (DEX)</button>
+                <button onclick="toggleSection('concludeOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Conclude Order</button>
             </div>
 
             <!-- Transfer Section -->
@@ -168,6 +174,24 @@
     try {
       const delegations = await window.mintlayer.getDelegationsTotal();
       displayOutput(`Delegations Total: ${JSON.stringify(delegations, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getAccountOrders() {
+    try {
+      const orders = await window.mintlayer.getAccountOrders();
+      displayOutput(`Orders: ${JSON.stringify(orders, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getAvailableOrders() {
+    try {
+      const orders = await window.mintlayer.getAvailableOrders();
+      displayOutput(`Orders: ${JSON.stringify(orders, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
