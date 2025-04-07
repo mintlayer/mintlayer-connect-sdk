@@ -11,16 +11,61 @@
 </head>
 <body>
 <h1>Mintlayer Wallet Demo</h1>
+
+Select network: <select name="" onchange="changeNetwork()" id="network">
+    <option value="mainnet">Mainnet</option>
+    <option value="testnet">Testnet</option>
+</select>
+
+<br />
+
 <button onclick="checkConnection()">Check Connection</button>
 <button onclick="connectWallet()">Connect Wallet</button>
 <button onclick="getNewAddress()">Get New Address</button>
 <button onclick="getVersion()">Get Version</button>
 <button onclick="createDelegation()">Create Delegation</button>
+<button onclick="getBalance()">Get Balance</button>
+<button onclick="getDelegations()">Get Delegation</button>
+<button onclick="getDelegationsTotal()">Get Delegations Total</button>
+
+<div>
+    <div>Transfer</div>
+    <div>
+        <input type="text" id="send_to" />
+        <input type="text" id="amount" />
+        <button onclick="doTransfer()">Send</button>
+    </div>
+</div>
+
+<div>
+    <div>Issue Token</div>
+    <div>
+        <textarea id="tx" rows="10" cols="50" placeholder="Transaction"></textarea>
+        <input type="text" id="authority" placeholder="Authority" />
+        <button onclick="issueToken()">Send</button>
+    </div>
+</div>
+
+<div>
+    <div>Sign transaction</div>
+    <div>
+        <textarea id="transactionData" rows="10" cols="50" placeholder="Complete Transaction Data to bypass to the Wallet"></textarea>
+        <button onclick="signTransaction()">Send</button>
+    </div>
+</div>
+
 <h3>Output:</h3>
 <div id="output">Results will appear here...</div>
 
+<script src="../src/mintlayer-wasm-lib/release/wasm_wrappers.js"></script>
 <script src="../src/mintlayer-connect-sdk.js"></script>
 <script>
+  function changeNetwork() {
+    const network = document.getElementById('network').value;
+    window.mintlayer.setNetwork(network);
+    displayOutput(`Network changed to: ${network}`);
+  }
+
   function displayOutput(message) {
     const output = document.getElementById('output');
     output.textContent = `${new Date().toLocaleTimeString()} - ${message}\n${output.textContent}`;
@@ -37,7 +82,7 @@
 
   async function connectWallet() {
     try {
-      const addresses = await window.mintlayer.request({ method: 'connect' });
+      const addresses = await window.mintlayer.connect();
       displayOutput(`Connected: ${JSON.stringify(addresses, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
@@ -62,10 +107,104 @@
     }
   }
 
+  async function getBalance() {
+    try {
+      const balance = await window.mintlayer.getBalance();
+      displayOutput(`Balance: ${JSON.stringify(balance, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getDelegations() {
+    try {
+      const delegations = await window.mintlayer.getDelegations();
+      displayOutput(`Delegations: ${JSON.stringify(delegations, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getDelegationsTotal() {
+    try {
+      const delegations = await window.mintlayer.getDelegationsTotal();
+      displayOutput(`Delegations Total: ${JSON.stringify(delegations, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
   async function createDelegation() {
     try {
       const delegateResult = await window.mintlayer.request({ method: 'delegate', params: { pool_id: 'tpool106xgru3kyxzuhhsx666gvktd5y34ucke2wkkwqzysc29jk0ul82qzj4tzh' } });
       displayOutput(`Delegate: ${JSON.stringify(delegateResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function doTransfer() {
+    const to = document.getElementById('send_to').value;
+    const amount = document.getElementById('amount').value;
+
+    if (!to || !amount) {
+      displayOutput('Please provide both recipient address and amount.');
+      return;
+    }
+
+    try {
+      const transferResult = await window.mintlayer.transfer({ to, amount });
+      displayOutput(`Transfer result: ${JSON.stringify(transferResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function issueToken() {
+    const tx = document.getElementById('tx').value;
+    const authority = document.getElementById('authority').value;
+
+    if (!tx || !authority) {
+      displayOutput('Please provide both transaction and authority.');
+      return;
+    }
+
+    try {
+      const tokenData = {
+        is_freezable: false,
+        metadata_uri: {
+          hex: "68747470733a2f2f6578616d706c652e636f6d2f646174612e6a736f6e",
+          string: "https://example.com/data.json"
+        },
+        number_of_decimals: 8,
+        token_ticker: {
+          hex: "4c4c4c",
+          string: "LLL"
+        },
+        total_supply: {
+          type: "Unlimited",
+        },
+        type: 'IssueFungibleToken'
+      };
+
+      const issueResult = await window.mintlayer.issueToken({ tokenData, authority });
+      displayOutput(`Issue token result: ${JSON.stringify(issueResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function signTransaction(){
+    const transactionData = document.getElementById('transactionData').value;
+
+    if (!transactionData) {
+      displayOutput('Please provide transaction data.');
+      return;
+    }
+
+    try {
+      const signResult = await window.mintlayer.signTransaction({ transaction: transactionData });
+      displayOutput(`Sign transaction result: ${JSON.stringify(signResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
