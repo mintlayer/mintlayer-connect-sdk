@@ -85,6 +85,44 @@
       }
     },
 
+    // Core ethod to build a transaction
+    buildTransaction: async ({ type = 'Transfer', params }) => {
+      if (connectedAddresses.length === 0) throw new Error('No addresses connected');
+      if (!params) throw new Error('Missing params');
+
+      let tx;
+
+      if(type === 'Transfer') {
+        
+      }
+
+      return tx;
+    },
+
+    // Transaction aliases
+    transfer: async ({ to, amount }) => {
+      const tx = await client.buildTransaction({ type: 'Transfer', params: { to, amount } });
+      return client.signTransaction(tx);
+    },
+
+    delegate: async ({ poolId, amount }) => {
+      const tx = await client.buildTransaction({ type: 'CreateDelegationId', params: { poolId } });
+      return client.signTransaction(tx);
+    },
+
+    issueToken: async ({ tokenData, authority }) => {
+      const tx = await client.buildTransaction({ type: 'IssueToken', params: { ...tokenData, authority } });
+      return client.signTransaction(tx);
+    },
+
+    // Send transaction to wallet for signing
+    signTransaction: async (tx) => {
+      return client.request({
+        method: 'signTransaction',
+        params: { txData: tx }
+      });
+    },
+
     // Event subscription
     on: (eventName, callback) => {
       window.addEventListener('message', (event) => {
