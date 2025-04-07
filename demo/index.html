@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mintlayer Wallet Demo</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
+      button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+      #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+<h1>Mintlayer Wallet Demo</h1>
+<button onclick="checkConnection()">Check Connection</button>
+<button onclick="connectWallet()">Connect Wallet</button>
+<button onclick="getNewAddress()">Get New Address</button>
+<button onclick="getVersion()">Get Version</button>
+<button onclick="createDelegation()">Create Delegation</button>
+<h3>Output:</h3>
+<div id="output">Results will appear here...</div>
+
+<script src="../src/mintlayer-connect-sdk.js"></script>
+<script>
+  function displayOutput(message) {
+    const output = document.getElementById('output');
+    output.textContent = `${new Date().toLocaleTimeString()} - ${message}\n${output.textContent}`;
+  }
+
+  async function checkConnection() {
+    try {
+      const result = await window.mintlayer.request({ method: 'checkConnection' });
+      displayOutput(`Connection status: ${JSON.stringify(result, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function connectWallet() {
+    try {
+      const addresses = await window.mintlayer.request({ method: 'connect' });
+      displayOutput(`Connected: ${JSON.stringify(addresses, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getNewAddress() {
+    try {
+      const addresses = await window.mintlayer.request({ method: 'getNewAddress' });
+      displayOutput(`New address: ${JSON.stringify(addresses, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getVersion() {
+    try {
+      const version = await window.mintlayer.request({ method: 'version' });
+      displayOutput(`Version: ${JSON.stringify(version, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function createDelegation() {
+    try {
+      const delegateResult = await window.mintlayer.request({ method: 'delegate', params: { pool_id: 'tpool106xgru3kyxzuhhsx666gvktd5y34ucke2wkkwqzysc29jk0ul82qzj4tzh' } });
+      displayOutput(`Delegate: ${JSON.stringify(delegateResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  if (window.mintlayer) displayOutput('Mintlayer Connect SDK detected!');
+  else displayOutput('Mintlayer Connect SDK not found.');
+</script>
+</body>
+</html>
