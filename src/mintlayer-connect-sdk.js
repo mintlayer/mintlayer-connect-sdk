@@ -138,6 +138,40 @@
       }
     },
 
+    // Get token owned by connected addresses
+    getTokensOwned: async () => {
+      if (connectedAddresses.length === 0) {
+        // throw new Error('No addresses connected. Call connect first.');
+      }
+      const { address } = await client.request({ method: 'checkConnection' });
+      const currentAddress = address[network];
+      try {
+        const address = [...currentAddress.receiving, ...currentAddress.change];
+
+        const authorityPromises = address.map(async (addr) => {
+          const response = await fetch(`${getApiServer()}/address/${addr}/token-authority`);
+          if (!response.ok) {
+            // if its 404 just skip it
+            if (response.status === 404) {
+              console.warn(`Address ${addr} not found`);
+              return {}; // Return 0 balance for not found addresses
+            }
+            throw new Error('Failed to fetch delegations');
+          }
+          const data = await response.json();
+          return data;
+        });
+        const authority = await Promise.all(authorityPromises);
+        const totalAuthority = authority.reduce((acc, del) => {
+          return acc.concat(del);
+        }, []);
+
+        return totalAuthority;
+      } catch (error) {
+        throw new Error(`API error: ${error.message}`);
+      }
+    },
+
     getDelegationsTotal: async () => {
       const delegations = await client.getDelegations();
       const totalDelegation = delegations.reduce((acc, del) => {
@@ -156,15 +190,30 @@
       const inputs = [];
       const outputs = [];
 
+      let input_amount_coin_req = 0n;
+      let input_amount_token_req = 0n;
+
       // Step 1. Gather necessary inputs and outputs for the transaction
       if(type === 'Transfer') {
+        const token_id = params.token_id || 'Coin';
+        input_amount_coin_req += BigInt(params.amount * Math.pow(10, 11));
         outputs.push({
           type: 'Transfer',
           destination: params.to,
-          amount: {
-            decimal: params.amount,
-            atoms: params.amount * Math.pow(10, 11),
-          },
+          value: {
+            ...(
+              token_id === 'Coin'
+                ? { type: 'Coin' }
+                : {
+                  type: 'TokenV1',
+                  token_id,
+                }
+            ),
+            amount: {
+              decimal: params.amount,
+              atoms: params.amount * Math.pow(10, 11),
+            },
+          }
         });
       }
 
@@ -178,6 +227,179 @@
           ...params,
         });
       }
+
+      if(type === 'MintToken') {
+        const amount = {
+          atoms: '10000000000000',
+          decimal: '100'
+        }
+        inputs.push({
+          input: {
+            amount,
+            command: "MintTokens",
+            input_type: "AccountCommand",
+            nonce: 0,
+            token_id: params.token_id,
+          },
+          utxo: null,
+        });
+        outputs.push({
+          destination: params.destination,
+          type: 'Transfer',
+          value: {
+            type: 'TokenV1',
+            token_id: params.token_id,
+            amount
+          },
+        })
+      }
+
+      if(type === 'CreateOrder') {
+        const {
+          ask_amount,
+          ask_token_id,
+          give_amount,
+          give_token_id,
+          conclude_address
+        } = params;
+        const give_token_details = {
+          number_of_decimals: 11, // TODO
+        }
+        const ask_token_details = {
+          number_of_decimals: 11, // TODO
+        }
+
+        if(give_token_id === 'Coin') {
+          input_amount_coin_req += BigInt(give_amount * Math.pow(10, 11));
+        } else {
+          input_amount_token_req += BigInt(give_amount * Math.pow(10, give_token_details.number_of_decimals));
+        }
+
+        outputs.push({
+          "type": "CreateOrder",
+          "ask_balance": {
+            "atoms": ask_amount * Math.pow(10, 11),
+            "decimal": ask_amount
+          },
+          "ask_currency": ask_token_id === 'Coin'
+            ? {
+              "type": "Coin"
+            }
+            : {
+              "token_id": ask_token_id,
+              "type": "Token"
+            },
+          "conclude_destination": conclude_address,
+          "give_balance": {
+            "atoms": give_amount * Math.pow(10, give_token_details.number_of_decimals),
+            "decimal": give_amount
+          },
+          "give_currency": give_token_id === 'Coin'
+            ? {
+              "type": "Coin"
+            }
+            : {
+              "token_id": give_token_id,
+              "type": "Token"
+            },
+          "initially_asked": {
+            "atoms": ask_amount * Math.pow(10, ask_token_details.number_of_decimals),
+            "decimal": ask_amount
+          },
+          "initially_given": {
+            "atoms": give_amount * Math.pow(10, ask_token_details.number_of_decimals),
+            "decimal": give_amount
+          },
+        })
+      }
+
+      if(type === 'ConcludeOrder') {
+        const {
+          order_id,
+          nonce,
+          conclude_destination,
+        } = params;
+        inputs.push({
+          input: {
+            type: "ConcludeOrder",
+            destination: conclude_destination,
+            order_id: order_id,
+            nonce: nonce,
+          },
+          utxo: null,
+        })
+
+        // TODO: fetch from network
+        const order_details = {
+          order_id: order_id,
+          ask_currency: 'Coin',
+          give_currency: 'Coin',
+          ask_amount: 0,
+          give_amount: 0,
+        }
+
+        // ask token
+        outputs.push({
+          type: 'Transfer',
+          destination: params.to,
+          value: {
+            ...(
+              order_details.ask_currency === 'Coin'
+                ? { type: 'Coin' }
+                : {
+                  type: 'TokenV1',
+                  token_id: order_details.ask_currency.token_id,
+                }
+            ),
+            amount: {
+              decimal: params.amount,
+              atoms: params.amount * Math.pow(10, 11),
+            },
+          }
+        });
+
+        // give token
+        outputs.push({
+          type: 'Transfer',
+          destination: params.to,
+          value: {
+            ...(
+              order_details.give_currency === 'Coin'
+                ? { type: 'Coin' }
+                : {
+                  type: 'TokenV1',
+                  token_id: order_details.give_currency.token_id,
+                }
+            ),
+            amount: {
+              decimal: params.amount,
+              atoms: params.amount * Math.pow(10, 11),
+            },
+          }
+        });
+      }
+
+      if(type === 'FillOrder') {
+        const {
+          order_id,
+          amount_atoms,
+          destination,
+        } = params;
+        inputs.push({
+          input: {
+            input_type: "AccountCommand",
+            command: "FillOrder",
+            order_id: order_id,
+            fill_atoms: amount_atoms.toString(),
+            destination: destination,
+          },
+          utxo: null,
+        })
+      }
+
+      // Check if the transaction requires additional inputs to pay fee or transfer
+
+      // Give a change output if needed
 
       const JSONRepresentation = {
         inputs,
@@ -218,8 +440,8 @@
       return client.signTransaction(tx);
     },
 
-    createOrder: async ({ conclude_destination, ask_currency, ask_amount, give_currency, give_amount }) => {
-      const tx = await client.buildTransaction({ type: 'CreateOrder', params: { conclude_destination, ask_currency, ask_amount, give_currency, give_amount } });
+    createOrder: async ({ conclude_destination, ask_token, ask_amount, give_token, give_amount }) => {
+      const tx = await client.buildTransaction({ type: 'CreateOrder', params: { conclude_destination, ask_token, ask_amount, give_token, give_amount } });
       return client.signTransaction(tx);
     },
 

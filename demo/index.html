@@ -39,6 +39,7 @@
             <button onclick="getDelegationsTotal()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Delegations Total</button>
             <button onclick="getAccountOrders()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Account Orders</button>
             <button onclick="getAvailableOrders()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Available Orders</button>
+            <button onclick="getTokensOwned()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Owned Tokens</button>
         </div>
 
         <div class="space-y-4">
@@ -80,6 +81,50 @@
                     <button onclick="issueToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
                 </div>
             </div>
+
+            <!-- Mint Token Section -->
+            <div id="mintToken" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Mint Token</h3>
+                <div class="space-y-4">
+                    <input type="text" id="mint_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="mint_destination" placeholder="Destination Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="mint_amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="mintToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Create Order Section -->
+            <div id="createOrder" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Create Order</h3>
+                <div class="space-y-4">
+                    <input type="text" id="ask_token" placeholder="Ask Token" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="ask_amount" placeholder="Ask Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="give_token" placeholder="Give Token" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="give_amount" placeholder="Give Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="conclude_destination" placeholder="Conclude Destination" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="createOrder()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Fill Order Section -->
+            <div id="fillOrder" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Fill Order (DEX)</h3>
+                <div class="space-y-4">
+                    <input type="text" id="fill_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="fill_amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="order_id" placeholder="Order ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="fillOrder()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Conclude Order Section -->
+            <div id="concludeOrder" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Conclude Order</h3>
+                <div class="space-y-4">
+                    <input type="text" id="conclude_order_id" placeholder="Order ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="concludeOrder()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -100,7 +145,7 @@
   }
 
   function toggleSection(sectionId) {
-    const sections = ['transfer', 'signTx', 'issueToken'];
+    const sections = ['transfer', 'signTx', 'issueToken', 'mintToken', 'createOrder', 'fillOrder', 'concludeOrder'];
     sections.forEach(id => {
       const el = document.getElementById(id);
       if (id === sectionId) {
@@ -182,7 +227,7 @@
   async function getAccountOrders() {
     try {
       const orders = await window.mintlayer.getAccountOrders();
-      displayOutput(`Orders: ${JSON.stringify(orders, null, 2)}`);
+      displayOutput(`Account Orders: ${JSON.stringify(orders, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
@@ -191,7 +236,17 @@
   async function getAvailableOrders() {
     try {
       const orders = await window.mintlayer.getAvailableOrders();
-      displayOutput(`Orders: ${JSON.stringify(orders, null, 2)}`);
+      displayOutput(`Available Orders: ${JSON.stringify(orders, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getTokensOwned() {
+    try {
+      console.log('window.mintlayer', window.mintlayer);
+      const tokens = await window.mintlayer.getTokensOwned();
+      displayOutput(`Available tokens: ${JSON.stringify(tokens, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
@@ -249,6 +304,84 @@
 
       const issueResult = await window.mintlayer.issueToken({ tokenData, authority });
       displayOutput(`Issue token result: ${JSON.stringify(issueResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function mintToken() {
+    const destination = document.getElementById('mint_destination').value;
+    const amount = document.getElementById('mint_amount').value;
+    const token_id = document.getElementById('mint_token_id').value;
+
+    if (!destination || !amount) {
+      displayOutput('Please provide both destination and amount.');
+      return;
+    }
+
+    try {
+      const mintResult = await window.mintlayer.mintToken({ destination, amount, token_id });
+      displayOutput(`Mint token result: ${JSON.stringify(mintResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function createOrder() {
+    const ask_token = document.getElementById('ask_token').value;
+    const ask_amount = document.getElementById('ask_amount').value;
+    const give_token = document.getElementById('give_token').value;
+    const give_amount = document.getElementById('give_amount').value;
+    const conclude_destination = document.getElementById('conclude_destination').value;
+
+    if (!ask_token || !ask_amount || !give_token || !give_amount || !conclude_destination) {
+      displayOutput('Please provide all order fields.');
+      return;
+    }
+
+    try {
+      const orderResult = await window.mintlayer.createOrder({
+        ask_token,
+        ask_amount,
+        give_token,
+        give_amount,
+        conclude_destination
+      });
+      displayOutput(`Create order result: ${JSON.stringify(orderResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function fillOrder() {
+    const token_id = document.getElementById('fill_token_id').value;
+    const amount = document.getElementById('fill_amount').value;
+    const order_id = document.getElementById('order_id').value;
+
+    if (!token_id || !amount || !order_id) {
+      displayOutput('Please provide token ID, amount, and order ID.');
+      return;
+    }
+
+    try {
+      const fillResult = await window.mintlayer.fillOrder({ token_id, amount, order_id });
+      displayOutput(`Fill order result: ${JSON.stringify(fillResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function concludeOrder() {
+    const order_id = document.getElementById('conclude_order_id').value;
+
+    if (!order_id) {
+      displayOutput('Please provide order ID.');
+      return;
+    }
+
+    try {
+      const concludeResult = await window.mintlayer.concludeOrder({ order_id });
+      displayOutput(`Conclude order result: ${JSON.stringify(concludeResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
