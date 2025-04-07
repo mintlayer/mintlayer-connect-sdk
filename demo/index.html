@@ -2,60 +2,87 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mintlayer Wallet Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
-      button { padding: 10px 20px; margin: 5px; cursor: pointer; }
-      #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
+      body {
+        background: linear-gradient(to bottom right, #f0f9ff, #e0f2fe);
+        min-height: 100vh;
+      }
     </style>
 </head>
-<body>
-<h1>Mintlayer Wallet Demo</h1>
+<body class="font-sans text-gray-800 antialiased">
+<div class="container mx-auto max-w-5xl p-6 flex flex-col lg:flex-row gap-6">
+    <!-- Left Column: Actions -->
+    <div class="lg:w-1/2 space-y-6">
+        <h1 class="text-3xl font-bold text-center text-blue-600 mb-6">Mintlayer Wallet Demo</h1>
 
-Select network: <select name="" onchange="changeNetwork()" id="network">
-    <option value="mainnet">Mainnet</option>
-    <option value="testnet">Testnet</option>
-</select>
+        <div class="flex justify-center mb-4">
+            <div class="flex items-center space-x-2">
+                <label for="network" class="text-sm font-medium text-gray-700">Select Network:</label>
+                <select id="network" onchange="changeNetwork()" class="border border-gray-300 rounded-md p-2 bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="mainnet">Mainnet</option>
+                    <option value="testnet">Testnet</option>
+                </select>
+            </div>
+        </div>
 
-<br />
+        <div class="grid grid-cols-2 gap-4">
+            <button onclick="checkConnection()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Check Connection</button>
+            <button onclick="connectWallet()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Connect Wallet</button>
+            <button onclick="getNewAddress()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get New Address</button>
+            <button onclick="getVersion()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Version</button>
+            <button onclick="createDelegation()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Create Delegation</button>
+            <button onclick="getBalance()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Balance</button>
+            <button onclick="getDelegations()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Delegations</button>
+            <button onclick="getDelegationsTotal()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Delegations Total</button>
+        </div>
 
-<button onclick="checkConnection()">Check Connection</button>
-<button onclick="connectWallet()">Connect Wallet</button>
-<button onclick="getNewAddress()">Get New Address</button>
-<button onclick="getVersion()">Get Version</button>
-<button onclick="createDelegation()">Create Delegation</button>
-<button onclick="getBalance()">Get Balance</button>
-<button onclick="getDelegations()">Get Delegation</button>
-<button onclick="getDelegationsTotal()">Get Delegations Total</button>
+        <div class="space-y-4">
+            <!-- Toggle Buttons -->
+            <div class="flex justify-between">
+                <button onclick="toggleSection('transfer')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Transfer</button>
+                <button onclick="toggleSection('signTx')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Sign Transaction</button>
+                <button onclick="toggleSection('issueToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Issue Token</button>
+            </div>
 
-<div>
-    <div>Transfer</div>
-    <div>
-        <input type="text" id="send_to" />
-        <input type="text" id="amount" />
-        <button onclick="doTransfer()">Send</button>
+            <!-- Transfer Section -->
+            <div id="transfer" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Transfer</h3>
+                <div class="space-y-4">
+                    <input type="text" id="send_to" placeholder="Recipient Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="doTransfer()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Sign Transaction Section -->
+            <div id="signTx" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Sign Transaction</h3>
+                <div class="space-y-4">
+                    <textarea id="transactionData" rows="5" placeholder="Complete Transaction Data" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"></textarea>
+                    <button onclick="signTransaction()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Issue Token Section -->
+            <div id="issueToken" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Issue Token</h3>
+                <div class="space-y-4">
+                    <input type="text" id="authority" placeholder="Authority Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="issueToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Output -->
+    <div class="lg:w-1/2">
+        <h3 class="text-xl font-semibold text-gray-700 mb-4">Output</h3>
+        <div id="output" class="bg-white p-4 rounded-lg shadow-md text-sm text-gray-600 whitespace-pre-wrap h-96 overflow-y-auto border border-gray-200"></div>
     </div>
 </div>
-
-<div>
-    <div>Issue Token</div>
-    <div>
-        <textarea id="tx" rows="10" cols="50" placeholder="Transaction"></textarea>
-        <input type="text" id="authority" placeholder="Authority" />
-        <button onclick="issueToken()">Send</button>
-    </div>
-</div>
-
-<div>
-    <div>Sign transaction</div>
-    <div>
-        <textarea id="transactionData" rows="10" cols="50" placeholder="Complete Transaction Data to bypass to the Wallet"></textarea>
-        <button onclick="signTransaction()">Send</button>
-    </div>
-</div>
-
-<h3>Output:</h3>
-<div id="output">Results will appear here...</div>
 
 <script src="../src/mintlayer-wasm-lib/release/wasm_wrappers.js"></script>
 <script src="../src/mintlayer-connect-sdk.js"></script>
@@ -64,6 +91,18 @@ Select network: <select name="" onchange="changeNetwork()" id="network">
     const network = document.getElementById('network').value;
     window.mintlayer.setNetwork(network);
     displayOutput(`Network changed to: ${network}`);
+  }
+
+  function toggleSection(sectionId) {
+    const sections = ['transfer', 'signTx', 'issueToken'];
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (id === sectionId) {
+        el.classList.toggle('hidden');
+      } else {
+        el.classList.add('hidden');
+      }
+    });
   }
 
   function displayOutput(message) {
@@ -136,7 +175,10 @@ Select network: <select name="" onchange="changeNetwork()" id="network">
 
   async function createDelegation() {
     try {
-      const delegateResult = await window.mintlayer.request({ method: 'delegate', params: { pool_id: 'tpool106xgru3kyxzuhhsx666gvktd5y34ucke2wkkwqzysc29jk0ul82qzj4tzh' } });
+      const delegateResult = await window.mintlayer.request({
+        method: 'delegate',
+        params: { poolId: 'tpool106xgru3kyxzuhhsx666gvktd5y34ucke2wkkwqzysc29jk0ul82qzj4tzh' }
+      });
       displayOutput(`Delegate: ${JSON.stringify(delegateResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
@@ -161,11 +203,10 @@ Select network: <select name="" onchange="changeNetwork()" id="network">
   }
 
   async function issueToken() {
-    const tx = document.getElementById('tx').value;
     const authority = document.getElementById('authority').value;
 
-    if (!tx || !authority) {
-      displayOutput('Please provide both transaction and authority.');
+    if (!authority) {
+      displayOutput('Please provide authority.');
       return;
     }
 
@@ -177,13 +218,8 @@ Select network: <select name="" onchange="changeNetwork()" id="network">
           string: "https://example.com/data.json"
         },
         number_of_decimals: 8,
-        token_ticker: {
-          hex: "4c4c4c",
-          string: "LLL"
-        },
-        total_supply: {
-          type: "Unlimited",
-        },
+        token_ticker: { hex: "4c4c4c", string: "LLL" },
+        total_supply: { type: "Unlimited" },
         type: 'IssueFungibleToken'
       };
 
@@ -194,7 +230,7 @@ Select network: <select name="" onchange="changeNetwork()" id="network">
     }
   }
 
-  async function signTransaction(){
+  async function signTransaction() {
     const transactionData = document.getElementById('transactionData').value;
 
     if (!transactionData) {
@@ -203,7 +239,7 @@ Select network: <select name="" onchange="changeNetwork()" id="network">
     }
 
     try {
-      const signResult = await window.mintlayer.signTransaction({ transaction: transactionData });
+      const signResult = await window.mintlayer.signTransaction(JSON.parse(transactionData));
       displayOutput(`Sign transaction result: ${JSON.stringify(signResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
