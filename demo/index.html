@@ -52,6 +52,7 @@
                 <button onclick="toggleSection('createOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Create Order</button>
                 <button onclick="toggleSection('fillOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Fill Order (DEX)</button>
                 <button onclick="toggleSection('concludeOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Conclude Order</button>
+                <button onclick="toggleSection('broadcastTx')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Broadcast</button>
             </div>
 
             <!-- Transfer Section -->
@@ -70,6 +71,15 @@
                 <div class="space-y-4">
                     <textarea id="transactionData" rows="5" placeholder="Complete Transaction Data" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"></textarea>
                     <button onclick="signTransaction()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Broadcast Transaction Section -->
+            <div id="broadcastTx" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Broadcast Transaction</h3>
+                <div class="space-y-4">
+                    <textarea id="broadcast_tx" rows="5" placeholder="Transaction HEX Data" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"></textarea>
+                    <button onclick="broadcastTx()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
                 </div>
             </div>
 
@@ -110,9 +120,9 @@
             <div id="fillOrder" class="bg-white p-6 rounded-lg shadow-md hidden">
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Fill Order (DEX)</h3>
                 <div class="space-y-4">
-                    <input type="text" id="fill_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="fill_order_id" placeholder="Order ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="fill_amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                    <input type="text" id="order_id" placeholder="Order ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="fill_destination" placeholder="Destination" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <button onclick="fillOrder()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
                 </div>
             </div>
@@ -145,7 +155,7 @@
   }
 
   function toggleSection(sectionId) {
-    const sections = ['transfer', 'signTx', 'issueToken', 'mintToken', 'createOrder', 'fillOrder', 'concludeOrder'];
+    const sections = ['transfer', 'signTx', 'issueToken', 'mintToken', 'createOrder', 'fillOrder', 'concludeOrder', 'broadcastTx'];
     sections.forEach(id => {
       const el = document.getElementById(id);
       if (id === sectionId) {
@@ -354,17 +364,17 @@
   }
 
   async function fillOrder() {
-    const token_id = document.getElementById('fill_token_id').value;
+    const order_id = document.getElementById('fill_order_id').value;
     const amount = document.getElementById('fill_amount').value;
-    const order_id = document.getElementById('order_id').value;
+    const destination = document.getElementById('fill_destination').value;
 
-    if (!token_id || !amount || !order_id) {
+    if (!amount || !order_id || !destination) {
       displayOutput('Please provide token ID, amount, and order ID.');
       return;
     }
 
     try {
-      const fillResult = await window.mintlayer.fillOrder({ token_id, amount, order_id });
+      const fillResult = await window.mintlayer.fillOrder({ amount, order_id, destination });
       displayOutput(`Fill order result: ${JSON.stringify(fillResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
@@ -398,6 +408,22 @@
     try {
       const signResult = await window.mintlayer.signTransaction(JSON.parse(transactionData));
       displayOutput(`Sign transaction result: ${JSON.stringify(signResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function broadcastTx() {
+    const transactionData = document.getElementById('broadcast_tx').value;
+
+    if (!transactionData) {
+      displayOutput('Please provide transaction data.');
+      return;
+    }
+
+    try {
+      const broadcastResult = await window.mintlayer.broadcastTx(transactionData);
+      displayOutput(`Broadcast transaction result: ${JSON.stringify(broadcastResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }

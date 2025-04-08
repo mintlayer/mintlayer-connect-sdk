@@ -53,7 +53,15 @@
       }
     }
 
-    return utxosToSpend
+    const transformedInput = utxosToSpend.map((item) => ({
+      input: {
+        ...item.outpoint,
+        input_type: 'UTXO'
+      },
+      utxo: item.utxo,
+    }));
+
+    return transformedInput
   }
 
   const client = {
@@ -281,8 +289,8 @@
                 }
             ),
             amount: {
-              decimal: params.amount,
-              atoms: params.amount * Math.pow(10, 11),
+              decimal: params.amount.toString(),
+              atoms: (params.amount * Math.pow(10, 11)).toString(),
             },
           }
         });
@@ -457,9 +465,13 @@
       if(type === 'FillOrder') {
         const {
           order_id,
-          amount_atoms,
+          amount,
           destination,
+          order_details,
         } = params;
+
+        const amount_atoms = amount * Math.pow(10, 11);
+
         inputs.push({
           input: {
             input_type: "AccountCommand",
@@ -467,6 +479,7 @@
             order_id: order_id,
             fill_atoms: amount_atoms.toString(),
             destination: destination,
+            nonce: order_details.nonce.toString()
           },
           utxo: null,
         })
@@ -572,8 +585,14 @@
       return client.signTransaction(tx);
     },
 
-    fillOrder: async ({ order, amount }) => {
-      const tx = await client.buildTransaction({ type: 'FillOrder', params: { order, amount } });
+    fillOrder: async ({ order_id, amount, destination }) => {
+      const response = await fetch(`${getApiServer()}/order/${order_id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch order');
+      }
+      const data = await response.json();
+      const order_details = data;
+      const tx = await client.buildTransaction({ type: 'FillOrder', params: { order_id, amount, order_details, destination } });
       return client.signTransaction(tx);
     },
 
@@ -619,6 +638,22 @@
         '[Mintlayer SDK] Warning: Sharing xPub exposes all derived addresses. Use with caution.'
       );
       return client.request({ method: 'getXPub' });
+    },
+
+    broadcastTx: async (tx) => {
+      const response = await fetch(`${getApiServer()}/transaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: tx
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to broadcast transaction');
+      }
+      const data = await response.json();
+      return data;
     },
 
     // Event subscription
