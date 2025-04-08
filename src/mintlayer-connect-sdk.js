@@ -9,6 +9,53 @@
 
   let connectedAddresses = [];
 
+  // helpers
+  const selectUTXOs = (utxos, amount, outputType, token_id) => {
+    if(outputType === 'Transfer') {
+      return selectUTXOsForTransfer(utxos, amount, token_id);
+    }
+  }
+
+  const selectUTXOsForTransfer = (utxos, amount, token_id) => {
+    utxos = utxos.filter((utxo)=>utxo.utxo.type === 'Transfer' || utxo.utxo.type === 'LockThenTransfer').filter((utxo) => {
+      if(token_id === null){
+        return true;
+      }
+      return utxo.utxo.value.token_id === token_id;
+    });
+
+    console.log('utxos', utxos);
+
+    let balance = BigInt(0)
+    const utxosToSpend = []
+    let lastIndex = 0
+
+    // take biggest UTXOs first
+    utxos.sort((a, b) => {
+      return b.utxo.value.amount.atoms - a.utxo.value.amount.atoms
+    })
+
+    for (let i = 0; i < utxos.length; i++) {
+      lastIndex = i
+      const utxoBalance = BigInt(utxos[i].utxo.value.amount.atoms);
+      if (balance < BigInt(amount)) {
+        balance += utxoBalance
+        utxosToSpend.push(utxos[i])
+      } else {
+        break
+      }
+    }
+
+    if (balance === BigInt(amount)) {
+      // pick up extra UTXO
+      if (utxos[lastIndex + 1]) {
+        utxosToSpend.push(utxos[lastIndex + 1])
+      }
+    }
+
+    return utxosToSpend
+  }
+
   const client = {
     isMintlayer: true,
 
@@ -185,6 +232,28 @@
       // if (connectedAddresses.length === 0) throw new Error('No addresses connected');
       if (!params) throw new Error('Missing params');
 
+      console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
+
+      const { address } = await client.request({ method: 'checkConnection' });
+      const currentAddress = address[network];
+      const addressList = [...currentAddress.receiving, ...currentAddress.change];
+
+      const response = await fetch('https://api.mintini.app' + '/account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ addresses: addressList, network: network === 'mainnet' ? 0 : 1 })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch utxos');
+      }
+      const data = await response.json();
+      const utxos = data.utxos;
+
+      console.log('[Mintlayer Connect SDK] UTXOs:', utxos);
+
       let tx;
       let fee;
       const inputs = [];
@@ -192,6 +261,8 @@
 
       let input_amount_coin_req = 0n;
       let input_amount_token_req = 0n;
+
+      let send_token;
 
       // Step 1. Gather necessary inputs and outputs for the transaction
       if(type === 'Transfer') {
@@ -233,6 +304,7 @@
           atoms: '10000000000000',
           decimal: '100'
         }
+
         inputs.push({
           input: {
             amount,
@@ -255,12 +327,15 @@
       }
 
       if(type === 'CreateOrder') {
+        console.log('params====', params);
         const {
           ask_amount,
-          ask_token_id,
+          ask_token,
           give_amount,
-          give_token_id,
-          conclude_address
+          give_token,
+          conclude_destination,
+          //ask_token_details,
+          //give_token_details,
         } = params;
         const give_token_details = {
           number_of_decimals: 11, // TODO
@@ -269,7 +344,7 @@
           number_of_decimals: 11, // TODO
         }
 
-        if(give_token_id === 'Coin') {
+        if(give_token === 'Coin') {
           input_amount_coin_req += BigInt(give_amount * Math.pow(10, 11));
         } else {
           input_amount_token_req += BigInt(give_amount * Math.pow(10, give_token_details.number_of_decimals));
@@ -281,25 +356,25 @@
             "atoms": ask_amount * Math.pow(10, 11),
             "decimal": ask_amount
           },
-          "ask_currency": ask_token_id === 'Coin'
+          "ask_currency": ask_token === 'Coin'
             ? {
               "type": "Coin"
             }
             : {
-              "token_id": ask_token_id,
+              "token_id": ask_token,
               "type": "Token"
             },
-          "conclude_destination": conclude_address,
+          "conclude_destination": conclude_destination,
           "give_balance": {
             "atoms": give_amount * Math.pow(10, give_token_details.number_of_decimals),
             "decimal": give_amount
           },
-          "give_currency": give_token_id === 'Coin'
+          "give_currency": give_token === 'Coin'
             ? {
               "type": "Coin"
             }
             : {
-              "token_id": give_token_id,
+              "token_id": give_token,
               "type": "Token"
             },
           "initially_asked": {
@@ -318,7 +393,7 @@
           order_id,
           nonce,
           conclude_destination,
-        } = params;
+        } = params.order;
         inputs.push({
           input: {
             type: "ConcludeOrder",
@@ -397,9 +472,61 @@
         })
       }
 
+      console.log('inputs', inputs);
+      console.log('outputs', outputs);
+
       // Check if the transaction requires additional inputs to pay fee or transfer
+      fee = BigInt(0.5 * Math.pow(10, 11));
+
+      input_amount_coin_req += fee;
+
+      const inputObjCoin = selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null);
+      console.log('inputObjCoin', inputObjCoin);
+      const inputObjToken = send_token?.token_id ? selectUTXOs(utxos, input_amount_token_req, 'Transfer', send_token?.token_id) : [];
+
+      const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo.value.amount.atoms), 0n);
+      const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo.value.amount.atoms), 0n);
+
+      const changeAmountCoin = totalInputValueCoin - input_amount_coin_req - fee - fee;
+      const changeAmountToken = totalInputValueToken - input_amount_token_req;
 
       // Give a change output if needed
+      // step 4. Add change if necessary
+      if (changeAmountCoin > 0) {
+        outputs.push({
+          type: 'Transfer',
+          value: {
+            type: 'Coin',
+            amount: {
+              atoms: changeAmountCoin.toString(),
+              decimal: (changeAmountCoin.toString() / 1e11).toString(),
+            },
+          },
+          destination: currentAddress.change[0], // TODO: change address
+        });
+      }
+
+      // const changeAmountToken = 0
+      //
+      // if (changeAmountToken > 0) {
+      //   const decimals = sendToken.token_details.number_of_decimals;
+      //
+      //   outputs.push({
+      //     type: 'Transfer',
+      //     value: {
+      //       type: 'TokenV1',
+      //       token_id: sendToken.token_id,
+      //       amount: {
+      //         atoms: changeAmountToken.toString(),
+      //         decimal: (changeAmountToken.toString() / Math.pow(10, decimals)).toString(),
+      //       },
+      //     },
+      //     destination: addresses[0], // change address
+      //   });
+      // }
+
+      inputs.push(...inputObjCoin)
+      inputs.push(...inputObjToken)
 
       const JSONRepresentation = {
         inputs,
@@ -461,7 +588,15 @@
       return orders;
     },
 
-    concludeOrder: async ({ order }) => {
+    concludeOrder: async ({ order_id }) => {
+      // fetch data for order
+      const response = await fetch(`${getApiServer()}/order/${order_id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch order');
+      }
+      const data = await response.json();
+      const order = data;
+
       const tx = await client.buildTransaction({ type: 'ConcludeOrder', params: { order } });
       return client.signTransaction(tx);
     },

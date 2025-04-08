@@ -246,7 +246,7 @@
     try {
       console.log('window.mintlayer', window.mintlayer);
       const tokens = await window.mintlayer.getTokensOwned();
-      displayOutput(`Available tokens: ${JSON.stringify(tokens, null, 2)}`);
+      displayOutput(`Owned tokens: ${JSON.stringify(tokens, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
