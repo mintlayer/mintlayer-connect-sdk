@@ -16,6 +16,14 @@
     }
   }
 
+  const stringToHex = (str) => {
+    let hex = ''
+    for (let i = 0; i < str.length; i++) {
+      hex += str.charCodeAt(i).toString(16)
+    }
+    return hex
+  }
+
   const selectUTXOsForTransfer = (utxos, amount, token_id) => {
     utxos = utxos.filter((utxo)=>utxo.utxo.type === 'Transfer' || utxo.utxo.type === 'LockThenTransfer').filter((utxo) => {
       if(token_id === null){
@@ -263,7 +271,7 @@
       console.log('[Mintlayer Connect SDK] UTXOs:', utxos);
 
       let tx;
-      let fee;
+      let fee = 0n;
       const inputs = [];
       const outputs = [];
 
@@ -298,12 +306,31 @@
 
       if(type === 'IssueFungibleToken') {
         console.log('params', params);
-        // fee = 1 * Math.pow(10, 11);
+        fee = BigInt(100 * Math.pow(10, 11).toString());
         // const { tokenData } = params;
         // assuming that token data is exactly as IssueFungibleToken output
         outputs.push({
-          type: 'IssueFungibleToken',
-          ...params,
+          authority: params.authority,
+          is_freezable: params.is_freezable,
+          metadata_uri: {
+            hex: stringToHex(params.metadata_uri),
+            string: params.metadata_uri,
+          },
+          number_of_decimals: params.number_of_decimals,
+          token_ticker: {
+            hex: stringToHex(params.token_ticker),
+            string: params.token_ticker
+          },
+          total_supply: params.supply_type === 'Unlimited' ? {
+            type: "Unlimited"
+          } : {
+            type: "Fixed",
+            amount: {
+              atoms: params.supply_amount * Math.pow(10, params.number_of_decimals),
+              decimal: params.supply_amount
+            }
+          },
+          type: 'IssueFungibleToken'
         });
       }
 
@@ -313,13 +340,16 @@
           decimal: '100'
         }
 
+        fee += BigInt((50 * Math.pow(10, 11)).toString());
+
         inputs.push({
           input: {
             amount,
             command: "MintTokens",
             input_type: "AccountCommand",
-            nonce: 0,
+            nonce: params.token_details.next_nonce || 0,
             token_id: params.token_id,
+            authority: params.token_details.authority,
           },
           utxo: null,
         });
@@ -489,7 +519,7 @@
       console.log('outputs', outputs);
 
       // Check if the transaction requires additional inputs to pay fee or transfer
-      fee = BigInt(0.5 * Math.pow(10, 11));
+      fee += BigInt(2 * Math.pow(10, 11).toString());
 
       input_amount_coin_req += fee;
 
@@ -570,13 +600,26 @@
       return client.signTransaction(tx);
     },
 
-    issueToken: async ({ tokenData, authority }) => {
-      const tx = await client.buildTransaction({ type: 'IssueFungibleToken', params: { ...tokenData, authority } });
+    issueToken: async ({ authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, supply_type, supply_amount }) => {
+      const tx = await client.buildTransaction({
+        type: 'IssueFungibleToken',
+        params: {
+          authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, supply_type, supply_amount
+        }
+      });
       return client.signTransaction(tx);
     },
 
+    // TODO remove nonce when api server is fixed
     mintToken: async ({ destination, amount, token_id }) => {
-      const tx = await client.buildTransaction({ type: 'MintToken', params: { destination, amount, token_id } });
+      const request = await fetch(`${getApiServer()}/token/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      const token_details = token;
+
+      const tx = await client.buildTransaction({ type: 'MintToken', params: { destination, amount, token_id, token_details } });
       return client.signTransaction(tx);
     },
 
@@ -650,7 +693,13 @@
       });
 
       if (!response.ok) {
-        throw new Error('Failed to broadcast transaction');
+        const error_json = await response.json();
+        console.log('error_json', error_json);
+        const match = error_json.error.match(/message: "(.*?)"/);
+        console.log('match', match);
+        const errorMessage = match ? match[1] : null;
+
+        throw new Error('Failed to broadcast transaction: ' + errorMessage);
       }
       const data = await response.json();
       return data;

@@ -88,6 +88,19 @@
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Issue Token</h3>
                 <div class="space-y-4">
                     <input type="text" id="authority" placeholder="Authority Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_token_ticker" placeholder="Token Ticker" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_token_metadata_uri" placeholder="Metadata URI" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_token_number_of_decimals" placeholder="Number of Decimals" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <select name="issue_token_supply_type" id="issue_token_supply_type" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="">Token Supply Type</option>
+                        <option value="Fixed">Fixed</option>
+                        <option value="Unlimited">Unlimited</option>
+                    </select>
+                    <input type="text" id="issue_token_supply_amount" placeholder="Supply Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <label class="inline-flex items-center mt-3">
+                        <input type="checkbox" id="issue_token_is_freezable" class="form-checkbox h-5 w-5 text-blue-600 transition duration-150 ease-in-out">
+                        <span class="ml-2 text-gray-700">Is Freezable</span>
+                    </label>
                     <button onclick="issueToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
                 </div>
             </div>
@@ -293,6 +306,12 @@
 
   async function issueToken() {
     const authority = document.getElementById('authority').value;
+    const is_freezable = document.getElementById('issue_token_is_freezable').checked;
+    const metadata_uri = document.getElementById('issue_token_metadata_uri').value;
+    const number_of_decimals = document.getElementById('issue_token_number_of_decimals').value;
+    const token_ticker = document.getElementById('issue_token_ticker').value;
+    const supply_type = document.getElementById('issue_token_supply_type').value;
+    const supply_amount = document.getElementById('issue_token_supply_amount').value;
 
     if (!authority) {
       displayOutput('Please provide authority.');
@@ -301,18 +320,16 @@
 
     try {
       const tokenData = {
-        is_freezable: false,
-        metadata_uri: {
-          hex: "68747470733a2f2f6578616d706c652e636f6d2f646174612e6a736f6e",
-          string: "https://example.com/data.json"
-        },
-        number_of_decimals: 8,
-        token_ticker: { hex: "4c4c4c", string: "LLL" },
-        total_supply: { type: "Unlimited" },
-        type: 'IssueFungibleToken'
+        authority,
+        is_freezable,
+        metadata_uri,
+        number_of_decimals,
+        token_ticker,
+        supply_type,
+        supply_amount,
       };
 
-      const issueResult = await window.mintlayer.issueToken({ tokenData, authority });
+      const issueResult = await window.mintlayer.issueToken({ ...tokenData, authority });
       displayOutput(`Issue token result: ${JSON.stringify(issueResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);

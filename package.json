@@ -1,14 +1,19 @@
 {
   "name": "mintlayer-connect-sdk",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "build": "mkdir -p dist && cp src/mintlayer-connect-sdk.js dist/",
-    "serve": "npx http-server . -p 8080",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "pnpm -r build",
+    "build:sdk": "pnpm --filter @mintlayer/mintlayer-connect-sdk build",
+    "build:react": "pnpm --filter @mintlayer/react-mintlayer build",
+    "publish:sdk": "pnpm --filter @mintlayer/mintlayer-connect-sdk publish --access public",
+    "publish:react": "pnpm --filter @mintlayer/react-mintlayer publish --access public",
+    "publish:all": "pnpm -r publish --access public"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0",
+    "ts-loader": "^9.0.0"
+  }
 }

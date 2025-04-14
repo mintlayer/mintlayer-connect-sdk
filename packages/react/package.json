@@ -1,0 +1,23 @@
+{
+  "name": "@mintlayer/react-mintlayer",
+  "version": "0.1.0",
+  "main": "dist/react-mintlayer.js",
+  "types": "dist/react-mintlayer.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc && webpack"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mintlayer/mintlayer-connect-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0",
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0",
+    "ts-loader": "^9.0.0"
+  }
+}
