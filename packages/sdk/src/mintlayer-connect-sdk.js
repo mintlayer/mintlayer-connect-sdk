@@ -27,7 +27,7 @@
   const selectUTXOsForTransfer = (utxos, amount, token_id) => {
     utxos = utxos.filter((utxo)=>utxo.utxo.type === 'Transfer' || utxo.utxo.type === 'LockThenTransfer').filter((utxo) => {
       if(token_id === null){
-        return true;
+        return utxo.utxo.value.type === 'Coin';
       }
       return utxo.utxo.value.token_id === token_id;
     });
@@ -282,8 +282,18 @@
 
       // Step 1. Gather necessary inputs and outputs for the transaction
       if(type === 'Transfer') {
-        const token_id = params.token_id || 'Coin';
-        input_amount_coin_req += BigInt(params.amount * Math.pow(10, 11));
+        const token_id = params.token_id ? params.token_id : 'Coin';
+
+        if (token_id === 'Coin') {
+          input_amount_coin_req += BigInt(params.amount * Math.pow(10, 11))
+        } else {
+          input_amount_token_req += BigInt(params.amount * Math.pow(10, params?.number_of_decimals || 11))
+          send_token = {
+            token_id,
+            number_of_decimals: params?.number_of_decimals || 11,
+          }
+        }
+
         outputs.push({
           type: 'Transfer',
           destination: params.to,
@@ -304,9 +314,67 @@
         });
       }
 
+      if(type === 'BurnToken') {
+        const token_id = params.token_id;
+        const token_details = params.token_details;
+
+        if (token_id === 'Coin') {
+          input_amount_coin_req += BigInt(params.amount * Math.pow(10, 11))
+        } else {
+          input_amount_token_req += BigInt(params.amount * Math.pow(10, token_details.number_of_decimals || 11))
+          send_token = {
+            token_id,
+            number_of_decimals: token_details.number_of_decimals || 11,
+          }
+        }
+
+        outputs.push({
+          type: 'BurnToken',
+          value: {
+            ...(
+              token_id === 'Coin'
+                ? { type: 'Coin' }
+                : {
+                  type: 'TokenV1',
+                  token_id,
+                }
+            ),
+            amount: {
+              decimal: params.amount.toString(),
+              atoms: (params.amount * Math.pow(10, 11)).toString(),
+            },
+          }
+        });
+      }
+
       if(type === 'IssueFungibleToken') {
         console.log('params', params);
         fee = BigInt(100 * Math.pow(10, 11).toString());
+
+        let total_supply;
+
+        if(params.supply_type === 'Unlimited') {
+          total_supply = {
+            type: "Unlimited"
+          }
+        }
+
+        if(params.supply_type === 'Lockable') {
+          total_supply = {
+            type: "Lockable",
+          }
+        }
+
+        if(params.supply_type === 'Fixed') {
+          total_supply = {
+            type: "Fixed",
+            amount: {
+              atoms: params.supply_amount * Math.pow(10, params.number_of_decimals),
+              decimal: params.supply_amount
+            }
+          }
+        }
+
         // const { tokenData } = params;
         // assuming that token data is exactly as IssueFungibleToken output
         outputs.push({
@@ -321,23 +389,15 @@
             hex: stringToHex(params.token_ticker),
             string: params.token_ticker
           },
-          total_supply: params.supply_type === 'Unlimited' ? {
-            type: "Unlimited"
-          } : {
-            type: "Fixed",
-            amount: {
-              atoms: params.supply_amount * Math.pow(10, params.number_of_decimals),
-              decimal: params.supply_amount
-            }
-          },
+          total_supply: total_supply,
           type: 'IssueFungibleToken'
         });
       }
 
       if(type === 'MintToken') {
         const amount = {
-          atoms: '10000000000000',
-          decimal: '100'
+          atoms: (params.amount * Math.pow(10, params.token_details.number_of_decimals || 11)).toString(),
+          decimal: params.amount.toString(),
         }
 
         fee += BigInt((50 * Math.pow(10, 11)).toString());
@@ -360,6 +420,189 @@
             type: 'TokenV1',
             token_id: params.token_id,
             amount
+          },
+        })
+      }
+
+      if(type === 'UnmintToken') {
+        const amount = {
+          atoms: '10000000000000',
+          decimal: '100'
+        }
+
+        fee += BigInt((50 * Math.pow(10, 11)).toString());
+
+        const token_id = params.token_id;
+        const token_details = params.token_details;
+
+        input_amount_token_req += BigInt(params.amount * Math.pow(10, token_details.number_of_decimals || 11))
+        send_token = {
+          token_id,
+          number_of_decimals: token_details.number_of_decimals || 11,
+        }
+
+        inputs.push({
+          input: {
+            amount,
+            command: "UnmintTokens",
+            input_type: "AccountCommand",
+            nonce: params.token_details.next_nonce || 0,
+            token_id: params.token_id,
+            authority: params.token_details.authority,
+          },
+          utxo: null,
+        });
+      }
+
+      if(type === 'LockTokenSupply') {
+        fee += BigInt((50 * Math.pow(10, 11)).toString());
+
+        const token_id = params.token_id;
+        const token_details = params.token_details;
+
+        inputs.push({
+          input: {
+            command: "LockTokenSupply",
+            input_type: "AccountCommand",
+            nonce: params.token_details.next_nonce || 0,
+            token_id: token_id,
+            authority: params.token_details.authority,
+          },
+          utxo: null,
+        });
+      }
+
+      if(type === 'ChangeTokenAuthority') {
+        fee += BigInt((50 * Math.pow(10, 11)).toString());
+
+        const token_id = params.token_id;
+        const token_details = params.token_details;
+
+        inputs.push({
+          input: {
+            command: "ChangeTokenAuthority",
+            input_type: "AccountCommand",
+            new_authority: params.new_authority,
+            nonce: params.token_details.next_nonce || 0,
+            token_id: token_id,
+            authority: params.token_details.authority,
+          },
+          utxo: null,
+        });
+      }
+
+      if(type === 'ChangeMetadataUri') {
+        fee += BigInt((50 * Math.pow(10, 11)).toString());
+
+        const token_id = params.token_id;
+        const token_details = params.token_details;
+
+        inputs.push({
+          input: {
+            command: "ChangeMetadataUri",
+            input_type: "AccountCommand",
+            new_metadata_uri: params.new_metadata_uri,
+            nonce: params.token_details.next_nonce || 0,
+            token_id: token_id,
+            authority: params.token_details.authority,
+          },
+          utxo: null,
+        });
+      }
+
+      if(type === 'FreezeToken') {
+        fee += BigInt((50 * Math.pow(10, 11)).toString());
+
+        const token_id = params.token_id;
+        const token_details = params.token_details;
+
+        inputs.push({
+          input: {
+            command: "FreezeToken",
+            input_type: "AccountCommand",
+            is_unfreezable: params.is_unfreezable,
+            nonce: params.token_details.next_nonce || 0,
+            token_id: token_id,
+            authority: params.token_details.authority,
+          },
+          utxo: null,
+        });
+      }
+
+      if(type === 'UnfreezeToken') {
+        fee += BigInt((50 * Math.pow(10, 11)).toString());
+
+        const token_id = params.token_id;
+        const token_details = params.token_details;
+
+        inputs.push({
+          input: {
+            command: "UnfreezeToken",
+            input_type: "AccountCommand",
+            nonce: params.token_details.next_nonce || 0,
+            token_id: token_id,
+            authority: params.token_details.authority,
+          },
+          utxo: null,
+        });
+      }
+
+      if(type === 'DataDeposit') {
+        fee += BigInt((100 * Math.pow(10, 11)).toString());
+        outputs.push({
+          type: 'DataDeposit',
+          data: params.data,
+        })
+      }
+
+      if(type === 'CreateDelegationId') {
+        fee += BigInt((1 * Math.pow(10, 11)).toString());
+        outputs.push({
+          type: 'CreateDelegationId',
+          destination: params.destination,
+          pool_id: params.pool_id,
+        })
+      }
+
+      if(type === 'DelegationStake') {
+        const {
+          pool_id,
+          delegation_id,
+          amount,
+          destination,
+        } = params;
+
+        const amount_atoms = amount * Math.pow(10, 11);
+        input_amount_coin_req += BigInt(params.amount * Math.pow(10, 11))
+
+        outputs.push({
+          type: "DelegateStaking",
+          delegation_id,
+          amount: {
+            atoms: amount_atoms.toString(),
+            decimal: amount.toString(),
+          },
+        })
+      }
+
+      if(type === 'DelegationWithdraw') {
+        const {
+          pool_id,
+          delegation_id,
+          amount,
+          destination,
+        } = params;
+
+        const amount_atoms = amount * Math.pow(10, 11);
+
+        inputs.push({
+          input: {
+            type: "DelegationWithdraw",
+            delegation_id,
+          },
+          amount: {
+            atoms: amount_atoms.toString(),
+            decimal: amount.toString(),
           },
         })
       }
@@ -530,7 +773,7 @@
       const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo.value.amount.atoms), 0n);
       const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo.value.amount.atoms), 0n);
 
-      const changeAmountCoin = totalInputValueCoin - input_amount_coin_req - fee - fee;
+      const changeAmountCoin = totalInputValueCoin - input_amount_coin_req - fee;
       const changeAmountToken = totalInputValueToken - input_amount_token_req;
 
       // Give a change output if needed
@@ -549,24 +792,22 @@
         });
       }
 
-      // const changeAmountToken = 0
-      //
-      // if (changeAmountToken > 0) {
-      //   const decimals = sendToken.token_details.number_of_decimals;
-      //
-      //   outputs.push({
-      //     type: 'Transfer',
-      //     value: {
-      //       type: 'TokenV1',
-      //       token_id: sendToken.token_id,
-      //       amount: {
-      //         atoms: changeAmountToken.toString(),
-      //         decimal: (changeAmountToken.toString() / Math.pow(10, decimals)).toString(),
-      //       },
-      //     },
-      //     destination: addresses[0], // change address
-      //   });
-      // }
+      if (changeAmountToken > 0) {
+        const decimals = send_token?.number_of_decimals;
+
+        outputs.push({
+          type: 'Transfer',
+          value: {
+            type: 'TokenV1',
+            token_id: send_token?.token_id,
+            amount: {
+              atoms: changeAmountToken.toString(),
+              decimal: (changeAmountToken.toString() / Math.pow(10, decimals)).toString(),
+            },
+          },
+          destination: currentAddress.change[0], // TODO: change address
+        });
+      }
 
       inputs.push(...inputObjCoin)
       inputs.push(...inputObjToken)
@@ -623,6 +864,79 @@
       return client.signTransaction(tx);
     },
 
+    // TODO remove nonce when api server is fixed
+    unmintToken: async ({ amount, token_id }) => {
+      const request = await fetch(`${getApiServer()}/token/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      const token_details = token;
+
+      const tx = await client.buildTransaction({ type: 'UnmintToken', params: { amount, token_id, token_details } });
+      return client.signTransaction(tx);
+    },
+
+    lockTokenSupply: async ({ token_id }) => {
+      const request = await fetch(`${getApiServer()}/token/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      const token_details = token;
+
+      const tx = await client.buildTransaction({ type: 'LockTokenSupply', params: { token_id, token_details } });
+      return client.signTransaction(tx);
+    },
+
+    changeTokenAuthority: async ({ token_id, new_authority }) => {
+      const request = await fetch(`${getApiServer()}/token/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      const token_details = token;
+
+      const tx = await client.buildTransaction({ type: 'ChangeTokenAuthority', params: { token_id, new_authority, token_details } });
+      return client.signTransaction(tx);
+    },
+
+    changeMetadataUri: async ({ token_id, new_metadata_uri }) => {
+      const request = await fetch(`${getApiServer()}/token/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      const token_details = token;
+
+      const tx = await client.buildTransaction({ type: 'ChangeMetadataUri', params: { token_id, new_metadata_uri, token_details } });
+      return client.signTransaction(tx);
+    },
+
+    freezeToken: async ({ token_id, is_unfreezable }) => {
+      const request = await fetch(`${getApiServer()}/token/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      const token_details = token;
+
+      const tx = await client.buildTransaction({ type: 'FreezeToken', params: { token_id, is_unfreezable, token_details } });
+      return client.signTransaction(tx);
+    },
+
+    unfreezeToken: async ({ token_id }) => {
+      const request = await fetch(`${getApiServer()}/token/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      const token_details = token;
+
+      const tx = await client.buildTransaction({ type: 'UnfreezeToken', params: { token_id, token_details } });
+      return client.signTransaction(tx);
+    },
+
     createOrder: async ({ conclude_destination, ask_token, ask_amount, give_token, give_amount }) => {
       const tx = await client.buildTransaction({ type: 'CreateOrder', params: { conclude_destination, ask_token, ask_amount, give_token, give_amount } });
       return client.signTransaction(tx);
@@ -668,8 +982,44 @@
       return client.signTransaction({...tx, intent});
     },
 
+    burn: async ({ token_id, amount }) => {
+      let token_details = null;
+
+      if(token_id !== 'Coin' || token_id !== null) {
+        const request = await fetch(`${getApiServer()}/token/${token_id}`);
+        if (!request.ok) {
+          throw new Error('Failed to fetch token');
+        }
+        token_details = await request.json();
+      }
+
+      const tx = await client.buildTransaction({ type: 'BurnToken', params: { token_id, amount, token_details } });
+      return client.signTransaction(tx);
+    },
+
+    dataDeposit: async ({ data }) => {
+      const tx = await client.buildTransaction({ type: 'DataDeposit', params: { data } });
+      return client.signTransaction(tx);
+    },
+
+    delegationCreate: async ({ pool_id, destination }) => {
+      const tx = await client.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
+      return client.signTransaction(tx);
+    },
+
+    delegationStake: async ({ pool_id, delegation_id, amount }) => {
+      const tx = await client.buildTransaction({ type: 'DelegationStake', params: { delegation_id, pool_id, amount } });
+      return client.signTransaction(tx);
+    },
+
+    delegationWithdraw: async ({ pool_id, delegation_id, amount }) => {
+      const tx = await client.buildTransaction({ type: 'DelegationWithdraw', params: { delegation_id, pool_id, amount } });
+      return client.signTransaction(tx);
+    },
+
     // Send transaction to wallet for signing
     signTransaction: async (tx) => {
+      console.log('tx', tx);
       return client.request({
         method: 'signTransaction',
         params: { txData: tx }

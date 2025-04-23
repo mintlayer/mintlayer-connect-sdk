@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
-    "build:sdk": "pnpm --filter @mintlayer/mintlayer-connect-sdk build",
-    "build:react": "pnpm --filter @mintlayer/react-mintlayer build",
-    "publish:sdk": "pnpm --filter @mintlayer/mintlayer-connect-sdk publish --access public",
-    "publish:react": "pnpm --filter @mintlayer/react-mintlayer publish --access public",
-    "publish:all": "pnpm -r publish --access public"
+    "build:sdk": "pnpm --filter @mintlayer/sdk build",
+    "build:react": "pnpm --filter @mintlayer/react build",
+    "publish:sdk": "pnpm --filter @mintlayer/sdk publish --access public",
+    "publish:react": "pnpm --filter @mintlayer/react publish --access public",
+    "publish:all": "pnpm -r publish --access public",
+    "serve": "npx http-server . -p 8080"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

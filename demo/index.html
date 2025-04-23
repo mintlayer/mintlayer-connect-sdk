@@ -47,12 +47,25 @@
             <div class="grid grid-cols-3 gap-4">
                 <button onclick="toggleSection('transfer')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Transfer</button>
                 <button onclick="toggleSection('signTx')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Sign Tx</button>
+                <button onclick="toggleSection('issueNft')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Issue NFT</button>
                 <button onclick="toggleSection('issueToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Issue Token</button>
                 <button onclick="toggleSection('mintToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Mint Token</button>
+                <button onclick="toggleSection('unmintToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Unmint Token</button>
+                <button onclick="toggleSection('lockTokenSupply')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Lock Supply</button>
+                <button onclick="toggleSection('changeTokenAuthority')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Change Token Authority</button>
+                <button onclick="toggleSection('changeTokenMetadata')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Change Token Metadata</button>
                 <button onclick="toggleSection('createOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Create Order</button>
                 <button onclick="toggleSection('fillOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Fill Order (DEX)</button>
                 <button onclick="toggleSection('concludeOrder')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Conclude Order</button>
+                <button onclick="toggleSection('bridgeRequest')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Bridge Request</button>
                 <button onclick="toggleSection('broadcastTx')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Broadcast</button>
+                <button onclick="toggleSection('freezeToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Freeze Token</button>
+                <button onclick="toggleSection('unfreezeToken')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Unfreeze Token</button>
+                <button onclick="toggleSection('burn')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Burn</button>
+                <button onclick="toggleSection('dataDeposit')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Data Deposit</button>
+                <button onclick="toggleSection('createDelegation')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Create Delegation</button>
+                <button onclick="toggleSection('delegationStake')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Delegation Stake</button>
+                <button onclick="toggleSection('delegationWithdraw')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Delegation Withdraw</button>
             </div>
 
             <!-- Transfer Section -->
@@ -74,12 +87,13 @@
                 </div>
             </div>
 
-            <!-- Broadcast Transaction Section -->
-            <div id="broadcastTx" class="bg-white p-6 rounded-lg shadow-md hidden">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Broadcast Transaction</h3>
+            <!-- Issue NFT Section -->
+            <div id="issueNft" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Issue NFT</h3>
                 <div class="space-y-4">
-                    <textarea id="broadcast_tx" rows="5" placeholder="Transaction HEX Data" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"></textarea>
-                    <button onclick="broadcastTx()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                    <input type="text" id="issue_nft_authority" placeholder="Authority Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_metadata_uri" placeholder="Metadata URI" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="issueNft()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Issue NFT</button>
                 </div>
             </div>
 
@@ -94,6 +108,7 @@
                     <select name="issue_token_supply_type" id="issue_token_supply_type" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         <option value="">Token Supply Type</option>
                         <option value="Fixed">Fixed</option>
+                        <option value="Lockable">Lockable</option>
                         <option value="Unlimited">Unlimited</option>
                     </select>
                     <input type="text" id="issue_token_supply_amount" placeholder="Supply Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
@@ -113,6 +128,45 @@
                     <input type="text" id="mint_destination" placeholder="Destination Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="mint_amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <button onclick="mintToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Unmint Token Section -->
+            <div id="unmintToken" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Unmint Token</h3>
+                <div class="space-y-4">
+                    <input type="text" id="unmint_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="unmint_amount" placeholder="Amount to Unmint" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="unmintToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Unmint</button>
+                </div>
+            </div>
+
+            <!-- Lock Token Supply Section -->
+            <div id="lockTokenSupply" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Lock Token Supply</h3>
+                <div class="space-y-4">
+                    <input type="text" id="lock_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="lockTokenSupply()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Lock Supply</button>
+                </div>
+            </div>
+
+            <!-- Change Token Authority Section -->
+            <div id="changeTokenAuthority" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Change Token Authority</h3>
+                <div class="space-y-4">
+                    <input type="text" id="change_authority_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="change_authority_new_authority" placeholder="New Authority Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="changeTokenAuthority()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Change Authority</button>
+                </div>
+            </div>
+
+            <!-- Change Token Metadata Section -->
+            <div id="changeTokenMetadata" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Change Token Metadata</h3>
+                <div class="space-y-4">
+                    <input type="text" id="change_metadata_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="change_metadata_uri" placeholder="New Metadata URI" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="changeTokenMetadata()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Change Metadata</button>
                 </div>
             </div>
 
@@ -148,6 +202,100 @@
                     <button onclick="concludeOrder()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
                 </div>
             </div>
+
+            <!-- Bridge Request Section -->
+            <div id="bridgeRequest" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Bridge Request</h3>
+                <div class="space-y-4">
+                    <input type="text" id="bridge_intent" placeholder="Intent Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="bridge_amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="bridge_destination" placeholder="Bridge Address Destination" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="bridge_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="bridgeRequest()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Broadcast Transaction Section -->
+            <div id="broadcastTx" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Broadcast Transaction</h3>
+                <div class="space-y-4">
+                    <textarea id="broadcast_tx" rows="5" placeholder="Transaction HEX Data" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none resize-none"></textarea>
+                    <button onclick="broadcastTx()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
+                </div>
+            </div>
+
+            <!-- Freeze Token Section -->
+            <div id="freezeToken" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Freeze Token</h3>
+                <div class="space-y-4">
+                    <input type="text" id="freeze_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <label class="inline-flex items-center mt-3">
+                        <input type="checkbox" id="freeze_token_is_unfreezable" class="form-checkbox h-5 w-5 text-blue-600 transition duration-150 ease-in-out">
+                        <span class="ml-2 text-gray-700">Is Unfreezable</span>
+                    </label>
+                    <button onclick="freezeToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Freeze</button>
+                </div>
+            </div>
+
+            <!-- Unfreeze Token Section -->
+            <div id="unfreezeToken" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Unfreeze Token</h3>
+                <div class="space-y-4">
+                    <input type="text" id="unfreeze_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="unfreezeToken()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Unfreeze</button>
+                </div>
+            </div>
+
+            <!-- Burn Section -->
+            <div id="burn" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Burn</h3>
+                <div class="space-y-4">
+                    <input type="text" id="burn_token_id" placeholder="Token ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="burn_amount" placeholder="Amount to Burn" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="burn()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Burn</button>
+                </div>
+            </div>
+
+            <!-- Data Deposit Section -->
+            <div id="dataDeposit" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Data Deposit</h3>
+                <div class="space-y-4">
+                    <input type="text" id="data_deposit_data" placeholder="Data to Deposit" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="dataDeposit()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Deposit</button>
+                </div>
+            </div>
+
+            <!-- Create Delegation Section -->
+            <div id="createDelegation" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Create Delegation</h3>
+                <div class="space-y-4">
+                    <input type="text" id="delegation_create_pool_id" placeholder="Pool ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="delegation_create_destination" placeholder="Destination Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="createDelegation()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Create Delegation</button>
+                </div>
+            </div>
+
+            <!-- Delegation Stake Section -->
+            <div id="delegationStake" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Delegation Stake</h3>
+                <div class="space-y-4">
+                    <input type="text" id="delegation_stake_pool_id" placeholder="Pool ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="delegation_stake_delegation_id" placeholder="Delegation ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="delegation_stake_amount" placeholder="Amount to Stake" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="delegationStake()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Stake</button>
+                </div>
+            </div>
+
+            <!-- Delegation Withdraw Section -->
+            <div id="delegationWithdraw" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Delegation Withdraw</h3>
+                <div class="space-y-4">
+                    <input type="text" id="delegation_withdraw_pool_id" placeholder="Pool ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="delegation_withdraw_delegation_id" placeholder="Delegation ID" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="delegation_withdraw_amount" placeholder="Amount to Withdraw" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="delegationWithdraw()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Withdraw</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -158,8 +306,7 @@
     </div>
 </div>
 
-<script src="../src/mintlayer-wasm-lib/release/wasm_wrappers.js"></script>
-<script src="../src/mintlayer-connect-sdk.js"></script>
+<script src="../packages/sdk/src/mintlayer-connect-sdk.js"></script>
 <script>
   function changeNetwork() {
     const network = document.getElementById('network').value;
@@ -168,7 +315,13 @@
   }
 
   function toggleSection(sectionId) {
-    const sections = ['transfer', 'signTx', 'issueToken', 'mintToken', 'createOrder', 'fillOrder', 'concludeOrder', 'broadcastTx'];
+    const sections = [
+      'transfer', 'signTx', 'issueNft', 'issueToken', 'mintToken', 'unmintToken',
+      'lockTokenSupply', 'changeTokenAuthority', 'changeTokenMetadata', 'createOrder',
+      'fillOrder', 'concludeOrder', 'bridgeRequest', 'broadcastTx', 'freezeToken',
+      'unfreezeToken', 'burn', 'dataDeposit', 'createDelegation', 'delegationStake',
+      'delegationWithdraw'
+    ];
     sections.forEach(id => {
       const el = document.getElementById(id);
       if (id === sectionId) {
@@ -354,6 +507,23 @@
     }
   }
 
+  async function unmintToken() {
+    const amount = document.getElementById('unmint_amount').value;
+    const token_id = document.getElementById('unmint_token_id').value;
+
+    if (!amount) {
+      displayOutput('Please provide both destination and amount.');
+      return;
+    }
+
+    try {
+      const unmintResult = await window.mintlayer.unmintToken({ amount, token_id });
+      displayOutput(`Unmint token result: ${JSON.stringify(unmintResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
   async function createOrder() {
     const ask_token = document.getElementById('ask_token').value;
     const ask_amount = document.getElementById('ask_amount').value;
@@ -414,6 +584,25 @@
     }
   }
 
+  async function bridgeRequest() {
+    const intent = document.getElementById('bridge_intent').value;
+    const amount = document.getElementById('bridge_amount').value;
+    const destination = document.getElementById('bridge_destination').value;
+    const token_id = document.getElementById('bridge_token_id').value;
+
+    if (!intent || !amount || !destination) {
+      displayOutput('Please provide intent, amount, and address.');
+      return;
+    }
+
+    try {
+      const bridgeResult = await window.mintlayer.bridgeRequest({ intent, amount, destination, token_id });
+      displayOutput(`Bridge request result: ${JSON.stringify(bridgeResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
   async function signTransaction() {
     const transactionData = document.getElementById('transactionData').value;
 
@@ -441,6 +630,175 @@
     try {
       const broadcastResult = await window.mintlayer.broadcastTx(transactionData);
       displayOutput(`Broadcast transaction result: ${JSON.stringify(broadcastResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function freezeToken() {
+    const token_id = document.getElementById('freeze_token_id').value;
+    const is_unfreezable = document.getElementById('freeze_token_is_unfreezable').checked;
+
+    if (!token_id) {
+      displayOutput('Please provide both token ID and address to freeze.');
+      return;
+    }
+
+    try {
+      const freezeResult = await window.mintlayer.freezeToken({ token_id, is_unfreezable });
+      displayOutput(`Freeze token result: ${JSON.stringify(freezeResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function unfreezeToken() {
+    const token_id = document.getElementById('unfreeze_token_id').value;
+
+    if (!token_id) {
+      displayOutput('Please provide both token ID and address to unfreeze.');
+      return;
+    }
+
+    try {
+      const unfreezeResult = await window.mintlayer.unfreezeToken({ token_id });
+      displayOutput(`Unfreeze token result: ${JSON.stringify(unfreezeResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function lockTokenSupply() {
+    const token_id = document.getElementById('lock_token_id').value;
+
+    if (!token_id) {
+      displayOutput('Please provide token ID.');
+      return;
+    }
+
+    try {
+      const lockResult = await window.mintlayer.lockTokenSupply({ token_id });
+      displayOutput(`Lock token supply result: ${JSON.stringify(lockResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function changeTokenAuthority() {
+    const token_id = document.getElementById('change_authority_token_id').value;
+    const new_authority = document.getElementById('change_authority_new_authority').value;
+
+    if (!token_id || !new_authority) {
+      displayOutput('Please provide both token ID and new authority.');
+      return;
+    }
+
+    try {
+      const changeResult = await window.mintlayer.changeTokenAuthority({ token_id, new_authority });
+      displayOutput(`Change token authority result: ${JSON.stringify(changeResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function changeTokenMetadata() {
+    const token_id = document.getElementById('change_metadata_token_id').value;
+    const new_metadata_uri = document.getElementById('change_metadata_uri').value;
+
+    if (!token_id || !new_metadata_uri) {
+      displayOutput('Please provide both token ID and new metadata URI.');
+      return;
+    }
+
+    try {
+      const changeResult = await window.mintlayer.changeMetadataUri({ token_id, new_metadata_uri });
+      displayOutput(`Change token metadata result: ${JSON.stringify(changeResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function burn() {
+    const token_id = document.getElementById('burn_token_id').value;
+    const amount = document.getElementById('burn_amount').value;
+
+    if (!amount) {
+      displayOutput('Please provide amount to burn.');
+      return;
+    }
+
+    try {
+      const burnResult = await window.mintlayer.burn({ token_id, amount });
+      displayOutput(`Burn result: ${JSON.stringify(burnResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function dataDeposit() {
+    const data = document.getElementById('data_deposit_data').value;
+
+    if (!data) {
+      displayOutput('Please provide data to deposit.');
+      return;
+    }
+
+    try {
+      const depositResult = await window.mintlayer.dataDeposit({ data });
+      displayOutput(`Data deposit result: ${JSON.stringify(depositResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function delegationCreate() {
+    const pool_id = document.getElementById('delegation_create_pool_id').value;
+    const destination = document.getElementById('delegation_create_destination').value;
+
+    if (!pool_id) {
+      displayOutput('Please provide pool ID.');
+      return;
+    }
+
+    try {
+      const stakeResult = await window.mintlayer.delegationCreate({ pool_id, destination });
+      displayOutput(`Delegation stake result: ${JSON.stringify(stakeResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function delegationStake() {
+    const pool_id = document.getElementById('delegation_stake_pool_id').value;
+    const delegation_id = document.getElementById('delegation_stake_delegation_id').value;
+    const amount = document.getElementById('delegation_stake_amount').value;
+
+    if (!pool_id || !amount) {
+      displayOutput('Please provide both pool ID and amount to stake.');
+      return;
+    }
+
+    try {
+      const stakeResult = await window.mintlayer.delegationStake({ pool_id, delegation_id, amount });
+      displayOutput(`Delegation stake result: ${JSON.stringify(stakeResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function delegationWithdraw() {
+    const pool_id = document.getElementById('delegation_withdraw_pool_id').value;
+    const delegation_id = document.getElementById('delegation_withdraw_delegation_id').value;
+    const amount = document.getElementById('delegation_withdraw_amount').value;
+
+    if (!pool_id || !amount) {
+      displayOutput('Please provide both pool ID and amount to withdraw.');
+      return;
+    }
+
+    try {
+      const withdrawResult = await window.mintlayer.delegationWithdraw({ pool_id, delegation_id, amount });
+      displayOutput(`Delegation withdraw result: ${JSON.stringify(withdrawResult, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
