@@ -2,13 +2,20 @@
   "name": "@mintlayer/sdk",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/mintlayer-connect-sdk.js",
+  "types": "dist/mintlayer-connect-sdk.d.ts",
   "scripts": {
-    "build": "mkdir -p dist && cp src/mintlayer-connect-sdk.js dist/",
+    "build": "tsc",
     "serve": "npx http-server . -p 8080",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "dependencies": {
+    "@mintlayer/wasm-lib": "^0.1.0"
+  },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
 }

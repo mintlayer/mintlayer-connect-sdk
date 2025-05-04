@@ -72,6 +72,7 @@
             <div id="transfer" class="bg-white p-6 rounded-lg shadow-md hidden">
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Transfer</h3>
                 <div class="space-y-4">
+                    <input type="text" id="token_id" placeholder="Token ID (leave empty to send coin)" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="send_to" placeholder="Recipient Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <button onclick="doTransfer()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Send</button>
@@ -91,8 +92,14 @@
             <div id="issueNft" class="bg-white p-6 rounded-lg shadow-md hidden">
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Issue NFT</h3>
                 <div class="space-y-4">
-                    <input type="text" id="issue_nft_authority" placeholder="Authority Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                    <input type="text" id="issue_nft_metadata_uri" placeholder="Metadata URI" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_ticker" placeholder="Ticker" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_name" placeholder="Name" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_description" placeholder="Description" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_creator" placeholder="Creator Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_additional_metadata_uri" placeholder="Additional Metadata URI" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_icon_uri" placeholder="Icon URI" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_media_hash" placeholder="Media Hash" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="issue_nft_media_uri" placeholder="Media URI" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <button onclick="issueNft()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Issue NFT</button>
                 </div>
             </div>
@@ -306,7 +313,6 @@
     </div>
 </div>
 
-<script src="../packages/sdk/src/mintlayer-connect-sdk.js"></script>
 <script>
   function changeNetwork() {
     const network = document.getElementById('network').value;

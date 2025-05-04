@@ -1,0 +1,21 @@
+{
+  "name": "@mintlayer/demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demo for Mintlayer Connect SDK",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "webpack",
+    "serve": "npx http-server . -p 8080",
+    "start": "pnpm build && pnpm serve"
+  },
+  "dependencies": {
+    "@mintlayer/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "webpack": "^5.0.0",
+    "webpack-cli": "^4.0.0",
+    "html-webpack-plugin": "^5.0.0"
+  }
+}

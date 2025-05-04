@@ -1,0 +1,32 @@
+{
+  "name": "@mintlayer/wasm-lib",
+  "version": "0.1.0",
+  "description": "A WebAssembly library compiled from Rust for browser and Node.js",
+  "license": "MIT",
+  "main": "wasm_wrappers.js",
+  "module": "wasm_wrappers.js",
+  "types": "wasm_wrappers.d.ts",
+  "files": [
+    "wasm_wrappers.js",
+    "wasm_wrappers.d.ts",
+    "wasm_wrappers_bg.wasm",
+    "wasm_wrappers_bg.wasm.d.ts"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "wasm",
+    "webassembly",
+    "rust",
+    "nodejs",
+    "browser"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mintlayer/mintlayer-core.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mintlayer/mintlayer-core/issues"
+  },
+  "homepage": "https://github.com/mintlayer/mintlayer-core/tree/master/wasm-wrappers",
+  "type": "module"
+}
