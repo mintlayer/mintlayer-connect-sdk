@@ -1063,7 +1063,7 @@ class Client {
     console.log('inputs', inputs);
     console.log('outputs', outputs);
 
-    fee += BigInt(2 * Math.pow(10, 11).toString());
+    fee += 0n; // TODO: adjust fee based on transaction size
     input_amount_coin_req += fee;
 
     const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null);
