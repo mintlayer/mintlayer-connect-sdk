@@ -1,6 +1,62 @@
 // @ts-nocheck
-import initWasm, {get_transaction_id, nft_issuance_fee, token_supply_change_fee} from '@mintlayer/wasm-lib';
-import { fungible_token_issuance_fee, Network } from '@mintlayer/wasm-lib';
+import initWasm, {
+  get_transaction_id,
+  nft_issuance_fee,
+  token_supply_change_fee,
+  get_token_id,
+  fungible_token_issuance_fee,
+  Network,
+  token_freeze_fee,
+  token_change_authority_fee,
+  encode_outpoint_source_id,
+  SourceId,
+  encode_input_for_utxo,
+  encode_input_for_conclude_order,
+  encode_input_for_fill_order,
+  encode_input_for_mint_tokens,
+  encode_input_for_unmint_tokens,
+  encode_input_for_lock_token_supply,
+  encode_input_for_change_token_authority,
+  encode_input_for_freeze_token,
+  encode_input_for_unfreeze_token,
+  encode_output_transfer,
+  encode_output_token_transfer,
+  estimate_transaction_size,
+  Amount,
+  encode_lock_until_time,
+  encode_lock_for_block_count,
+  encode_output_token_lock_then_transfer,
+  encode_output_lock_then_transfer,
+  encode_output_issue_nft,
+  data_deposit_fee,
+  encode_input_for_change_token_metadata_uri,
+  TokenUnfreezable,
+  encode_create_order_output,
+  encode_output_token_burn,
+  encode_transaction,
+  encode_output_coin_burn, FreezableToken, TotalSupply, encode_output_issue_fungible_token, encode_output_data_deposit,
+} from '@mintlayer/wasm-lib';
+
+const NETWORKS = {
+  mainnet: 0,
+  testnet: 1,
+  regtest: 2,
+  signet: 3,
+}
+
+function mergeUint8Arrays(arrays: any) {
+  const totalLength = arrays.reduce((sum: any, arr: any) => sum + arr.length, 0)
+
+  const result = new Uint8Array(totalLength)
+
+  let offset = 0
+  for (const arr of arrays) {
+    result.set(arr, offset)
+    offset += arr.length
+  }
+
+  return result
+}
 
 interface Amount {
   atoms: string;
@@ -164,6 +220,99 @@ class Client {
       hex += str.charCodeAt(i).toString(16);
     }
     return hex;
+  }
+
+  private getOutputs ({
+                                amount,
+                                address,
+                                networkType,
+                                type = 'Transfer',
+                                lock,
+                                chainTip,
+                                tokenId,
+                                utxo,
+                              }: any) {
+    if (type === 'LockThenTransfer' && !lock) {
+      throw new Error('LockThenTransfer requires a lock')
+    }
+
+    const amountInstace = Amount.from_atoms(amount)
+
+    const networkIndex = NETWORKS[networkType]
+    if (type === 'Transfer') {
+      if (tokenId) {
+        console.log(
+          'amountInstace,\n' +
+          '        address,\n' +
+          '        tokenId,\n' +
+          '        networkIndex,',
+          amountInstace,
+          address,
+          tokenId,
+          networkIndex,
+        )
+        return encode_output_token_transfer(
+          amountInstace,
+          address,
+          tokenId,
+          networkIndex,
+        )
+      } else {
+        return encode_output_transfer(amountInstace, address, networkIndex)
+      }
+    }
+    if (type === 'LockThenTransfer') {
+      let lockEncoded
+      if (lock.type === 'UntilTime') {
+        lockEncoded = encode_lock_until_time(BigInt(lock.content.timestamp))
+      }
+      if (lock.type === 'ForBlockCount') {
+        lockEncoded = encode_lock_for_block_count(BigInt(lock.content))
+      }
+      if (tokenId) {
+        return encode_output_token_lock_then_transfer(
+          amountInstace,
+          address,
+          tokenId,
+          lockEncoded,
+          networkIndex,
+        )
+      } else {
+        return encode_output_lock_then_transfer(
+          amountInstace,
+          address,
+          lockEncoded,
+          networkIndex,
+        )
+      }
+    }
+    if (type === 'spendFromDelegation') {
+      const stakingMaturity = getStakingMaturity(chainTip, networkType)
+      const encodedLockForBlock = encode_lock_for_block_count(stakingMaturity)
+      return encode_output_lock_then_transfer(
+        amountInstace,
+        address,
+        encodedLockForBlock,
+        networkIndex,
+      )
+    }
+
+    if (type === 'IssueNft') {
+      return encode_output_issue_nft(
+        utxo.utxo.token_id,
+        utxo.utxo.destination,
+        utxo.utxo.data.name.string,
+        utxo.utxo.data.ticker.string,
+        utxo.utxo.data.description.string,
+        Buffer.from(utxo.utxo.data.media_hash.hex, 'hex'),
+        utxo.utxo.data.creator,
+        utxo.utxo.data.media_uri.string,
+        utxo.utxo.data.icon_uri.string,
+        utxo.utxo.data.additional_metadata_uri.string,
+        BigInt(Number(chainTip)),
+        networkIndex,
+      )
+    }
   }
 
   private selectUTXOsForTransfer(utxos: UtxoEntry[], amount: bigint, token_id: string | null): Input[] {
@@ -407,17 +556,21 @@ class Client {
         fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
         return BigInt(fee.atoms());
       case 'LockTokenSupply':
-        return BigInt(50 * Math.pow(10, 11).toString());
+        fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+        return BigInt(fee.atoms());
       case 'ChangeTokenAuthority':
-        return BigInt(50 * Math.pow(10, 11).toString());
+        fee = token_change_authority_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+        return BigInt(fee.atoms());
       case 'ChangeMetadataUri':
         return BigInt(50 * Math.pow(10, 11).toString());
       case 'FreezeToken':
-        return BigInt(50 * Math.pow(10, 11).toString());
+        fee = token_freeze_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+        return BigInt(fee.atoms());
       case 'UnfreezeToken':
         return BigInt(50 * Math.pow(10, 11).toString());
       case 'DataDeposit':
-        return BigInt(100 * Math.pow(10, 11).toString());
+        fee = data_deposit_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+        return BigInt(fee.atoms());
       case 'CreateDelegationId':
         return 0n;
       case 'DelegationStake':
@@ -967,7 +1120,20 @@ class Client {
 
     const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
-    const HEXRepresentation_unsigned = {};
+    const transaction = encode_transaction(
+      mergeUint8Arrays(BINRepresentation.inputs),
+      mergeUint8Arrays(BINRepresentation.outputs),
+      BigInt(0),
+    )
+
+    const transaction_id = get_transaction_id(transaction);
+
+    console.log('transaction_id', transaction_id);
+
+    const HEXRepresentation_unsigned = transaction.reduce(
+      (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
+      '',
+    );
 
     console.log('[Mintlayer Connect SDK] Transaction JSON:', JSONRepresentation);
 
@@ -975,6 +1141,7 @@ class Client {
       JSONRepresentation,
       BINRepresentation,
       HEXRepresentation_unsigned,
+      transaction_id,
     };
   }
 
@@ -994,9 +1161,11 @@ class Client {
         index: input.index,
       }))
     const transactionBytes = transactionStrings.map((transaction) => ({
-      bytes: Buffer.from(transaction.transaction, 'hex'),
+      bytes: Uint8Array.from(
+        transaction.transaction.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
+      ),
       index: transaction.index,
-    }))
+    }));
     const outpointedSourceIds = transactionBytes.map((transaction) => ({
       source_id: encode_outpoint_source_id(
         transaction.bytes,
@@ -1088,7 +1257,7 @@ class Client {
     const outputsArrayItems = transactionJSONrepresentation.outputs.map(
       (output) => {
         if (output.type === 'Transfer') {
-          return getOutputs({
+          return this.getOutputs({
             amount: BigInt(output.value.amount.atoms).toString(),
             address: output.destination,
             networkType,
@@ -1098,7 +1267,7 @@ class Client {
           })
         }
         if (output.type === 'LockThenTransfer') {
-          return getOutputs({
+          return this.getOutputs({
             type: 'LockThenTransfer',
             lock: output.lock,
             amount: BigInt(output.value.amount.atoms).toString(),
@@ -1207,15 +1376,10 @@ class Client {
       network,
     )
 
-    console.log('transactionsize', transactionsize)
-
-    const feeRate = BigInt(Math.ceil(100000000000 / 1000))
-
     return {
       inputs: inputsArray,
       outputs: outputsArray,
       transactionsize,
-      feeRate,
     }
   }
 
