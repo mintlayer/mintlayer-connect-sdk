@@ -1,22 +1,39 @@
 {
-  "name": "@mintlayer/react-mintlayer",
-  "version": "0.1.0",
-  "main": "dist/react-mintlayer.js",
-  "types": "dist/react-mintlayer.d.ts",
-  "files": ["dist"],
+  "name": "@mintlayer/react",
+  "version": "1.0.0",
+  "description": "React library for Mintlayer Connect SDK",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
-    "build": "tsc && webpack"
+    "build": "webpack",
+    "start": "webpack serve --mode development",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@mintlayer/sdk": "workspace:*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "ts-loader": "^9.0.0",
     "typescript": "^5.0.0",
     "webpack": "^5.0.0",
-    "webpack-cli": "^5.0.0",
-    "ts-loader": "^9.0.0"
-  }
+    "webpack-cli": "^4.0.0",
+    "webpack-dev-server": "^4.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "keywords": [
+    "mintlayer",
+    "react",
+    "blockchain",
+    "sdk"
+  ],
+  "author": "",
+  "license": "ISC"
 }
