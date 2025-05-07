@@ -238,6 +238,10 @@ class Client {
 
     const amountInstace = Amount.from_atoms(amount)
 
+    console.log('networkType', networkType);
+
+    console.log('NETWORKS', NETWORKS);
+
     const networkIndex = NETWORKS[networkType]
     if (type === 'Transfer') {
       if (tokenId) {
@@ -1063,7 +1067,7 @@ class Client {
     console.log('inputs', inputs);
     console.log('outputs', outputs);
 
-    fee += 0n; // TODO: adjust fee based on transaction size
+    fee += BigInt(2 * Math.pow(10, 11).toString());
     input_amount_coin_req += fee;
 
     const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null);
@@ -1260,7 +1264,7 @@ class Client {
           return this.getOutputs({
             amount: BigInt(output.value.amount.atoms).toString(),
             address: output.destination,
-            networkType,
+            networkType: this.network,
             ...(output?.value?.token_id
               ? { tokenId: output.value.token_id }
               : {}),
@@ -1272,7 +1276,7 @@ class Client {
             lock: output.lock,
             amount: BigInt(output.value.amount.atoms).toString(),
             address: output.destination,
-            networkType,
+            networkType: this.network,
             ...(output?.value?.token_id
               ? { tokenId: output.value.token_id }
               : {}),
@@ -1583,17 +1587,17 @@ class Client {
 
   async bridgeRequest({ destination, amount, token_id, intent }: { destination: string; amount: number; token_id: string; intent: string }): Promise<any> {
     this.ensureInitialized();
-    let token_details: Record<string, any> | null = null;
+    const token_details: Record<string, any> = token_id ? { token_id } : {};
 
     if (token_id !== 'Coin' && token_id !== null) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
       if (!request.ok) {
         throw new Error('Failed to fetch token');
       }
-      token_details = await request.json();
+      token_details[token_id] = await request.json();
     }
 
-    const tx = await this.buildTransaction({ type: 'Transfer', params: { destination, amount, token_id, token_details } });
+    const tx = await this.buildTransaction({ type: 'Transfer', params: { to: destination, amount, token_id, token_details } });
     return this.signTransaction({ ...tx, intent });
   }
 
