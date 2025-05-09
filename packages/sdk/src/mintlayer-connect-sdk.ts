@@ -45,6 +45,7 @@ const NETWORKS = {
 }
 
 function mergeUint8Arrays(arrays: any) {
+  console.log('arrays', arrays);
   const totalLength = arrays.reduce((sum: any, arr: any) => sum + arr.length, 0)
 
   const result = new Uint8Array(totalLength)
@@ -215,6 +216,11 @@ class Client {
   }
 
   private stringToHex(str: string): string {
+    console.log(str);
+    if(!str) {
+      return '';
+    }
+
     let hex = '';
     for (let i = 0; i < str.length; i++) {
       hex += str.charCodeAt(i).toString(16);
@@ -338,6 +344,8 @@ class Client {
     filteredUtxos.sort((a, b) => {
       return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
     });
+
+    console.log('filteredUtxos', filteredUtxos);
 
     for (let i = 0; i < filteredUtxos.length; i++) {
       lastIndex = i;
@@ -950,7 +958,6 @@ class Client {
     }
 
     if (type === 'CreateOrder') {
-      console.log('params====', params);
       const { ask_amount, ask_token, give_amount, give_token, conclude_destination } = params;
       const give_token_details = { number_of_decimals: 11 }; // TODO
       const ask_token_details = { number_of_decimals: 11 }; // TODO
@@ -1121,6 +1128,8 @@ class Client {
       inputs,
       outputs,
     };
+
+    console.log('JSONRepresentation', JSONRepresentation);
 
     const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
@@ -1306,6 +1315,59 @@ class Client {
             )
           }
         }
+        if (output.type === 'IssueNft') {
+          const {
+            name,
+            ticker,
+            description,
+            media_hash,
+            creator,
+            media_uri,
+            icon_uri,
+            additional_metadata_uri,
+          } = output.data
+
+          const {
+            destination: address,
+            token_id,
+          } = output
+
+          const chainTip = '200000'
+
+          try {
+            encode_output_issue_nft(
+              token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
+              address,
+              name.string,
+              ticker.string,
+              description.string,
+              media_hash.string,
+              null, // TODO: check for public key, key hash is not working
+              media_uri.string,
+              icon_uri.string,
+              additional_metadata_uri.string,
+              BigInt(chainTip),
+              network,
+            )
+          } catch (e) {
+            console.error(e);
+          }
+
+          return encode_output_issue_nft(
+            token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
+            address,
+            name.string,
+            ticker.string,
+            description.string,
+            media_hash.string,
+            null, // TODO: check for public key, key hash is not working
+            media_uri.string,
+            icon_uri.string,
+            additional_metadata_uri.string,
+            BigInt(chainTip),
+            network,
+          )
+        }
         if (output.type === 'IssueFungibleToken') {
           const {
             authority,
@@ -1397,6 +1459,23 @@ class Client {
       }
       const token = await request.json();
       token_details[token_id] = token;
+    }
+    const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
+    return this.signTransaction(tx);
+  }
+
+  async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<any> {
+    this.ensureInitialized();
+    const amount = 1;
+    const token_details: Record<string, any> = token_id ? { token_id } : {};
+    if (token_id) {
+      const request = await fetch(`${this.getApiServer()}/nft/${token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      token_details[token_id] = token;
+      token_details[token_id].number_of_decimals = 1; // that's NFT
     }
     const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
     return this.signTransaction(tx);
