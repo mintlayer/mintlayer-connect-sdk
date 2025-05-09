@@ -1143,6 +1143,28 @@ class Client {
 
     console.log('transaction_id', transaction_id);
 
+    // some operations need to be recoded with given data
+    // if outputs include issueNft type
+    if(outputs.some((output) => output.type === 'IssueNft')) {
+      console.log('Get data for');
+      // need to modify the transaction outout exact that object
+      try {
+        get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+      } catch (error) {
+        console.log('Error', error);
+        throw new Error('Error while getting token id');
+      }
+      const token_id = get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+      const index = outputs.findIndex((output) => output.type === 'IssueNft');
+      const output = outputs[index];
+      outputs[index] = {
+        ...output,
+        token_id: token_id,
+      }
+    }
+
+    console.log('outputs', outputs);
+
     const HEXRepresentation_unsigned = transaction.reduce(
       (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
       '',
@@ -1332,26 +1354,7 @@ class Client {
             token_id,
           } = output
 
-          const chainTip = '200000'
-
-          try {
-            encode_output_issue_nft(
-              token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
-              address,
-              name.string,
-              ticker.string,
-              description.string,
-              media_hash.string,
-              null, // TODO: check for public key, key hash is not working
-              media_uri.string,
-              icon_uri.string,
-              additional_metadata_uri.string,
-              BigInt(chainTip),
-              network,
-            )
-          } catch (e) {
-            console.error(e);
-          }
+          const chainTip = '200000' // TODO unhardcode
 
           return encode_output_issue_nft(
             token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
