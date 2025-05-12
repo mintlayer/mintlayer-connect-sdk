@@ -37,6 +37,8 @@ import initWasm, {
   encode_output_coin_burn, FreezableToken, TotalSupply, encode_output_issue_fungible_token, encode_output_data_deposit,
 } from '@mintlayer/wasm-lib';
 
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
 const NETWORKS = {
   mainnet: 0,
   testnet: 1,
@@ -165,6 +167,30 @@ class Client {
     const client = new Client(options);
     await client.init();
     return client;
+  }
+
+  private stringToBase58(str: string): string {
+    const bytes = new TextEncoder().encode(str);
+
+    let num = BigInt('0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+    let encoded = '';
+    const base = BigInt(58);
+    while (num > 0) {
+      const remainder = num % base;
+      num = num / base;
+      encoded = BASE58_ALPHABET[Number(remainder)] + encoded;
+    }
+
+    for (let byte of bytes) {
+      if (byte === 0) {
+        encoded = '1' + encoded;
+      } else {
+        break;
+      }
+    }
+
+    return encoded;
   }
 
   private getApiServer(): string {
@@ -637,10 +663,10 @@ class Client {
       if (token_id === 'Coin') {
         input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
       } else {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals || 11));
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals));
         send_token = {
           token_id,
-          number_of_decimals: token_details?.number_of_decimals || 11,
+          number_of_decimals: token_details?.number_of_decimals,
         };
       }
 
@@ -658,7 +684,7 @@ class Client {
             }),
           amount: {
             decimal: params.amount!.toString(),
-            atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals || 11)).toString(),
+            atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
           },
         },
       });
@@ -671,10 +697,10 @@ class Client {
       if (token_id === 'Coin') {
         input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
       } else {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals || 11));
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals));
         send_token = {
           token_id,
-          number_of_decimals: token_details!.number_of_decimals || 11,
+          number_of_decimals: token_details!.number_of_decimals,
         };
       }
 
@@ -772,7 +798,7 @@ class Client {
 
     if (type === 'MintToken') {
       const amount = {
-        atoms: (params.amount! * Math.pow(10, params.token_details!.number_of_decimals || 11)).toString(),
+        atoms: (params.amount! * Math.pow(10, params.token_details!.number_of_decimals)).toString(),
         decimal: params.amount!.toString(),
       };
 
@@ -807,10 +833,10 @@ class Client {
       const token_id = params.token_id;
       const token_details = params.token_details;
 
-      input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals || 11));
+      input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals));
       send_token = {
         token_id,
-        number_of_decimals: token_details!.number_of_decimals || 11,
+        number_of_decimals: token_details!.number_of_decimals,
       };
 
       inputs.push({
@@ -1478,7 +1504,7 @@ class Client {
       }
       const token = await request.json();
       token_details[token_id] = token;
-      token_details[token_id].number_of_decimals = 1; // that's NFT
+      token_details[token_id].number_of_decimals = 0; // that's NFT
     }
     const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
     return this.signTransaction(tx);
@@ -1492,6 +1518,19 @@ class Client {
 
   async issueNft(tokenData: Record<string, any>): Promise<any> {
     this.ensureInitialized();
+    const description = tokenData.description;
+
+    if(description.length >= 70) {
+      throw new Error('Description is too long. Max length is 70 characters.');
+    }
+
+    const descriptionBase58 = this.stringToBase58(description);
+
+    if(descriptionBase58.length >= 100) {
+      throw new Error('Description is too long.');
+    }
+
+    tokenData.description = descriptionBase58;
     const tx = await this.buildTransaction({ type: 'IssueNft', params: tokenData });
     return this.signTransaction(tx);
   }
