@@ -47,7 +47,6 @@ const NETWORKS = {
 }
 
 function mergeUint8Arrays(arrays: any) {
-  console.log('arrays', arrays);
   const totalLength = arrays.reduce((sum: any, arr: any) => sum + arr.length, 0)
 
   const result = new Uint8Array(totalLength)
@@ -207,7 +206,7 @@ class Client {
 
     try {
       await initWasm();
-      console.log('Wasm initialized');
+      console.log('[Mintlayer Connect SDK] Wasm initialized');
 
       if (this.network !== 'testnet' && this.network !== 'mainnet') {
         throw new Error('Invalid network. Use "testnet" or "mainnet".');
@@ -239,7 +238,6 @@ class Client {
   }
 
   private stringToHex(str: string): string {
-    console.log(str);
     if(!str) {
       return '';
     }
@@ -267,23 +265,9 @@ class Client {
 
     const amountInstace = Amount.from_atoms(amount)
 
-    console.log('networkType', networkType);
-
-    console.log('NETWORKS', NETWORKS);
-
     const networkIndex = NETWORKS[networkType]
     if (type === 'Transfer') {
       if (tokenId) {
-        console.log(
-          'amountInstace,\n' +
-          '        address,\n' +
-          '        tokenId,\n' +
-          '        networkIndex,',
-          amountInstace,
-          address,
-          tokenId,
-          networkIndex,
-        )
         return encode_output_token_transfer(
           amountInstace,
           address,
@@ -379,8 +363,6 @@ class Client {
         return utxo.utxo.value.token_id === token_id;
       });
 
-    console.log('utxos', filteredUtxos);
-
     let balance = BigInt(0);
     const utxosToSpend: UtxoEntry[] = [];
     let lastIndex = 0;
@@ -388,8 +370,6 @@ class Client {
     filteredUtxos.sort((a, b) => {
       return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
     });
-
-    console.log('filteredUtxos', filteredUtxos);
 
     for (let i = 0; i < filteredUtxos.length; i++) {
       lastIndex = i;
@@ -678,22 +658,15 @@ class Client {
       const token_id = params.token_id ? params.token_id : 'Coin';
       const token_details = params.token_details;
 
-      console.log('token_details', token_details);
-      console.log('params.amount', params.amount);
-
       if (token_id === 'Coin') {
         input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
       } else {
-        console.log('BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals))', BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals)));
         input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals));
-        console.log('input_amount_token_req', input_amount_token_req);
         send_token = {
           token_id,
           number_of_decimals: token_details?.number_of_decimals,
         };
       }
-
-      console.log('send_token', send_token);
 
       outputs.push({
         type: 'Transfer',
@@ -1129,9 +1102,6 @@ class Client {
       });
     }
 
-    console.log('inputs', inputs);
-    console.log('outputs', outputs);
-
     fee += BigInt(2 * Math.pow(10, 11).toString());
     input_amount_coin_req += fee;
 
@@ -1187,8 +1157,6 @@ class Client {
       outputs,
     };
 
-    console.log('JSONRepresentation', JSONRepresentation);
-
     const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
     const transaction = encode_transaction(
@@ -1199,17 +1167,13 @@ class Client {
 
     const transaction_id = get_transaction_id(transaction);
 
-    console.log('transaction_id', transaction_id);
-
     // some operations need to be recoded with given data
     // if outputs include issueNft type
     if(outputs.some((output) => output.type === 'IssueNft')) {
-      console.log('Get data for');
       // need to modify the transaction outout exact that object
       try {
         get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
       } catch (error) {
-        console.log('Error', error);
         throw new Error('Error while getting token id');
       }
       const token_id = get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
@@ -1220,8 +1184,6 @@ class Client {
         token_id: token_id,
       }
     }
-
-    console.log('outputs', outputs);
 
     const HEXRepresentation_unsigned = transaction.reduce(
       (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
@@ -1273,7 +1235,6 @@ class Client {
     const inputCommands = transactionJSONrepresentation.inputs
       .filter(({ input }) => input.input_type === 'AccountCommand')
       .map(({ input }) => {
-        console.log('input', input)
         if (input.command === 'ConcludeOrder') {
           return encode_input_for_conclude_order(
             input.order_id,
@@ -1439,14 +1400,10 @@ class Client {
             total_supply,
           } = output
 
-          const chainTip = '200000'
-
-          console.log('is_freezable', is_freezable)
+          const chainTip = '200000' // TODO: unhardcode height
 
           const is_token_freezable =
             is_freezable === true ? FreezableToken.Yes : FreezableToken.No
-
-          console.log('is_token_freezable', is_token_freezable)
 
           const supply_amount =
             total_supply.type === 'Fixed'
@@ -1485,16 +1442,6 @@ class Client {
     const inputAddresses = transactionJSONrepresentation.inputs
       .filter(({ input }) => input.input_type === 'UTXO')
       .map((input) => input?.utxo?.destination || input?.destination)
-
-    console.log('inputsArray', inputsArray)
-    console.log('outputsArray', outputsArray)
-
-    console.log(
-      mergeUint8Arrays(inputsArray),
-      inputAddresses,
-      mergeUint8Arrays(outputsArray),
-      network,
-    )
 
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
@@ -1797,7 +1744,6 @@ class Client {
 
   async signTransaction(tx: Transaction): Promise<any> {
     this.ensureInitialized();
-    console.log('tx', tx);
     return this.request({
       method: 'signTransaction',
       params: { txData: tx },
@@ -1822,9 +1768,7 @@ class Client {
 
     if (!response.ok) {
       const error_json = await response.json();
-      console.log('error_json', error_json);
       const match = error_json.error.match(/message: "(.*?)"/);
-      console.log('match', match);
       const errorMessage = match ? match[1] : null;
 
       throw new Error('Failed to broadcast transaction: ' + errorMessage);
