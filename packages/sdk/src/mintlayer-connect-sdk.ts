@@ -235,10 +235,7 @@ class Client {
   }
 
   private selectUTXOs(utxos: UtxoEntry[], amount: bigint, outputType: string, token_id: string | null): Input[] {
-    if (outputType === 'Transfer') {
-      return this.selectUTXOsForTransfer(utxos, amount, token_id);
-    }
-    return [];
+    return this.selectUTXOsForTransfer(utxos, amount, token_id);
   }
 
   private stringToHex(str: string): string {
@@ -352,8 +349,29 @@ class Client {
   }
 
   private selectUTXOsForTransfer(utxos: UtxoEntry[], amount: bigint, token_id: string | null): Input[] {
+    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
     const filteredUtxos = utxos
-      .filter((utxo) => utxo.utxo.type === 'Transfer' || utxo.utxo.type === 'LockThenTransfer')
+      .map((utxo) => {
+        if(utxo.utxo.type === 'IssueNft') {
+          return {
+            ...utxo,
+            utxo: {
+              ...utxo.utxo,
+              value: {
+                amount: {
+                  atoms: 1,
+                  decimal: 1
+                },
+                type: 'TokenV1',
+                token_id: utxo.utxo.token_id,
+              },
+            },
+          };
+        } else {
+          return utxo;
+        }
+      })
+      .filter((utxo) => transferableUtxoTypes.includes(utxo.utxo.type))
       .filter((utxo) => {
         if (token_id === null) {
           return utxo.utxo.value.type === 'Coin';
@@ -660,10 +678,15 @@ class Client {
       const token_id = params.token_id ? params.token_id : 'Coin';
       const token_details = params.token_details;
 
+      console.log('token_details', token_details);
+      console.log('params.amount', params.amount);
+
       if (token_id === 'Coin') {
         input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
       } else {
+        console.log('BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals))', BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals)));
         input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals));
+        console.log('input_amount_token_req', input_amount_token_req);
         send_token = {
           token_id,
           number_of_decimals: token_details?.number_of_decimals,
@@ -682,10 +705,19 @@ class Client {
               type: 'TokenV1',
               token_id,
             }),
-          amount: {
-            decimal: params.amount!.toString(),
-            atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
-          },
+          ...(token_id === 'Coin'
+            ? {
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, 11)).toString(),
+              }
+            }
+            : {
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
+              }
+            }),
         },
       });
     }
@@ -1480,14 +1512,14 @@ class Client {
 
   async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<any> {
     this.ensureInitialized();
-    const token_details: Record<string, any> = token_id ? { token_id } : {};
+    let token_details: Record<string, any> = token_id ? { token_id } : {};
     if (token_id) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
       if (!request.ok) {
         throw new Error('Failed to fetch token');
       }
       const token = await request.json();
-      token_details[token_id] = token;
+      token_details = { ...token };
     }
     const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
     return this.signTransaction(tx);
@@ -1496,15 +1528,15 @@ class Client {
   async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<any> {
     this.ensureInitialized();
     const amount = 1;
-    const token_details: Record<string, any> = token_id ? { token_id } : {};
+    let token_details: Record<string, any> = token_id ? { token_id } : {};
     if (token_id) {
       const request = await fetch(`${this.getApiServer()}/nft/${token_id}`);
       if (!request.ok) {
         throw new Error('Failed to fetch token');
       }
       const token = await request.json();
-      token_details[token_id] = token;
-      token_details[token_id].number_of_decimals = 0; // that's NFT
+      token_details = token;
+      token_details.number_of_decimals = 0; // that's NFT
     }
     const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
     return this.signTransaction(tx);
@@ -1708,14 +1740,15 @@ class Client {
 
   async bridgeRequest({ destination, amount, token_id, intent }: { destination: string; amount: number; token_id: string; intent: string }): Promise<any> {
     this.ensureInitialized();
-    const token_details: Record<string, any> = token_id ? { token_id } : {};
+    let token_details: Record<string, any> = token_id ? { token_id } : {};
 
     if (token_id !== 'Coin' && token_id !== null) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
       if (!request.ok) {
         throw new Error('Failed to fetch token');
       }
-      token_details[token_id] = await request.json();
+      const token = await request.json();
+      token_details = { ...token };
     }
 
     const tx = await this.buildTransaction({ type: 'Transfer', params: { to: destination, amount, token_id, token_details } });
