@@ -31,6 +31,7 @@
         <div class="grid grid-cols-2 gap-4">
             <button onclick="checkConnection()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Check Connection</button>
             <button onclick="connectWallet()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Connect Wallet</button>
+            <button onclick="disconnectWallet()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Disconnect Wallet</button>
             <button onclick="getNewAddress()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get New Address</button>
             <button onclick="getVersion()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Version</button>
             <button onclick="createDelegation()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Create Delegation</button>
@@ -357,7 +358,7 @@
 
   async function checkConnection() {
     try {
-      const result = await window.mintlayer.request({ method: 'checkConnection' });
+      const result = await window.mintlayer.isConnected();
       displayOutput(`Connection status: ${JSON.stringify(result, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
@@ -368,6 +369,15 @@
     try {
       const addresses = await window.mintlayer.connect();
       displayOutput(`Connected: ${JSON.stringify(addresses, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function disconnectWallet() {
+    try {
+      const result = await window.mintlayer.disconnect();
+      displayOutput(`Disconnected: ${JSON.stringify(result, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }

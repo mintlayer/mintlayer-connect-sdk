@@ -413,44 +413,41 @@ class Client {
     return this.network;
   }
 
+  isConnected() {
+    this.ensureInitialized();
+    return this.connectedAddresses[this.network]?.receiving?.length > 0;
+  }
+
   async connect(): Promise<string[]> {
     this.ensureInitialized();
-    return this.request({ method: 'connect' });
+    if (typeof window !== 'undefined' && window.mojito?.connect) {
+      const addresses = await window.mojito.connect();
+      console.log('addresses', addresses);
+      this.connectedAddresses = addresses;
+      return addresses;
+    } else {
+      throw new Error('Mojito extension not available');
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    this.ensureInitialized();
+    if (typeof window !== 'undefined' && window.mojito?.disconnect) {
+      await window.mojito.disconnect();
+      this.connectedAddresses = [];
+    } else {
+      throw new Error('Mojito extension not available');
+    }
   }
 
   async request({ method, params }: { method: string; params?: Record<string, any> }): Promise<any> {
     this.ensureInitialized();
-    return new Promise((resolve, reject) => {
-      const requestId = Math.random().toString(36).substring(2);
-      window.postMessage(
-        {
-          type: 'MINTLAYER_REQUEST',
-          requestId,
-          method,
-          params: params || {},
-        },
-        '*'
-      );
 
-      const handler = (event: MessageEvent) => {
-        if (
-          event.data.type === 'MINTLAYER_RESPONSE' &&
-          event.data.requestId === requestId
-        ) {
-          window.removeEventListener('message', handler);
-          if (event.data.error) {
-            reject(new Error(event.data.error));
-          } else {
-            const result = event.data.result;
-            if (method === 'connect' && result) {
-              this.connectedAddresses = result;
-            }
-            resolve(result);
-          }
-        }
-      };
-      window.addEventListener('message', handler);
-    });
+    if (typeof window !== 'undefined' && window.mojito?.request) {
+      return await window.mojito.request(method, params);
+    } else {
+      throw new Error('Mojito extension not available');
+    }
   }
 
   async getAddresses(): Promise<string[]> {
@@ -463,7 +460,7 @@ class Client {
 
   async getBalance(): Promise<number> {
     this.ensureInitialized();
-    const { address } = await this.request({ method: 'checkConnection' });
+    const address = this.connectedAddresses;
     const currentAddress = address[this.network];
 
     if (this.connectedAddresses.length === 0) {
@@ -500,7 +497,7 @@ class Client {
     if (this.connectedAddresses.length === 0) {
       // throw new Error('No addresses connected. Call connect first.');
     }
-    const { address } = await this.request({ method: 'checkConnection' });
+    const address = this.connectedAddresses;
     const currentAddress = address[this.network];
     try {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
@@ -533,7 +530,7 @@ class Client {
     if (this.connectedAddresses.length === 0) {
       // throw new Error('No addresses connected. Call connect first.');
     }
-    const { address } = await this.request({ method: 'checkConnection' });
+    const address = this.connectedAddresses;
     const currentAddress = address[this.network];
     try {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
@@ -622,7 +619,7 @@ class Client {
 
     console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
 
-    const { address } = await this.request({ method: 'checkConnection' });
+    const address = this.connectedAddresses;
     const currentAddress = address[this.network];
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
@@ -1663,7 +1660,7 @@ class Client {
   async getAccountOrders(): Promise<any[]> {
     this.ensureInitialized();
     const allOrders = await this.getAvailableOrders();
-    const { address } = await this.request({ method: 'checkConnection' });
+    const address = this.connectedAddresses;
     const currentAddress = address[this.network];
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
     const orders = allOrders.filter((order: any) => {
