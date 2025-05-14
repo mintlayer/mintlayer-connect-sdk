@@ -162,9 +162,16 @@ class Client {
     this.isInitialized = false;
   }
 
-  static async create(options: ClientOptions = {}): Promise<Client> {
+  static async create(options: ClientOptions = { autoRestore: true }): Promise<Client> {
+    console.log('Create client');
     const client = new Client(options);
     await client.init();
+
+    if (options.autoRestore !== false) {
+      const restored = await client.restore();
+      console.log('[Mojito SDK] Session restore', restored ? 'successful' : 'skipped');
+    }
+
     return client;
   }
 
@@ -437,6 +444,31 @@ class Client {
       this.connectedAddresses = [];
     } else {
       throw new Error('Mojito extension not available');
+    }
+  }
+
+  async restore(): Promise<boolean> {
+    this.ensureInitialized();
+
+    if (typeof window === 'undefined' || !window.mojito || typeof window.mojito.restore !== 'function') {
+      console.warn('[Mintlayer SDK] No injected wallet found. Cannot restore session.');
+      return false;
+    }
+
+    try {
+      const addressData = await window.mojito.restore();
+
+      if (addressData?.[this.network]?.receiving?.length) {
+        this.connectedAddresses = addressData[this.network].receiving;
+        console.log('[Mintlayer SDK] Session restored:', this.connectedAddresses);
+        return true;
+      }
+
+      console.log('[Mintlayer SDK] No session data found for restore');
+      return false;
+    } catch (err) {
+      console.error('[Mintlayer SDK] Failed to restore session:', err);
+      return false;
     }
   }
 
