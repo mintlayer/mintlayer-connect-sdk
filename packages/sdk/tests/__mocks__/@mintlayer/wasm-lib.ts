@@ -5,7 +5,7 @@ async function initWasm() {
 }
 
 module.exports = {
-  __esModule: true, // 👈 магия для Jest/TS чтобы `import default` работал
+  __esModule: true,
   ...wasm,
   default: initWasm,
 };
