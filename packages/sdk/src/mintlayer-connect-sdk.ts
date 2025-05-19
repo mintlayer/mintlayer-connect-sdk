@@ -149,6 +149,7 @@ interface BuildTransactionParams {
 
 interface ClientOptions {
   network?: 'mainnet' | 'testnet';
+  autoRestore?: boolean;
 }
 
 class Client {
@@ -429,7 +430,6 @@ class Client {
     this.ensureInitialized();
     if (typeof window !== 'undefined' && window.mojito?.connect) {
       const addresses = await window.mojito.connect();
-      console.log('addresses', addresses);
       this.connectedAddresses = addresses;
       return addresses;
     } else {
@@ -460,7 +460,7 @@ class Client {
 
       if (addressData?.[this.network]?.receiving?.length) {
         this.connectedAddresses = addressData[this.network].receiving;
-        console.log('[Mintlayer SDK] Session restored:', this.connectedAddresses);
+        console.log('[Mintlayer SDK] Session restored');
         return true;
       }
 
@@ -736,8 +736,6 @@ class Client {
 
     const data = await response.json();
     const utxos: UtxoEntry[] = data.utxos;
-
-    console.log('[Mintlayer Connect SDK] UTXOs:', utxos);
 
     let fee = 0n;
     const inputs: Input[] = [];
@@ -1285,8 +1283,6 @@ class Client {
       (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
       '',
     );
-
-    console.log('[Mintlayer Connect SDK] Transaction JSON:', JSONRepresentation);
 
     return {
       JSONRepresentation,
