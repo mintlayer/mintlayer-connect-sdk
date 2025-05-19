@@ -701,6 +701,12 @@ class Client {
         return 0n;
       case 'DelegationStake':
         return 0n;
+      case 'CreateOrder':
+        return 0n;
+      case 'FillOrder':
+        return 0n;
+      case 'ConcludeOrder':
+        return 0n;
       default:
         throw new Error(`Unknown transaction type: ${type}`);
     }
