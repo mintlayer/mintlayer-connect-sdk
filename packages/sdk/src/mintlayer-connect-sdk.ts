@@ -524,6 +524,67 @@ class Client {
     }
   }
 
+  async getBalances(): Promise<{
+    coin: number;
+    token: Record<string, number>;
+  }> {
+    this.ensureInitialized();
+    const address = this.connectedAddresses;
+    const currentAddress = address[this.network];
+
+    if (this.connectedAddresses.length === 0) {
+      // throw new Error('No addresses connected. Call connect first.');
+    }
+
+    try {
+      const addressList = [...currentAddress.receiving, ...currentAddress.change];
+
+      const balancePromises = addressList.map(async (addr: string) => {
+        const response = await fetch(`${this.getApiServer()}/address/${addr}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.warn(`Address ${addr} not found`);
+            return null;
+          }
+          throw new Error('Failed to fetch balance');
+        }
+        const data = await response.json();
+        return data;
+      });
+
+      const results = await Promise.all(balancePromises);
+
+      let totalBalance = 0;
+      const tokenMap: Record<string, number> = {};
+
+      for (const result of results) {
+        if (!result) continue;
+
+        // Add coin balance
+        totalBalance += parseFloat(result.coin_balance.decimal);
+
+        // Add token balances
+        if (Array.isArray(result.tokens)) {
+          for (const token of result.tokens) {
+            const tokenId = token.token_id;
+            const tokenDecimal = parseFloat(token.amount.decimal);
+            if (!tokenMap[tokenId]) {
+              tokenMap[tokenId] = 0;
+            }
+            tokenMap[tokenId] += tokenDecimal;
+          }
+        }
+      }
+
+      return {
+        coin: totalBalance,
+        token: tokenMap,
+      };
+    } catch (error) {
+      throw new Error(`API error: ${(error as Error).message}`);
+    }
+  }
+
   async getDelegations(): Promise<any[]> {
     this.ensureInitialized();
     if (this.connectedAddresses.length === 0) {

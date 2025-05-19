@@ -36,6 +36,7 @@
             <button onclick="getVersion()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Version</button>
             <button onclick="createDelegation()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Create Delegation</button>
             <button onclick="getBalance()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Balance</button>
+            <button onclick="getBalances()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Balances</button>
             <button onclick="getDelegations()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Delegations</button>
             <button onclick="getDelegationsTotal()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Delegations Total</button>
             <button onclick="getAccountOrders()" class="bg-blue-500 text-white py-2 px-4 rounded-md shadow hover:bg-blue-600 transition">Get Account Orders</button>
@@ -404,6 +405,15 @@
   async function getBalance() {
     try {
       const balance = await window.mintlayer.getBalance();
+      displayOutput(`Balance: ${JSON.stringify(balance, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function getBalances() {
+    try {
+      const balance = await window.mintlayer.getBalances();
       displayOutput(`Balance: ${JSON.stringify(balance, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
