@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc",
     "serve": "npx http-server . -p 8080",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "dependencies": {
     "@mintlayer/wasm-lib": "^0.1.0"
@@ -16,6 +17,12 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jest-fetch-mock": "^3.0.3",
+    "ts-jest": "^29.3.4",
+    "typescript": "^5.0.0",
+    "whatwg-fetch": "^3.6.20"
   }
 }
