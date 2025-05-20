@@ -6,4 +6,4 @@ module.exports = {
   moduleNameMapper: {
     '^@mintlayer/wasm-lib$': '<rootDir>/tests/__mocks__/@mintlayer/wasm-lib.ts',
   },
-};
+}

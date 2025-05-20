@@ -34,10 +34,14 @@ import initWasm, {
   encode_create_order_output,
   encode_output_token_burn,
   encode_transaction,
-  encode_output_coin_burn, FreezableToken, TotalSupply, encode_output_issue_fungible_token, encode_output_data_deposit,
-} from '@mintlayer/wasm-lib';
+  encode_output_coin_burn,
+  FreezableToken,
+  TotalSupply,
+  encode_output_issue_fungible_token,
+  encode_output_data_deposit,
+} from '@mintlayer/wasm-lib'
 
-const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
 const NETWORKS = {
   mainnet: 0,
@@ -61,212 +65,208 @@ function mergeUint8Arrays(arrays: any) {
 }
 
 interface Amount {
-  atoms: string;
-  decimal: string;
+  atoms: string
+  decimal: string
 }
 
 interface Value {
-  type: 'Coin' | 'TokenV1';
-  token_id?: string;
-  amount: Amount;
+  type: 'Coin' | 'TokenV1'
+  token_id?: string
+  amount: Amount
 }
 
 interface Utxo {
-  type: 'Transfer' | 'LockThenTransfer';
-  value: Value;
+  type: 'Transfer' | 'LockThenTransfer'
+  value: Value
 }
 
 interface Outpoint {
-  id: string;
-  index: number;
+  id: string
+  index: number
 }
 
 interface UtxoEntry {
-  outpoint: Outpoint;
-  utxo: Utxo;
+  outpoint: Outpoint
+  utxo: Utxo
 }
 
 interface Input {
   input: {
-    [key: string]: any;
-    input_type: string;
-  };
-  utxo: Utxo | null;
+    [key: string]: any
+    input_type: string
+  }
+  utxo: Utxo | null
 }
 
 interface Output {
-  type: string;
-  destination?: string;
-  value?: Value;
-  [key: string]: any;
+  type: string
+  destination?: string
+  value?: Value
+  [key: string]: any
 }
 
 interface Transaction {
   JSONRepresentation: {
-    inputs: Input[];
-    outputs: Output[];
-  };
-  BINRepresentation: Record<string, any>;
-  HEXRepresentation_unsigned: Record<string, any>;
+    inputs: Input[]
+    outputs: Output[]
+  }
+  BINRepresentation: Record<string, any>
+  HEXRepresentation_unsigned: Record<string, any>
 }
 
 interface BuildTransactionParams {
-  to?: string;
-  amount?: number;
-  token_id?: string;
-  token_details?: Record<string, any>;
-  destination?: string;
-  pool_id?: string;
-  delegation_id?: string;
-  data?: string;
-  authority?: string;
-  is_freezable?: boolean;
-  metadata_uri?: string;
-  number_of_decimals?: number;
-  token_ticker?: string;
-  supply_type?: 'Unlimited' | 'Lockable' | 'Fixed';
-  supply_amount?: number;
-  creator?: string;
-  additional_metadata_uri?: string;
-  description?: string;
-  icon_uri?: string;
-  media_hash?: string;
-  media_uri?: string;
-  name?: string;
-  ticker?: string;
-  new_authority?: string;
-  new_metadata_uri?: string;
-  is_unfreezable?: boolean;
-  conclude_destination?: string;
-  ask_token?: string;
-  ask_amount?: number;
-  give_token?: string;
-  give_amount?: number;
-  order_id?: string;
-  order_details?: Record<string, any>;
-  intent?: string;
+  to?: string
+  amount?: number
+  token_id?: string
+  token_details?: Record<string, any>
+  destination?: string
+  pool_id?: string
+  delegation_id?: string
+  data?: string
+  authority?: string
+  is_freezable?: boolean
+  metadata_uri?: string
+  number_of_decimals?: number
+  token_ticker?: string
+  supply_type?: 'Unlimited' | 'Lockable' | 'Fixed'
+  supply_amount?: number
+  creator?: string
+  additional_metadata_uri?: string
+  description?: string
+  icon_uri?: string
+  media_hash?: string
+  media_uri?: string
+  name?: string
+  ticker?: string
+  new_authority?: string
+  new_metadata_uri?: string
+  is_unfreezable?: boolean
+  conclude_destination?: string
+  ask_token?: string
+  ask_amount?: number
+  give_token?: string
+  give_amount?: number
+  order_id?: string
+  order_details?: Record<string, any>
+  intent?: string
 }
 
 interface ClientOptions {
-  network?: 'mainnet' | 'testnet';
-  autoRestore?: boolean;
+  network?: 'mainnet' | 'testnet'
+  autoRestore?: boolean
 }
 
 class Client {
-  private network: 'mainnet' | 'testnet';
-  private connectedAddresses: string[];
-  private isInitialized: boolean;
+  private network: 'mainnet' | 'testnet'
+  private connectedAddresses: string[]
+  private isInitialized: boolean
 
   constructor(options: ClientOptions = {}) {
-    this.network = options.network || 'mainnet';
-    this.connectedAddresses = [];
-    this.isInitialized = false;
+    this.network = options.network || 'mainnet'
+    this.connectedAddresses = []
+    this.isInitialized = false
   }
 
   static async create(options: ClientOptions = { autoRestore: true }): Promise<Client> {
-    console.log('Create client');
-    const client = new Client(options);
-    await client.init();
+    console.log('Create client')
+    const client = new Client(options)
+    await client.init()
 
     if (options.autoRestore !== false) {
-      const restored = await client.restore();
-      console.log('[Mojito SDK] Session restore', restored ? 'successful' : 'skipped');
+      const restored = await client.restore()
+      console.log('[Mojito SDK] Session restore', restored ? 'successful' : 'skipped')
     }
 
-    return client;
+    return client
   }
 
   private stringToBase58(str: string): string {
-    const bytes = new TextEncoder().encode(str);
+    const bytes = new TextEncoder().encode(str)
 
-    let num = BigInt('0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''));
+    let num = BigInt(
+      '0x' +
+        Array.from(bytes)
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join(''),
+    )
 
-    let encoded = '';
-    const base = BigInt(58);
+    let encoded = ''
+    const base = BigInt(58)
     while (num > 0) {
-      const remainder = num % base;
-      num = num / base;
-      encoded = BASE58_ALPHABET[Number(remainder)] + encoded;
+      const remainder = num % base
+      num = num / base
+      encoded = BASE58_ALPHABET[Number(remainder)] + encoded
     }
 
     for (let byte of bytes) {
       if (byte === 0) {
-        encoded = '1' + encoded;
+        encoded = '1' + encoded
       } else {
-        break;
+        break
       }
     }
 
-    return encoded;
+    return encoded
   }
 
   private getApiServer(): string {
     return this.network === 'testnet'
       ? 'https://api-server-lovelace.mintlayer.org/api/v2'
-      : 'https://api-server.mintlayer.org/api/v2';
+      : 'https://api-server.mintlayer.org/api/v2'
   }
 
   private async init(): Promise<void> {
     if (this.isInitialized) {
-      console.log('[Mintlayer Connect SDK] Already initialized');
-      return;
+      console.log('[Mintlayer Connect SDK] Already initialized')
+      return
     }
 
     try {
-      await initWasm();
-      console.log('[Mintlayer Connect SDK] Wasm initialized');
+      await initWasm()
+      console.log('[Mintlayer Connect SDK] Wasm initialized')
 
       if (this.network !== 'testnet' && this.network !== 'mainnet') {
-        throw new Error('Invalid network. Use "testnet" or "mainnet".');
+        throw new Error('Invalid network. Use "testnet" or "mainnet".')
       }
-      console.log(`[Mintlayer Connect SDK] Network set to: ${this.network}`);
+      console.log(`[Mintlayer Connect SDK] Network set to: ${this.network}`)
 
-      const response = await fetch(this.getApiServer() + '/chain/tip');
+      const response = await fetch(this.getApiServer() + '/chain/tip')
       if (!response.ok) {
-        throw new Error('Failed to connect to API server');
+        throw new Error('Failed to connect to API server')
       }
-      console.log('[Mintlayer Connect SDK] API server is reachable');
+      console.log('[Mintlayer Connect SDK] API server is reachable')
 
-      this.isInitialized = true;
-      console.log('[Mintlayer Connect SDK] Initialized successfully');
+      this.isInitialized = true
+      console.log('[Mintlayer Connect SDK] Initialized successfully')
     } catch (error) {
-      console.error('[Mintlayer Connect SDK] Initialization failed:', error);
-      throw error;
+      console.error('[Mintlayer Connect SDK] Initialization failed:', error)
+      throw error
     }
   }
 
   private ensureInitialized(): void {
     if (!this.isInitialized) {
-      throw new Error('SDK not initialized. Use Client.create() to initialize the SDK.');
+      throw new Error('SDK not initialized. Use Client.create() to initialize the SDK.')
     }
   }
 
   private selectUTXOs(utxos: UtxoEntry[], amount: bigint, outputType: string, token_id: string | null): Input[] {
-    return this.selectUTXOsForTransfer(utxos, amount, token_id);
+    return this.selectUTXOsForTransfer(utxos, amount, token_id)
   }
 
   private stringToHex(str: string): string {
-    if(!str) {
-      return '';
+    if (!str) {
+      return ''
     }
 
-    let hex = '';
+    let hex = ''
     for (let i = 0; i < str.length; i++) {
-      hex += str.charCodeAt(i).toString(16);
+      hex += str.charCodeAt(i).toString(16)
     }
-    return hex;
+    return hex
   }
 
-  private getOutputs ({
-                                amount,
-                                address,
-                                networkType,
-                                type = 'Transfer',
-                                lock,
-                                chainTip,
-                                tokenId,
-                                utxo,
-                              }: any) {
+  private getOutputs({ amount, address, networkType, type = 'Transfer', lock, chainTip, tokenId, utxo }: any) {
     if (type === 'LockThenTransfer' && !lock) {
       throw new Error('LockThenTransfer requires a lock')
     }
@@ -276,12 +276,7 @@ class Client {
     const networkIndex = NETWORKS[networkType]
     if (type === 'Transfer') {
       if (tokenId) {
-        return encode_output_token_transfer(
-          amountInstace,
-          address,
-          tokenId,
-          networkIndex,
-        )
+        return encode_output_token_transfer(amountInstace, address, tokenId, networkIndex)
       } else {
         return encode_output_transfer(amountInstace, address, networkIndex)
       }
@@ -295,31 +290,15 @@ class Client {
         lockEncoded = encode_lock_for_block_count(BigInt(lock.content))
       }
       if (tokenId) {
-        return encode_output_token_lock_then_transfer(
-          amountInstace,
-          address,
-          tokenId,
-          lockEncoded,
-          networkIndex,
-        )
+        return encode_output_token_lock_then_transfer(amountInstace, address, tokenId, lockEncoded, networkIndex)
       } else {
-        return encode_output_lock_then_transfer(
-          amountInstace,
-          address,
-          lockEncoded,
-          networkIndex,
-        )
+        return encode_output_lock_then_transfer(amountInstace, address, lockEncoded, networkIndex)
       }
     }
     if (type === 'spendFromDelegation') {
       const stakingMaturity = getStakingMaturity(chainTip, networkType)
       const encodedLockForBlock = encode_lock_for_block_count(stakingMaturity)
-      return encode_output_lock_then_transfer(
-        amountInstace,
-        address,
-        encodedLockForBlock,
-        networkIndex,
-      )
+      return encode_output_lock_then_transfer(amountInstace, address, encodedLockForBlock, networkIndex)
     }
 
     if (type === 'IssueNft') {
@@ -341,10 +320,10 @@ class Client {
   }
 
   private selectUTXOsForTransfer(utxos: UtxoEntry[], amount: bigint, token_id: string | null): Input[] {
-    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
+    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft']
     const filteredUtxos = utxos
       .map((utxo) => {
-        if(utxo.utxo.type === 'IssueNft') {
+        if (utxo.utxo.type === 'IssueNft') {
           return {
             ...utxo,
             utxo: {
@@ -352,47 +331,47 @@ class Client {
               value: {
                 amount: {
                   atoms: 1,
-                  decimal: 1
+                  decimal: 1,
                 },
                 type: 'TokenV1',
                 token_id: utxo.utxo.token_id,
               },
             },
-          };
+          }
         } else {
-          return utxo;
+          return utxo
         }
       })
       .filter((utxo) => transferableUtxoTypes.includes(utxo.utxo.type))
       .filter((utxo) => {
         if (token_id === null) {
-          return utxo.utxo.value.type === 'Coin';
+          return utxo.utxo.value.type === 'Coin'
         }
-        return utxo.utxo.value.token_id === token_id;
-      });
+        return utxo.utxo.value.token_id === token_id
+      })
 
-    let balance = BigInt(0);
-    const utxosToSpend: UtxoEntry[] = [];
-    let lastIndex = 0;
+    let balance = BigInt(0)
+    const utxosToSpend: UtxoEntry[] = []
+    let lastIndex = 0
 
     filteredUtxos.sort((a, b) => {
-      return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
-    });
+      return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms))
+    })
 
     for (let i = 0; i < filteredUtxos.length; i++) {
-      lastIndex = i;
-      const utxoBalance = BigInt(filteredUtxos[i].utxo.value.amount.atoms);
+      lastIndex = i
+      const utxoBalance = BigInt(filteredUtxos[i].utxo.value.amount.atoms)
       if (balance < amount) {
-        balance += utxoBalance;
-        utxosToSpend.push(filteredUtxos[i]);
+        balance += utxoBalance
+        utxosToSpend.push(filteredUtxos[i])
       } else {
-        break;
+        break
       }
     }
 
     if (balance === amount) {
       if (filteredUtxos[lastIndex + 1]) {
-        utxosToSpend.push(filteredUtxos[lastIndex + 1]);
+        utxosToSpend.push(filteredUtxos[lastIndex + 1])
       }
     }
 
@@ -402,176 +381,176 @@ class Client {
         input_type: 'UTXO',
       },
       utxo: item.utxo,
-    }));
+    }))
 
-    return transformedInput;
+    return transformedInput
   }
 
-  readonly isMintlayer: boolean = true;
+  readonly isMintlayer: boolean = true
 
   setNetwork(net: 'mainnet' | 'testnet'): void {
     if (net !== 'testnet' && net !== 'mainnet') {
-      throw new Error('Invalid network. Use "testnet" or "mainnet".');
+      throw new Error('Invalid network. Use "testnet" or "mainnet".')
     }
-    this.network = net;
-    console.log(`[Mintlayer Connect SDK] Network set to: ${this.network}`);
+    this.network = net
+    console.log(`[Mintlayer Connect SDK] Network set to: ${this.network}`)
   }
 
   getNetwork(): 'mainnet' | 'testnet' {
-    return this.network;
+    return this.network
   }
 
   isConnected() {
-    this.ensureInitialized();
-    return this.connectedAddresses[this.network]?.receiving?.length > 0;
+    this.ensureInitialized()
+    return this.connectedAddresses[this.network]?.receiving?.length > 0
   }
 
   async connect(): Promise<string[]> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     if (typeof window !== 'undefined' && window.mojito?.connect) {
-      const addresses = await window.mojito.connect();
-      this.connectedAddresses = addresses;
-      return addresses;
+      const addresses = await window.mojito.connect()
+      this.connectedAddresses = addresses
+      return addresses
     } else {
-      throw new Error('Mojito extension not available');
+      throw new Error('Mojito extension not available')
     }
   }
 
   async disconnect(): Promise<void> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     if (typeof window !== 'undefined' && window.mojito?.disconnect) {
-      await window.mojito.disconnect();
-      this.connectedAddresses = [];
+      await window.mojito.disconnect()
+      this.connectedAddresses = []
     } else {
-      throw new Error('Mojito extension not available');
+      throw new Error('Mojito extension not available')
     }
   }
 
   async restore(): Promise<boolean> {
-    this.ensureInitialized();
+    this.ensureInitialized()
 
     if (typeof window === 'undefined' || !window.mojito || typeof window.mojito.restore !== 'function') {
-      console.warn('[Mintlayer SDK] No injected wallet found. Cannot restore session.');
-      return false;
+      console.warn('[Mintlayer SDK] No injected wallet found. Cannot restore session.')
+      return false
     }
 
     try {
-      const addressData = await window.mojito.restore();
+      const addressData = await window.mojito.restore()
 
       if (addressData?.[this.network]?.receiving?.length) {
-        this.connectedAddresses = addressData[this.network].receiving;
-        console.log('[Mintlayer SDK] Session restored');
-        return true;
+        this.connectedAddresses = addressData[this.network].receiving
+        console.log('[Mintlayer SDK] Session restored')
+        return true
       }
 
-      console.log('[Mintlayer SDK] No session data found for restore');
-      return false;
+      console.log('[Mintlayer SDK] No session data found for restore')
+      return false
     } catch (err) {
-      console.error('[Mintlayer SDK] Failed to restore session:', err);
-      return false;
+      console.error('[Mintlayer SDK] Failed to restore session:', err)
+      return false
     }
   }
 
   async request({ method, params }: { method: string; params?: Record<string, any> }): Promise<any> {
-    this.ensureInitialized();
+    this.ensureInitialized()
 
     if (typeof window !== 'undefined' && window.mojito?.request) {
-      return await window.mojito.request(method, params);
+      return await window.mojito.request(method, params)
     } else {
-      throw new Error('Mojito extension not available');
+      throw new Error('Mojito extension not available')
     }
   }
 
   async getAddresses(): Promise<string[]> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     if (this.connectedAddresses.length > 0) {
-      return this.connectedAddresses;
+      return this.connectedAddresses
     }
-    return [];
+    return []
   }
 
   async getBalance(): Promise<number> {
-    this.ensureInitialized();
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    this.ensureInitialized()
+    const address = this.connectedAddresses
+    const currentAddress = address[this.network]
 
     if (this.connectedAddresses.length === 0) {
       // throw new Error('No addresses connected. Call connect first.');
     }
     try {
-      const addressList = [...currentAddress.receiving, ...currentAddress.change];
+      const addressList = [...currentAddress.receiving, ...currentAddress.change]
 
       const balancePromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}`);
+        const response = await fetch(`${this.getApiServer()}/address/${addr}`)
         if (!response.ok) {
           if (response.status === 404) {
-            console.warn(`Address ${addr} not found`);
-            return 0;
+            console.warn(`Address ${addr} not found`)
+            return 0
           }
-          throw new Error('Failed to fetch balance');
+          throw new Error('Failed to fetch balance')
         }
-        const data = await response.json();
-        return data.coin_balance.decimal;
-      });
-      const balances = await Promise.all(balancePromises);
+        const data = await response.json()
+        return data.coin_balance.decimal
+      })
+      const balances = await Promise.all(balancePromises)
       const totalBalance = balances.reduce((acc: number, balance: string) => {
-        return acc + parseFloat(balance);
-      }, 0);
+        return acc + parseFloat(balance)
+      }, 0)
 
-      return totalBalance;
+      return totalBalance
     } catch (error) {
-      throw new Error(`API error: ${(error as Error).message}`);
+      throw new Error(`API error: ${(error as Error).message}`)
     }
   }
 
   async getBalances(): Promise<{
-    coin: number;
-    token: Record<string, number>;
+    coin: number
+    token: Record<string, number>
   }> {
-    this.ensureInitialized();
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    this.ensureInitialized()
+    const address = this.connectedAddresses
+    const currentAddress = address[this.network]
 
     if (this.connectedAddresses.length === 0) {
       // throw new Error('No addresses connected. Call connect first.');
     }
 
     try {
-      const addressList = [...currentAddress.receiving, ...currentAddress.change];
+      const addressList = [...currentAddress.receiving, ...currentAddress.change]
 
       const balancePromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}`);
+        const response = await fetch(`${this.getApiServer()}/address/${addr}`)
         if (!response.ok) {
           if (response.status === 404) {
-            console.warn(`Address ${addr} not found`);
-            return null;
+            console.warn(`Address ${addr} not found`)
+            return null
           }
-          throw new Error('Failed to fetch balance');
+          throw new Error('Failed to fetch balance')
         }
-        const data = await response.json();
-        return data;
-      });
+        const data = await response.json()
+        return data
+      })
 
-      const results = await Promise.all(balancePromises);
+      const results = await Promise.all(balancePromises)
 
-      let totalBalance = 0;
-      const tokenMap: Record<string, number> = {};
+      let totalBalance = 0
+      const tokenMap: Record<string, number> = {}
 
       for (const result of results) {
-        if (!result) continue;
+        if (!result) continue
 
         // Add coin balance
-        totalBalance += parseFloat(result.coin_balance.decimal);
+        totalBalance += parseFloat(result.coin_balance.decimal)
 
         // Add token balances
         if (Array.isArray(result.tokens)) {
           for (const token of result.tokens) {
-            const tokenId = token.token_id;
-            const tokenDecimal = parseFloat(token.amount.decimal);
+            const tokenId = token.token_id
+            const tokenDecimal = parseFloat(token.amount.decimal)
             if (!tokenMap[tokenId]) {
-              tokenMap[tokenId] = 0;
+              tokenMap[tokenId] = 0
             }
-            tokenMap[tokenId] += tokenDecimal;
+            tokenMap[tokenId] += tokenDecimal
           }
         }
       }
@@ -579,148 +558,154 @@ class Client {
       return {
         coin: totalBalance,
         token: tokenMap,
-      };
+      }
     } catch (error) {
-      throw new Error(`API error: ${(error as Error).message}`);
+      throw new Error(`API error: ${(error as Error).message}`)
     }
   }
 
   async getDelegations(): Promise<any[]> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     if (this.connectedAddresses.length === 0) {
       // throw new Error('No addresses connected. Call connect first.');
     }
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const address = this.connectedAddresses
+    const currentAddress = address[this.network]
     try {
-      const addressList = [...currentAddress.receiving, ...currentAddress.change];
+      const addressList = [...currentAddress.receiving, ...currentAddress.change]
 
       const delegationPromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}/delegations`);
+        const response = await fetch(`${this.getApiServer()}/address/${addr}/delegations`)
         if (!response.ok) {
           if (response.status === 404) {
-            console.warn(`Address ${addr} not found`);
-            return {};
+            console.warn(`Address ${addr} not found`)
+            return {}
           }
-          throw new Error('Failed to fetch delegations');
+          throw new Error('Failed to fetch delegations')
         }
-        const data = await response.json();
-        return data;
-      });
-      const delegations = await Promise.all(delegationPromises);
+        const data = await response.json()
+        return data
+      })
+      const delegations = await Promise.all(delegationPromises)
       const totalDelegations = delegations.reduce((acc: any[], del: any) => {
-        return acc.concat(del);
-      }, []);
+        return acc.concat(del)
+      }, [])
 
-      return totalDelegations;
+      return totalDelegations
     } catch (error) {
-      throw new Error(`API error: ${(error as Error).message}`);
+      throw new Error(`API error: ${(error as Error).message}`)
     }
   }
 
   async getTokensOwned(): Promise<any[]> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     if (this.connectedAddresses.length === 0) {
       // throw new Error('No addresses connected. Call connect first.');
     }
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const address = this.connectedAddresses
+    const currentAddress = address[this.network]
     try {
-      const addressList = [...currentAddress.receiving, ...currentAddress.change];
+      const addressList = [...currentAddress.receiving, ...currentAddress.change]
 
       const authorityPromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}/token-authority`);
+        const response = await fetch(`${this.getApiServer()}/address/${addr}/token-authority`)
         if (!response.ok) {
           if (response.status === 404) {
-            console.warn(`Address ${addr} not found`);
-            return {};
+            console.warn(`Address ${addr} not found`)
+            return {}
           }
-          throw new Error('Failed to fetch delegations');
+          throw new Error('Failed to fetch delegations')
         }
-        const data = await response.json();
-        return data;
-      });
-      const authority = await Promise.all(authorityPromises);
+        const data = await response.json()
+        return data
+      })
+      const authority = await Promise.all(authorityPromises)
       const totalAuthority = authority.reduce((acc: any[], del: any) => {
-        return acc.concat(del);
-      }, []);
+        return acc.concat(del)
+      }, [])
 
-      return totalAuthority;
+      return totalAuthority
     } catch (error) {
-      throw new Error(`API error: ${(error as Error).message}`);
+      throw new Error(`API error: ${(error as Error).message}`)
     }
   }
 
   async getDelegationsTotal(): Promise<number> {
-    this.ensureInitialized();
-    const delegations = await this.getDelegations();
+    this.ensureInitialized()
+    const delegations = await this.getDelegations()
     const totalDelegation = delegations.reduce((acc: number, del: any) => {
-      return acc + parseFloat(del.balance.decimal);
-    }, 0);
-    return totalDelegation;
+      return acc + parseFloat(del.balance.decimal)
+    }, 0)
+    return totalDelegation
   }
 
   getFeeForType(type: string): bigint {
-    this.ensureInitialized();
-    const block_height = 200000n; // TODO: Get the current block height
-    let fee = 0n;
+    this.ensureInitialized()
+    const block_height = 200000n // TODO: Get the current block height
+    let fee = 0n
     switch (type) {
       case 'Transfer':
-        return BigInt(2 * Math.pow(10, 11).toString());
+        return BigInt(2 * Math.pow(10, 11).toString())
       case 'BurnToken':
-        return 0n;
+        return 0n
       case 'IssueNft':
-        fee = nft_issuance_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = nft_issuance_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'IssueFungibleToken':
-        fee = fungible_token_issuance_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = fungible_token_issuance_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'MintToken':
-        fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'UnmintToken':
-        fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'LockTokenSupply':
-        fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = token_supply_change_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'ChangeTokenAuthority':
-        fee = token_change_authority_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = token_change_authority_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'ChangeMetadataUri':
-        return BigInt(50 * Math.pow(10, 11).toString());
+        return BigInt(50 * Math.pow(10, 11).toString())
       case 'FreezeToken':
-        fee = token_freeze_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = token_freeze_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'UnfreezeToken':
-        return BigInt(50 * Math.pow(10, 11).toString());
+        return BigInt(50 * Math.pow(10, 11).toString())
       case 'DataDeposit':
-        fee = data_deposit_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-        return BigInt(fee.atoms());
+        fee = data_deposit_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet)
+        return BigInt(fee.atoms())
       case 'CreateDelegationId':
-        return 0n;
+        return 0n
       case 'DelegationStake':
-        return 0n;
+        return 0n
       case 'CreateOrder':
-        return 0n;
+        return 0n
       case 'FillOrder':
-        return 0n;
+        return 0n
       case 'ConcludeOrder':
-        return 0n;
+        return 0n
       default:
-        throw new Error(`Unknown transaction type: ${type}`);
+        throw new Error(`Unknown transaction type: ${type}`)
     }
   }
 
-  async buildTransaction({ type = 'Transfer', params }: { type?: string; params: BuildTransactionParams }): Promise<Transaction> {
-    this.ensureInitialized();
-    if (!params) throw new Error('Missing params');
+  async buildTransaction({
+    type = 'Transfer',
+    params,
+  }: {
+    type?: string
+    params: BuildTransactionParams
+  }): Promise<Transaction> {
+    this.ensureInitialized()
+    if (!params) throw new Error('Missing params')
 
-    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
+    console.log('[Mintlayer Connect SDK] Building transaction:', type, params)
 
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
-    const addressList = [...currentAddress.receiving, ...currentAddress.change];
+    const address = this.connectedAddresses
+    const currentAddress = address[this.network]
+    const addressList = [...currentAddress.receiving, ...currentAddress.change]
 
     const response = await fetch('https://api.mintini.app' + '/account', {
       method: 'POST',
@@ -728,38 +713,38 @@ class Client {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ addresses: addressList, network: this.network === 'mainnet' ? 0 : 1 }),
-    });
+    })
 
     if (!response.ok) {
-      throw new Error('Failed to fetch utxos');
+      throw new Error('Failed to fetch utxos')
     }
 
-    const data = await response.json();
-    const utxos: UtxoEntry[] = data.utxos;
+    const data = await response.json()
+    const utxos: UtxoEntry[] = data.utxos
 
-    let fee = 0n;
-    const inputs: Input[] = [];
-    const outputs: Output[] = [];
+    let fee = 0n
+    const inputs: Input[] = []
+    const outputs: Output[] = []
 
-    let input_amount_coin_req = 0n;
-    let input_amount_token_req = 0n;
+    let input_amount_coin_req = 0n
+    let input_amount_token_req = 0n
 
-    let send_token: { token_id: string; number_of_decimals: number } | undefined;
+    let send_token: { token_id: string; number_of_decimals: number } | undefined
 
-    fee += this.getFeeForType(type);
+    fee += this.getFeeForType(type)
 
     if (type === 'Transfer') {
-      const token_id = params.token_id ? params.token_id : 'Coin';
-      const token_details = params.token_details;
+      const token_id = params.token_id ? params.token_id : 'Coin'
+      const token_details = params.token_details
 
       if (token_id === 'Coin') {
-        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
+        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11))
       } else {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals));
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals))
         send_token = {
           token_id,
           number_of_decimals: token_details?.number_of_decimals,
-        };
+        }
       }
 
       outputs.push({
@@ -769,38 +754,38 @@ class Client {
           ...(token_id === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id,
-            }),
+                type: 'TokenV1',
+                token_id,
+              }),
           ...(token_id === 'Coin'
             ? {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                },
               }
-            }
             : {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
-              }
-            }),
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
+                },
+              }),
         },
-      });
+      })
     }
 
     if (type === 'BurnToken') {
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const token_id = params.token_id
+      const token_details = params.token_details
 
       if (token_id === 'Coin') {
-        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
+        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11))
       } else {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals));
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals))
         send_token = {
           token_id,
           number_of_decimals: token_details!.number_of_decimals,
-        };
+        }
       }
 
       outputs.push({
@@ -809,24 +794,24 @@ class Client {
           ...(token_id === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id,
-            }),
+                type: 'TokenV1',
+                token_id,
+              }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
           },
         },
-      });
+      })
     }
 
     if (type === 'IssueFungibleToken') {
-      let total_supply: { type: string; amount?: Amount };
+      let total_supply: { type: string; amount?: Amount }
 
       if (params.supply_type === 'Unlimited') {
-        total_supply = { type: 'Unlimited' };
+        total_supply = { type: 'Unlimited' }
       } else if (params.supply_type === 'Lockable') {
-        total_supply = { type: 'Lockable' };
+        total_supply = { type: 'Lockable' }
       } else if (params.supply_type === 'Fixed') {
         total_supply = {
           type: 'Fixed',
@@ -834,9 +819,9 @@ class Client {
             atoms: (params.supply_amount! * Math.pow(10, params.number_of_decimals!)).toString(),
             decimal: params.supply_amount!.toString(),
           },
-        };
+        }
       } else {
-        throw new Error('Invalid supply_type');
+        throw new Error('Invalid supply_type')
       }
 
       outputs.push({
@@ -853,7 +838,7 @@ class Client {
         },
         total_supply,
         type: 'IssueFungibleToken',
-      });
+      })
     }
 
     if (type === 'IssueNft') {
@@ -892,14 +877,14 @@ class Client {
             string: params.ticker,
           },
         },
-      });
+      })
     }
 
     if (type === 'MintToken') {
       const amount = {
         atoms: (params.amount! * Math.pow(10, params.token_details!.number_of_decimals)).toString(),
         decimal: params.amount!.toString(),
-      };
+      }
 
       inputs.push({
         input: {
@@ -911,7 +896,7 @@ class Client {
           authority: params.token_details!.authority,
         },
         utxo: null,
-      });
+      })
       outputs.push({
         destination: params.destination,
         type: 'Transfer',
@@ -920,23 +905,23 @@ class Client {
           token_id: params.token_id,
           amount,
         },
-      });
+      })
     }
 
     if (type === 'UnmintToken') {
       const amount = {
         atoms: '10000000000000',
         decimal: '100',
-      };
+      }
 
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const token_id = params.token_id
+      const token_details = params.token_details
 
-      input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals));
+      input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals))
       send_token = {
         token_id,
         number_of_decimals: token_details!.number_of_decimals,
-      };
+      }
 
       inputs.push({
         input: {
@@ -948,12 +933,12 @@ class Client {
           authority: token_details!.authority,
         },
         utxo: null,
-      });
+      })
     }
 
     if (type === 'LockTokenSupply') {
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const token_id = params.token_id
+      const token_details = params.token_details
 
       inputs.push({
         input: {
@@ -964,12 +949,12 @@ class Client {
           authority: token_details!.authority,
         },
         utxo: null,
-      });
+      })
     }
 
     if (type === 'ChangeTokenAuthority') {
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const token_id = params.token_id
+      const token_details = params.token_details
 
       inputs.push({
         input: {
@@ -981,12 +966,12 @@ class Client {
           authority: token_details!.authority,
         },
         utxo: null,
-      });
+      })
     }
 
     if (type === 'ChangeMetadataUri') {
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const token_id = params.token_id
+      const token_details = params.token_details
 
       inputs.push({
         input: {
@@ -998,12 +983,12 @@ class Client {
           authority: token_details!.authority,
         },
         utxo: null,
-      });
+      })
     }
 
     if (type === 'FreezeToken') {
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const token_id = params.token_id
+      const token_details = params.token_details
 
       inputs.push({
         input: {
@@ -1015,12 +1000,12 @@ class Client {
           authority: token_details!.authority,
         },
         utxo: null,
-      });
+      })
     }
 
     if (type === 'UnfreezeToken') {
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const token_id = params.token_id
+      const token_details = params.token_details
 
       inputs.push({
         input: {
@@ -1031,14 +1016,14 @@ class Client {
           authority: token_details!.authority,
         },
         utxo: null,
-      });
+      })
     }
 
     if (type === 'DataDeposit') {
       outputs.push({
         type: 'DataDeposit',
         data: params.data,
-      });
+      })
     }
 
     if (type === 'CreateDelegationId') {
@@ -1046,14 +1031,14 @@ class Client {
         type: 'CreateDelegationId',
         destination: params.destination,
         pool_id: params.pool_id,
-      });
+      })
     }
 
     if (type === 'DelegationStake') {
-      const { pool_id, delegation_id, amount } = params;
+      const { pool_id, delegation_id, amount } = params
 
-      const amount_atoms = amount! * Math.pow(10, 11);
-      input_amount_coin_req += BigInt(amount! * Math.pow(10, 11));
+      const amount_atoms = amount! * Math.pow(10, 11)
+      input_amount_coin_req += BigInt(amount! * Math.pow(10, 11))
 
       outputs.push({
         type: 'DelegateStaking',
@@ -1062,13 +1047,13 @@ class Client {
           atoms: amount_atoms.toString(),
           decimal: amount!.toString(),
         },
-      });
+      })
     }
 
     if (type === 'DelegationWithdraw') {
-      const { pool_id, delegation_id, amount } = params;
+      const { pool_id, delegation_id, amount } = params
 
-      const amount_atoms = amount! * Math.pow(10, 11);
+      const amount_atoms = amount! * Math.pow(10, 11)
 
       inputs.push({
         input: {
@@ -1079,18 +1064,18 @@ class Client {
           atoms: amount_atoms.toString(),
           decimal: amount!.toString(),
         },
-      });
+      })
     }
 
     if (type === 'CreateOrder') {
-      const { ask_amount, ask_token, give_amount, give_token, conclude_destination } = params;
-      const give_token_details = { number_of_decimals: 11 }; // TODO
-      const ask_token_details = { number_of_decimals: 11 }; // TODO
+      const { ask_amount, ask_token, give_amount, give_token, conclude_destination } = params
+      const give_token_details = { number_of_decimals: 11 } // TODO
+      const ask_token_details = { number_of_decimals: 11 } // TODO
 
       if (give_token === 'Coin') {
-        input_amount_coin_req += BigInt(give_amount! * Math.pow(10, 11));
+        input_amount_coin_req += BigInt(give_amount! * Math.pow(10, 11))
       } else {
-        input_amount_token_req += BigInt(give_amount! * Math.pow(10, give_token_details.number_of_decimals));
+        input_amount_token_req += BigInt(give_amount! * Math.pow(10, give_token_details.number_of_decimals))
       }
 
       outputs.push({
@@ -1099,19 +1084,13 @@ class Client {
           atoms: (ask_amount! * Math.pow(10, 11)).toString(),
           decimal: ask_amount!.toString(),
         },
-        ask_currency:
-          ask_token === 'Coin'
-            ? { type: 'Coin' }
-            : { token_id: ask_token, type: 'Token' },
+        ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'Token' },
         conclude_destination,
         give_balance: {
           atoms: (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString(),
           decimal: give_amount!.toString(),
         },
-        give_currency:
-          give_token === 'Coin'
-            ? { type: 'Coin' }
-            : { token_id: give_token, type: 'Token' },
+        give_currency: give_token === 'Coin' ? { type: 'Coin' } : { token_id: give_token, type: 'Token' },
         initially_asked: {
           atoms: (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
           decimal: ask_amount!.toString(),
@@ -1120,11 +1099,11 @@ class Client {
           atoms: (give_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
           decimal: give_amount!.toString(),
         },
-      });
+      })
     }
 
     if (type === 'ConcludeOrder') {
-      const { order_id, nonce, conclude_destination } = params.order;
+      const { order_id, nonce, conclude_destination } = params.order
       inputs.push({
         input: {
           type: 'ConcludeOrder',
@@ -1133,7 +1112,7 @@ class Client {
           nonce: nonce,
         },
         utxo: null,
-      });
+      })
 
       const order_details = {
         order_id: order_id,
@@ -1141,7 +1120,7 @@ class Client {
         give_currency: 'Coin',
         ask_amount: 0,
         give_amount: 0,
-      };
+      }
 
       outputs.push({
         type: 'Transfer',
@@ -1150,15 +1129,15 @@ class Client {
           ...(order_details.ask_currency === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id: order_details.ask_currency.token_id,
-            }),
+                type: 'TokenV1',
+                token_id: order_details.ask_currency.token_id,
+              }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
           },
         },
-      });
+      })
 
       outputs.push({
         type: 'Transfer',
@@ -1167,21 +1146,21 @@ class Client {
           ...(order_details.give_currency === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id: order_details.give_currency.token_id,
-            }),
+                type: 'TokenV1',
+                token_id: order_details.give_currency.token_id,
+              }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
           },
         },
-      });
+      })
     }
 
     if (type === 'FillOrder') {
-      const { order_id, amount, destination, order_details } = params;
+      const { order_id, amount, destination, order_details } = params
 
-      const amount_atoms = amount! * Math.pow(10, 11);
+      const amount_atoms = amount! * Math.pow(10, 11)
 
       inputs.push({
         input: {
@@ -1193,24 +1172,26 @@ class Client {
           nonce: order_details.nonce.toString(),
         },
         utxo: null,
-      });
+      })
     }
 
-    fee += BigInt(2 * Math.pow(10, 11).toString());
-    input_amount_coin_req += fee;
+    fee += BigInt(2 * Math.pow(10, 11).toString())
+    input_amount_coin_req += fee
 
-    const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null);
-    const inputObjToken = send_token?.token_id ? this.selectUTXOs(utxos, input_amount_token_req, 'Transfer', send_token.token_id) : [];
+    const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null)
+    const inputObjToken = send_token?.token_id
+      ? this.selectUTXOs(utxos, input_amount_token_req, 'Transfer', send_token.token_id)
+      : []
 
-    const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
-    const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
+    const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n)
+    const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n)
 
     if (totalInputValueToken < input_amount_token_req) {
-      console.log('Not enough token UTXOs');
+      console.log('Not enough token UTXOs')
     }
 
-    const changeAmountCoin = totalInputValueCoin - input_amount_coin_req;
-    const changeAmountToken = totalInputValueToken - input_amount_token_req;
+    const changeAmountCoin = totalInputValueCoin - input_amount_coin_req
+    const changeAmountToken = totalInputValueToken - input_amount_token_req
 
     if (changeAmountCoin > 0) {
       outputs.push({
@@ -1223,11 +1204,11 @@ class Client {
           },
         },
         destination: currentAddress.change[0],
-      });
+      })
     }
 
     if (changeAmountToken > 0) {
-      const decimals = send_token?.number_of_decimals;
+      const decimals = send_token?.number_of_decimals
 
       outputs.push({
         type: 'Transfer',
@@ -1240,18 +1221,18 @@ class Client {
           },
         },
         destination: currentAddress.change[0],
-      });
+      })
     }
 
-    inputs.push(...inputObjCoin);
-    inputs.push(...inputObjToken);
+    inputs.push(...inputObjCoin)
+    inputs.push(...inputObjToken)
 
     const JSONRepresentation = {
       inputs,
       outputs,
-    };
+    }
 
-    const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
+    const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1)
 
     const transaction = encode_transaction(
       mergeUint8Arrays(BINRepresentation.inputs),
@@ -1259,43 +1240,43 @@ class Client {
       BigInt(0),
     )
 
-    const transaction_id = get_transaction_id(transaction);
+    const transaction_id = get_transaction_id(transaction)
 
     // some operations need to be recoded with given data
     // if outputs include issueNft type
-    if(outputs.some((output) => output.type === 'IssueNft')) {
+    if (outputs.some((output) => output.type === 'IssueNft')) {
       // need to modify the transaction outout exact that object
       try {
-        get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+        get_token_id(
+          mergeUint8Arrays(BINRepresentation.inputs),
+          this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
+        )
       } catch (error) {
-        throw new Error('Error while getting token id');
+        throw new Error('Error while getting token id')
       }
-      const token_id = get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
-      const index = outputs.findIndex((output) => output.type === 'IssueNft');
-      const output = outputs[index];
+      const token_id = get_token_id(
+        mergeUint8Arrays(BINRepresentation.inputs),
+        this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
+      )
+      const index = outputs.findIndex((output) => output.type === 'IssueNft')
+      const output = outputs[index]
       outputs[index] = {
         ...output,
         token_id: token_id,
       }
     }
 
-    const HEXRepresentation_unsigned = transaction.reduce(
-      (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
-      '',
-    );
+    const HEXRepresentation_unsigned = transaction.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '')
 
     return {
       JSONRepresentation,
       BINRepresentation,
       HEXRepresentation_unsigned,
       transaction_id,
-    };
+    }
   }
 
-  getTransactionBINrepresentation(
-    transactionJSONrepresentation,
-    _network,
-  ) {
+  getTransactionBINrepresentation(transactionJSONrepresentation, _network) {
     const network = _network
     const networkType = network === 1 ? 'testnet' : 'mainnet'
     // Binarisation
@@ -1308,31 +1289,20 @@ class Client {
         index: input.index,
       }))
     const transactionBytes = transactionStrings.map((transaction) => ({
-      bytes: Uint8Array.from(
-        transaction.transaction.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
-      ),
-      index: transaction.index,
-    }));
-    const outpointedSourceIds = transactionBytes.map((transaction) => ({
-      source_id: encode_outpoint_source_id(
-        transaction.bytes,
-        SourceId.Transaction,
-      ),
+      bytes: Uint8Array.from(transaction.transaction.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))),
       index: transaction.index,
     }))
-    const inputsIds = outpointedSourceIds.map((source) =>
-      encode_input_for_utxo(source.source_id, source.index),
-    )
+    const outpointedSourceIds = transactionBytes.map((transaction) => ({
+      source_id: encode_outpoint_source_id(transaction.bytes, SourceId.Transaction),
+      index: transaction.index,
+    }))
+    const inputsIds = outpointedSourceIds.map((source) => encode_input_for_utxo(source.source_id, source.index))
 
     const inputCommands = transactionJSONrepresentation.inputs
       .filter(({ input }) => input.input_type === 'AccountCommand')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
-          return encode_input_for_conclude_order(
-            input.order_id,
-            BigInt(input.nonce.toString()),
-            network,
-          )
+          return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), network)
         }
         if (input.command === 'FillOrder') {
           return encode_input_for_fill_order(
@@ -1352,18 +1322,10 @@ class Client {
           )
         }
         if (input.command === 'UnmintTokens') {
-          return encode_input_for_unmint_tokens(
-            input.token_id,
-            input.nonce.toString(),
-            network,
-          )
+          return encode_input_for_unmint_tokens(input.token_id, input.nonce.toString(), network)
         }
         if (input.command === 'LockTokenSupply') {
-          return encode_input_for_lock_token_supply(
-            input.token_id,
-            input.nonce.toString(),
-            network,
-          )
+          return encode_input_for_lock_token_supply(input.token_id, input.nonce.toString(), network)
         }
         if (input.command === 'ChangeTokenAuthority') {
           return encode_input_for_change_token_authority(
@@ -1390,145 +1352,114 @@ class Client {
           )
         }
         if (input.command === 'UnfreezeToken') {
-          return encode_input_for_unfreeze_token(
-            input.token_id,
-            input.nonce.toString(),
-            network,
-          )
+          return encode_input_for_unfreeze_token(input.token_id, input.nonce.toString(), network)
         }
       })
 
     const inputsArray = [...inputCommands, ...inputsIds]
 
-    const outputsArrayItems = transactionJSONrepresentation.outputs.map(
-      (output) => {
-        if (output.type === 'Transfer') {
-          return this.getOutputs({
-            amount: BigInt(output.value.amount.atoms).toString(),
-            address: output.destination,
-            networkType: this.network,
-            ...(output?.value?.token_id
-              ? { tokenId: output.value.token_id }
-              : {}),
-          })
-        }
-        if (output.type === 'LockThenTransfer') {
-          return this.getOutputs({
-            type: 'LockThenTransfer',
-            lock: output.lock,
-            amount: BigInt(output.value.amount.atoms).toString(),
-            address: output.destination,
-            networkType: this.network,
-            ...(output?.value?.token_id
-              ? { tokenId: output.value.token_id }
-              : {}),
-          })
-        }
-        if (output.type === 'CreateOrder') {
-          return encode_create_order_output(
-            Amount.from_atoms(output.ask_balance.atoms.toString()), //ask_amount
-            output.ask_currency.token_id || null, // ask_token_id
-            Amount.from_atoms(output.give_balance.atoms.toString()), //give_amount
-            output.give_currency.token_id || null, //give_token_id
-            output.conclude_destination, // conclude_address
+    const outputsArrayItems = transactionJSONrepresentation.outputs.map((output) => {
+      if (output.type === 'Transfer') {
+        return this.getOutputs({
+          amount: BigInt(output.value.amount.atoms).toString(),
+          address: output.destination,
+          networkType: this.network,
+          ...(output?.value?.token_id ? { tokenId: output.value.token_id } : {}),
+        })
+      }
+      if (output.type === 'LockThenTransfer') {
+        return this.getOutputs({
+          type: 'LockThenTransfer',
+          lock: output.lock,
+          amount: BigInt(output.value.amount.atoms).toString(),
+          address: output.destination,
+          networkType: this.network,
+          ...(output?.value?.token_id ? { tokenId: output.value.token_id } : {}),
+        })
+      }
+      if (output.type === 'CreateOrder') {
+        return encode_create_order_output(
+          Amount.from_atoms(output.ask_balance.atoms.toString()), //ask_amount
+          output.ask_currency.token_id || null, // ask_token_id
+          Amount.from_atoms(output.give_balance.atoms.toString()), //give_amount
+          output.give_currency.token_id || null, //give_token_id
+          output.conclude_destination, // conclude_address
+          network, // network
+        )
+      }
+      if (output.type === 'BurnToken') {
+        if (output.value.token_id) {
+          return encode_output_token_burn(
+            Amount.from_atoms(output.value.amount.atoms.toString()), // amount
+            output.value.token_id, // token_id
             network, // network
           )
         }
-        if (output.type === 'BurnToken') {
-          if (output.value.token_id) {
-            return encode_output_token_burn(
-              Amount.from_atoms(output.value.amount.atoms.toString()), // amount
-              output.value.token_id, // token_id
-              network, // network
-            )
-          }
-          if (output.value.type === 'Coin') {
-            return encode_output_coin_burn(
-              Amount.from_atoms(output.value.amount.atoms.toString()), // amount
-            )
-          }
-        }
-        if (output.type === 'IssueNft') {
-          const {
-            name,
-            ticker,
-            description,
-            media_hash,
-            creator,
-            media_uri,
-            icon_uri,
-            additional_metadata_uri,
-          } = output.data
-
-          const {
-            destination: address,
-            token_id,
-          } = output
-
-          const chainTip = '200000' // TODO unhardcode
-
-          return encode_output_issue_nft(
-            token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
-            address,
-            name.string,
-            ticker.string,
-            description.string,
-            media_hash.string,
-            null, // TODO: check for public key, key hash is not working
-            media_uri.string,
-            icon_uri.string,
-            additional_metadata_uri.string,
-            BigInt(chainTip),
-            network,
+        if (output.value.type === 'Coin') {
+          return encode_output_coin_burn(
+            Amount.from_atoms(output.value.amount.atoms.toString()), // amount
           )
         }
-        if (output.type === 'IssueFungibleToken') {
-          const {
-            authority,
-            is_freezable,
-            metadata_uri,
-            number_of_decimals,
-            token_ticker,
-            total_supply,
-          } = output
+      }
+      if (output.type === 'IssueNft') {
+        const { name, ticker, description, media_hash, creator, media_uri, icon_uri, additional_metadata_uri } =
+          output.data
 
-          const chainTip = '200000' // TODO: unhardcode height
+        const { destination: address, token_id } = output
 
-          const is_token_freezable =
-            is_freezable === true ? FreezableToken.Yes : FreezableToken.No
+        const chainTip = '200000' // TODO unhardcode
 
-          const supply_amount =
-            total_supply.type === 'Fixed'
-              ? Amount.from_atoms(total_supply.amount.atoms.toString())
-              : null
+        return encode_output_issue_nft(
+          token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
+          address,
+          name.string,
+          ticker.string,
+          description.string,
+          media_hash.string,
+          null, // TODO: check for public key, key hash is not working
+          media_uri.string,
+          icon_uri.string,
+          additional_metadata_uri.string,
+          BigInt(chainTip),
+          network,
+        )
+      }
+      if (output.type === 'IssueFungibleToken') {
+        const { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, total_supply } = output
 
-          const total_supply_type =
-            total_supply.type === 'Fixed'
-              ? TotalSupply.Fixed
-              : total_supply.type === 'Lockable'
-                ? TotalSupply.Lockable
-                : TotalSupply.Unlimited
+        const chainTip = '200000' // TODO: unhardcode height
 
-          // const encoder = new TextEncoder()
+        const is_token_freezable = is_freezable === true ? FreezableToken.Yes : FreezableToken.No
 
-          return encode_output_issue_fungible_token(
-            authority, // ok
-            token_ticker.string, // ok
-            metadata_uri.string, // ok
-            parseInt(number_of_decimals), // ok
-            total_supply_type, // ok
-            supply_amount, // ok
-            is_token_freezable, // ok
-            BigInt(chainTip), // ok
-            network,
-          )
-        }
+        const supply_amount =
+          total_supply.type === 'Fixed' ? Amount.from_atoms(total_supply.amount.atoms.toString()) : null
 
-        if (output.type === 'DataDeposit') {
-          return encode_output_data_deposit(new TextEncoder().encode(output.data))
-        }
-      },
-    )
+        const total_supply_type =
+          total_supply.type === 'Fixed'
+            ? TotalSupply.Fixed
+            : total_supply.type === 'Lockable'
+              ? TotalSupply.Lockable
+              : TotalSupply.Unlimited
+
+        // const encoder = new TextEncoder()
+
+        return encode_output_issue_fungible_token(
+          authority, // ok
+          token_ticker.string, // ok
+          metadata_uri.string, // ok
+          parseInt(number_of_decimals), // ok
+          total_supply_type, // ok
+          supply_amount, // ok
+          is_token_freezable, // ok
+          BigInt(chainTip), // ok
+          network,
+        )
+      }
+
+      if (output.type === 'DataDeposit') {
+        return encode_output_data_deposit(new TextEncoder().encode(output.data))
+      }
+    })
     const outputsArray = outputsArrayItems
 
     const inputAddresses = transactionJSONrepresentation.inputs
@@ -1550,345 +1481,411 @@ class Client {
   }
 
   async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<any> {
-    this.ensureInitialized();
-    let token_details: Record<string, any> = token_id ? { token_id } : {};
+    this.ensureInitialized()
+    let token_details: Record<string, any> = token_id ? { token_id } : {}
     if (token_id) {
-      const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+      const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
       if (!request.ok) {
-        throw new Error('Failed to fetch token');
+        throw new Error('Failed to fetch token')
       }
-      const token = await request.json();
-      token_details = { ...token };
+      const token = await request.json()
+      token_details = { ...token }
     }
-    const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } })
+    return this.signTransaction(tx)
   }
 
   async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<any> {
-    this.ensureInitialized();
-    const amount = 1;
-    let token_details: Record<string, any> = token_id ? { token_id } : {};
+    this.ensureInitialized()
+    const amount = 1
+    let token_details: Record<string, any> = token_id ? { token_id } : {}
     if (token_id) {
-      const request = await fetch(`${this.getApiServer()}/nft/${token_id}`);
+      const request = await fetch(`${this.getApiServer()}/nft/${token_id}`)
       if (!request.ok) {
-        throw new Error('Failed to fetch token');
+        throw new Error('Failed to fetch token')
       }
-      const token = await request.json();
-      token_details = token;
-      token_details.number_of_decimals = 0; // that's NFT
+      const token = await request.json()
+      token_details = token
+      token_details.number_of_decimals = 0 // that's NFT
     }
-    const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } })
+    return this.signTransaction(tx)
   }
 
   async delegate({ poolId, amount }: { poolId: string; amount: number }): Promise<any> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { poolId } });
-    return this.signTransaction(tx);
+    this.ensureInitialized()
+    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { poolId } })
+    return this.signTransaction(tx)
   }
 
   async issueNft(tokenData: Record<string, any>): Promise<any> {
-    this.ensureInitialized();
-    const description = tokenData.description;
+    this.ensureInitialized()
+    const description = tokenData.description
 
-    if(description.length >= 70) {
-      throw new Error('Description is too long. Max length is 70 characters.');
+    if (description.length >= 70) {
+      throw new Error('Description is too long. Max length is 70 characters.')
     }
 
-    const descriptionBase58 = this.stringToBase58(description);
+    const descriptionBase58 = this.stringToBase58(description)
 
-    if(descriptionBase58.length >= 100) {
-      throw new Error('Description is too long.');
+    if (descriptionBase58.length >= 100) {
+      throw new Error('Description is too long.')
     }
 
-    tokenData.description = descriptionBase58;
-    const tx = await this.buildTransaction({ type: 'IssueNft', params: tokenData });
-    return this.signTransaction(tx);
+    tokenData.description = descriptionBase58
+    const tx = await this.buildTransaction({ type: 'IssueNft', params: tokenData })
+    return this.signTransaction(tx)
   }
 
   async issueToken({
-                     authority,
-                     is_freezable,
-                     metadata_uri,
-                     number_of_decimals,
-                     token_ticker,
-                     supply_type,
-                     supply_amount,
-                   }: {
-    authority: string;
-    is_freezable: boolean;
-    metadata_uri: string;
-    number_of_decimals: number;
-    token_ticker: string;
-    supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
-    supply_amount?: number;
+    authority,
+    is_freezable,
+    metadata_uri,
+    number_of_decimals,
+    token_ticker,
+    supply_type,
+    supply_amount,
+  }: {
+    authority: string
+    is_freezable: boolean
+    metadata_uri: string
+    number_of_decimals: number
+    token_ticker: string
+    supply_type: 'Unlimited' | 'Lockable' | 'Fixed'
+    supply_amount?: number
   }): Promise<any> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     const tx = await this.buildTransaction({
       type: 'IssueFungibleToken',
       params: { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, supply_type, supply_amount },
-    });
-    return this.signTransaction(tx);
+    })
+    return this.signTransaction(tx)
   }
 
-  async mintToken({ destination, amount, token_id }: { destination: string; amount: number; token_id: string }): Promise<any> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+  async mintToken({
+    destination,
+    amount,
+    token_id,
+  }: {
+    destination: string
+    amount: number
+    token_id: string
+  }): Promise<any> {
+    this.ensureInitialized()
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
     if (!request.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to fetch token')
     }
-    const token = await request.json();
-    const token_details = token;
+    const token = await request.json()
+    const token_details = token
 
-    const tx = await this.buildTransaction({ type: 'MintToken', params: { destination, amount, token_id, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({
+      type: 'MintToken',
+      params: { destination, amount, token_id, token_details },
+    })
+    return this.signTransaction(tx)
   }
 
   async unmintToken({ amount, token_id }: { amount: number; token_id: string }): Promise<any> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+    this.ensureInitialized()
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
     if (!request.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to fetch token')
     }
-    const token = await request.json();
-    const token_details = token;
+    const token = await request.json()
+    const token_details = token
 
-    const tx = await this.buildTransaction({ type: 'UnmintToken', params: { amount, token_id, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'UnmintToken', params: { amount, token_id, token_details } })
+    return this.signTransaction(tx)
   }
 
   async lockTokenSupply({ token_id }: { token_id: string }): Promise<any> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+    this.ensureInitialized()
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
     if (!request.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to fetch token')
     }
-    const token = await request.json();
-    const token_details = token;
+    const token = await request.json()
+    const token_details = token
 
-    const tx = await this.buildTransaction({ type: 'LockTokenSupply', params: { token_id, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'LockTokenSupply', params: { token_id, token_details } })
+    return this.signTransaction(tx)
   }
 
   async changeTokenAuthority({ token_id, new_authority }: { token_id: string; new_authority: string }): Promise<any> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+    this.ensureInitialized()
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
     if (!request.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to fetch token')
     }
-    const token = await request.json();
-    const token_details = token;
+    const token = await request.json()
+    const token_details = token
 
-    const tx = await this.buildTransaction({ type: 'ChangeTokenAuthority', params: { token_id, new_authority, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({
+      type: 'ChangeTokenAuthority',
+      params: { token_id, new_authority, token_details },
+    })
+    return this.signTransaction(tx)
   }
 
-  async changeMetadataUri({ token_id, new_metadata_uri }: { token_id: string; new_metadata_uri: string }): Promise<any> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+  async changeMetadataUri({
+    token_id,
+    new_metadata_uri,
+  }: {
+    token_id: string
+    new_metadata_uri: string
+  }): Promise<any> {
+    this.ensureInitialized()
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
     if (!request.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to fetch token')
     }
-    const token = await request.json();
-    const token_details = token;
+    const token = await request.json()
+    const token_details = token
 
-    const tx = await this.buildTransaction({ type: 'ChangeMetadataUri', params: { token_id, new_metadata_uri, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({
+      type: 'ChangeMetadataUri',
+      params: { token_id, new_metadata_uri, token_details },
+    })
+    return this.signTransaction(tx)
   }
 
   async freezeToken({ token_id, is_unfreezable }: { token_id: string; is_unfreezable: boolean }): Promise<any> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+    this.ensureInitialized()
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
     if (!request.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to fetch token')
     }
-    const token = await request.json();
-    const token_details = token;
+    const token = await request.json()
+    const token_details = token
 
-    const tx = await this.buildTransaction({ type: 'FreezeToken', params: { token_id, is_unfreezable, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'FreezeToken', params: { token_id, is_unfreezable, token_details } })
+    return this.signTransaction(tx)
   }
 
   async unfreezeToken({ token_id }: { token_id: string }): Promise<any> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+    this.ensureInitialized()
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
     if (!request.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to fetch token')
     }
-    const token = await request.json();
-    const token_details = token;
+    const token = await request.json()
+    const token_details = token
 
-    const tx = await this.buildTransaction({ type: 'UnfreezeToken', params: { token_id, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'UnfreezeToken', params: { token_id, token_details } })
+    return this.signTransaction(tx)
   }
 
   async createOrder({
-                      conclude_destination,
-                      ask_token,
-                      ask_amount,
-                      give_token,
-                      give_amount,
-                    }: {
-    conclude_destination: string;
-    ask_token: string;
-    ask_amount: number;
-    give_token: string;
-    give_amount: number;
+    conclude_destination,
+    ask_token,
+    ask_amount,
+    give_token,
+    give_amount,
+  }: {
+    conclude_destination: string
+    ask_token: string
+    ask_amount: number
+    give_token: string
+    give_amount: number
   }): Promise<any> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'CreateOrder', params: { conclude_destination, ask_token, ask_amount, give_token, give_amount } });
-    return this.signTransaction(tx);
+    this.ensureInitialized()
+    const tx = await this.buildTransaction({
+      type: 'CreateOrder',
+      params: { conclude_destination, ask_token, ask_amount, give_token, give_amount },
+    })
+    return this.signTransaction(tx)
   }
 
-  async fillOrder({ order_id, amount, destination }: { order_id: string; amount: number; destination: string }): Promise<any> {
-    this.ensureInitialized();
-    const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
+  async fillOrder({
+    order_id,
+    amount,
+    destination,
+  }: {
+    order_id: string
+    amount: number
+    destination: string
+  }): Promise<any> {
+    this.ensureInitialized()
+    const response = await fetch(`${this.getApiServer()}/order/${order_id}`)
     if (!response.ok) {
-      throw new Error('Failed to fetch order');
+      throw new Error('Failed to fetch order')
     }
-    const data = await response.json();
-    const order_details = data;
-    const tx = await this.buildTransaction({ type: 'FillOrder', params: { order_id, amount, order_details, destination } });
-    return this.signTransaction(tx);
+    const data = await response.json()
+    const order_details = data
+    const tx = await this.buildTransaction({
+      type: 'FillOrder',
+      params: { order_id, amount, order_details, destination },
+    })
+    return this.signTransaction(tx)
   }
 
   async getAccountOrders(): Promise<any[]> {
-    this.ensureInitialized();
-    const allOrders = await this.getAvailableOrders();
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
-    const addressList = [...currentAddress.receiving, ...currentAddress.change];
+    this.ensureInitialized()
+    const allOrders = await this.getAvailableOrders()
+    const address = this.connectedAddresses
+    const currentAddress = address[this.network]
+    const addressList = [...currentAddress.receiving, ...currentAddress.change]
     const orders = allOrders.filter((order: any) => {
-      return addressList.includes(order.conclude_destination);
-    });
-    return orders;
+      return addressList.includes(order.conclude_destination)
+    })
+    return orders
   }
 
   async concludeOrder({ order_id }: { order_id: string }): Promise<any> {
-    this.ensureInitialized();
-    const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
+    this.ensureInitialized()
+    const response = await fetch(`${this.getApiServer()}/order/${order_id}`)
     if (!response.ok) {
-      throw new Error('Failed to fetch order');
+      throw new Error('Failed to fetch order')
     }
-    const data = await response.json();
-    const order = data;
+    const data = await response.json()
+    const order = data
 
-    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order } })
+    return this.signTransaction(tx)
   }
 
-  async bridgeRequest({ destination, amount, token_id, intent }: { destination: string; amount: number; token_id: string; intent: string }): Promise<any> {
-    this.ensureInitialized();
-    let token_details: Record<string, any> = token_id ? { token_id } : {};
+  async bridgeRequest({
+    destination,
+    amount,
+    token_id,
+    intent,
+  }: {
+    destination: string
+    amount: number
+    token_id: string
+    intent: string
+  }): Promise<any> {
+    this.ensureInitialized()
+    let token_details: Record<string, any> = token_id ? { token_id } : {}
 
     if (token_id !== 'Coin' && token_id !== null) {
-      const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+      const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
       if (!request.ok) {
-        throw new Error('Failed to fetch token');
+        throw new Error('Failed to fetch token')
       }
-      const token = await request.json();
-      token_details = { ...token };
+      const token = await request.json()
+      token_details = { ...token }
     }
 
-    const tx = await this.buildTransaction({ type: 'Transfer', params: { to: destination, amount, token_id, token_details } });
-    return this.signTransaction({ ...tx, intent });
+    const tx = await this.buildTransaction({
+      type: 'Transfer',
+      params: { to: destination, amount, token_id, token_details },
+    })
+    return this.signTransaction({ ...tx, intent })
   }
 
   async burn({ token_id, amount }: { token_id: string; amount: number }): Promise<any> {
-    this.ensureInitialized();
-    let token_details: Record<string, any> | null = null;
+    this.ensureInitialized()
+    let token_details: Record<string, any> | null = null
 
     if (token_id !== 'Coin' && token_id !== null) {
-      const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+      const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
       if (!request.ok) {
-        throw new Error('Failed to fetch token');
+        throw new Error('Failed to fetch token')
       }
-      token_details = await request.json();
+      token_details = await request.json()
     }
 
-    const tx = await this.buildTransaction({ type: 'BurnToken', params: { token_id, amount, token_details } });
-    return this.signTransaction(tx);
+    const tx = await this.buildTransaction({ type: 'BurnToken', params: { token_id, amount, token_details } })
+    return this.signTransaction(tx)
   }
 
   async dataDeposit({ data }: { data: string }): Promise<any> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'DataDeposit', params: { data } });
-    return this.signTransaction(tx);
+    this.ensureInitialized()
+    const tx = await this.buildTransaction({ type: 'DataDeposit', params: { data } })
+    return this.signTransaction(tx)
   }
 
   async delegationCreate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<any> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
-    return this.signTransaction(tx);
+    this.ensureInitialized()
+    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } })
+    return this.signTransaction(tx)
   }
 
-  async delegationStake({ pool_id, delegation_id, amount }: { pool_id: string; delegation_id: string; amount: number }): Promise<any> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'DelegationStake', params: { delegation_id, pool_id, amount } });
-    return this.signTransaction(tx);
+  async delegationStake({
+    pool_id,
+    delegation_id,
+    amount,
+  }: {
+    pool_id: string
+    delegation_id: string
+    amount: number
+  }): Promise<any> {
+    this.ensureInitialized()
+    const tx = await this.buildTransaction({ type: 'DelegationStake', params: { delegation_id, pool_id, amount } })
+    return this.signTransaction(tx)
   }
 
-  async delegationWithdraw({ pool_id, delegation_id, amount }: { pool_id: string; delegation_id: string; amount: number }): Promise<any> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'DelegationWithdraw', params: { delegation_id, pool_id, amount } });
-    return this.signTransaction(tx);
+  async delegationWithdraw({
+    pool_id,
+    delegation_id,
+    amount,
+  }: {
+    pool_id: string
+    delegation_id: string
+    amount: number
+  }): Promise<any> {
+    this.ensureInitialized()
+    const tx = await this.buildTransaction({ type: 'DelegationWithdraw', params: { delegation_id, pool_id, amount } })
+    return this.signTransaction(tx)
   }
 
   async signTransaction(tx: Transaction): Promise<any> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     return this.request({
       method: 'signTransaction',
       params: { txData: tx },
-    });
+    })
   }
 
   async getXPub(): Promise<string> {
-    this.ensureInitialized();
-    console.warn('[Mintlayer SDK] Warning: Sharing xPub exposes all derived addresses. Use with caution.');
-    return this.request({ method: 'getXPub' });
+    this.ensureInitialized()
+    console.warn('[Mintlayer SDK] Warning: Sharing xPub exposes all derived addresses. Use with caution.')
+    return this.request({ method: 'getXPub' })
   }
 
   async broadcastTx(tx: string): Promise<any> {
-    this.ensureInitialized();
+    this.ensureInitialized()
     const response = await fetch(`${this.getApiServer()}/transaction`, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain',
       },
       body: tx,
-    });
+    })
 
     if (!response.ok) {
-      const error_json = await response.json();
-      const match = error_json.error.match(/message: "(.*?)"/);
-      const errorMessage = match ? match[1] : null;
+      const error_json = await response.json()
+      const match = error_json.error.match(/message: "(.*?)"/)
+      const errorMessage = match ? match[1] : null
 
-      throw new Error('Failed to broadcast transaction: ' + errorMessage);
+      throw new Error('Failed to broadcast transaction: ' + errorMessage)
     }
-    const data = await response.json();
-    return data;
+    const data = await response.json()
+    return data
   }
 
   on(eventName: string, callback: (data: any) => void): void {
-    this.ensureInitialized();
+    this.ensureInitialized()
     window.addEventListener('message', (event: MessageEvent) => {
       if (event.data.type === 'MINTLAYER_EVENT' && event.data.event === eventName) {
-        callback(event.data.data);
+        callback(event.data.data)
       }
-    });
+    })
   }
 
   async getAvailableOrders(): Promise<any[]> {
-    this.ensureInitialized();
-    const response = await fetch(`${this.getApiServer()}/order`);
+    this.ensureInitialized()
+    const response = await fetch(`${this.getApiServer()}/order`)
     if (!response.ok) {
-      throw new Error('Failed to fetch orders');
+      throw new Error('Failed to fetch orders')
     }
-    const data = await response.json();
-    return data;
+    const data = await response.json()
+    return data
   }
 }
 
-export { Client };
+export { Client }
 
-console.log('[Mintlayer Connect SDK] Loaded');
+console.log('[Mintlayer Connect SDK] Loaded')

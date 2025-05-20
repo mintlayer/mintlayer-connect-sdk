@@ -5,4 +5,4 @@ module.exports = {
   hideBreadcrumbs: true,
   hidePageTitle: true,
   includeVersion: false,
-};
+}

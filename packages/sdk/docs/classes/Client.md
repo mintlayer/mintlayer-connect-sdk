@@ -1,6 +1,6 @@
 [**@mintlayer/sdk**](../README.md)
 
-***
+---
 
 Defined in: [mintlayer-connect-sdk.ts:155](https://github.com/mintlayer/mintlayer-connect-sdk/blob/0929d70e005e7fd16373bf0d634ccbec4470fc4a/packages/sdk/src/mintlayer-connect-sdk.ts#L155)
 
@@ -62,7 +62,7 @@ Defined in: [mintlayer-connect-sdk.ts:1780](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### broadcastTx()
 
@@ -80,7 +80,7 @@ Defined in: [mintlayer-connect-sdk.ts:1851](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### buildTransaction()
 
@@ -104,7 +104,7 @@ Defined in: [mintlayer-connect-sdk.ts:715](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`Transaction`\>
 
-***
+---
 
 ### burn()
 
@@ -128,7 +128,7 @@ Defined in: [mintlayer-connect-sdk.ts:1797](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### changeMetadataUri()
 
@@ -152,7 +152,7 @@ Defined in: [mintlayer-connect-sdk.ts:1686](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### changeTokenAuthority()
 
@@ -176,7 +176,7 @@ Defined in: [mintlayer-connect-sdk.ts:1673](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### concludeOrder()
 
@@ -196,7 +196,7 @@ Defined in: [mintlayer-connect-sdk.ts:1767](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### connect()
 
@@ -208,7 +208,7 @@ Defined in: [mintlayer-connect-sdk.ts:429](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`string`[]\>
 
-***
+---
 
 ### createOrder()
 
@@ -244,7 +244,7 @@ Defined in: [mintlayer-connect-sdk.ts:1725](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### dataDeposit()
 
@@ -264,7 +264,7 @@ Defined in: [mintlayer-connect-sdk.ts:1813](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### delegate()
 
@@ -288,7 +288,7 @@ Defined in: [mintlayer-connect-sdk.ts:1584](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### delegationCreate()
 
@@ -312,7 +312,7 @@ Defined in: [mintlayer-connect-sdk.ts:1819](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### delegationStake()
 
@@ -340,7 +340,7 @@ Defined in: [mintlayer-connect-sdk.ts:1825](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### delegationWithdraw()
 
@@ -368,7 +368,7 @@ Defined in: [mintlayer-connect-sdk.ts:1831](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### disconnect()
 
@@ -380,7 +380,7 @@ Defined in: [mintlayer-connect-sdk.ts:440](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`void`\>
 
-***
+---
 
 ### fillOrder()
 
@@ -408,7 +408,7 @@ Defined in: [mintlayer-connect-sdk.ts:1743](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### freezeToken()
 
@@ -432,7 +432,7 @@ Defined in: [mintlayer-connect-sdk.ts:1699](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### getAccountOrders()
 
@@ -444,7 +444,7 @@ Defined in: [mintlayer-connect-sdk.ts:1755](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`[]\>
 
-***
+---
 
 ### getAddresses()
 
@@ -456,7 +456,7 @@ Defined in: [mintlayer-connect-sdk.ts:485](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`string`[]\>
 
-***
+---
 
 ### getAvailableOrders()
 
@@ -468,7 +468,7 @@ Defined in: [mintlayer-connect-sdk.ts:1881](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`[]\>
 
-***
+---
 
 ### getBalance()
 
@@ -480,7 +480,7 @@ Defined in: [mintlayer-connect-sdk.ts:493](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`number`\>
 
-***
+---
 
 ### getBalances()
 
@@ -492,7 +492,7 @@ Defined in: [mintlayer-connect-sdk.ts:527](https://github.com/mintlayer/mintlaye
 
 `Promise`\<\{ `coin`: `number`; `token`: `Record`\<`string`, `number`\>; \}\>
 
-***
+---
 
 ### getDelegations()
 
@@ -504,7 +504,7 @@ Defined in: [mintlayer-connect-sdk.ts:588](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`any`[]\>
 
-***
+---
 
 ### getDelegationsTotal()
 
@@ -516,7 +516,7 @@ Defined in: [mintlayer-connect-sdk.ts:654](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`number`\>
 
-***
+---
 
 ### getFeeForType()
 
@@ -534,7 +534,7 @@ Defined in: [mintlayer-connect-sdk.ts:663](https://github.com/mintlayer/mintlaye
 
 `bigint`
 
-***
+---
 
 ### getNetwork()
 
@@ -546,7 +546,7 @@ Defined in: [mintlayer-connect-sdk.ts:420](https://github.com/mintlayer/mintlaye
 
 `"mainnet"` \| `"testnet"`
 
-***
+---
 
 ### getTokensOwned()
 
@@ -558,7 +558,7 @@ Defined in: [mintlayer-connect-sdk.ts:621](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`any`[]\>
 
-***
+---
 
 ### getTransactionBINrepresentation()
 
@@ -592,7 +592,7 @@ Defined in: [mintlayer-connect-sdk.ts:1295](https://github.com/mintlayer/mintlay
 
 > **transactionsize**: `number`
 
-***
+---
 
 ### getXPub()
 
@@ -604,7 +604,7 @@ Defined in: [mintlayer-connect-sdk.ts:1845](https://github.com/mintlayer/mintlay
 
 `Promise`\<`string`\>
 
-***
+---
 
 ### isConnected()
 
@@ -616,7 +616,7 @@ Defined in: [mintlayer-connect-sdk.ts:424](https://github.com/mintlayer/mintlaye
 
 `boolean`
 
-***
+---
 
 ### issueNft()
 
@@ -634,7 +634,7 @@ Defined in: [mintlayer-connect-sdk.ts:1590](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### issueToken()
 
@@ -678,7 +678,7 @@ Defined in: [mintlayer-connect-sdk.ts:1609](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### lockTokenSupply()
 
@@ -698,7 +698,7 @@ Defined in: [mintlayer-connect-sdk.ts:1660](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### mintToken()
 
@@ -726,7 +726,7 @@ Defined in: [mintlayer-connect-sdk.ts:1634](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### on()
 
@@ -748,7 +748,7 @@ Defined in: [mintlayer-connect-sdk.ts:1872](https://github.com/mintlayer/mintlay
 
 `void`
 
-***
+---
 
 ### request()
 
@@ -772,7 +772,7 @@ Defined in: [mintlayer-connect-sdk.ts:475](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### restore()
 
@@ -784,7 +784,7 @@ Defined in: [mintlayer-connect-sdk.ts:450](https://github.com/mintlayer/mintlaye
 
 `Promise`\<`boolean`\>
 
-***
+---
 
 ### setNetwork()
 
@@ -802,7 +802,7 @@ Defined in: [mintlayer-connect-sdk.ts:412](https://github.com/mintlayer/mintlaye
 
 `void`
 
-***
+---
 
 ### signTransaction()
 
@@ -820,7 +820,7 @@ Defined in: [mintlayer-connect-sdk.ts:1837](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### transfer()
 
@@ -848,7 +848,7 @@ Defined in: [mintlayer-connect-sdk.ts:1552](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### transferNft()
 
@@ -872,7 +872,7 @@ Defined in: [mintlayer-connect-sdk.ts:1567](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### unfreezeToken()
 
@@ -892,7 +892,7 @@ Defined in: [mintlayer-connect-sdk.ts:1712](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### unmintToken()
 
@@ -916,7 +916,7 @@ Defined in: [mintlayer-connect-sdk.ts:1647](https://github.com/mintlayer/mintlay
 
 `Promise`\<`any`\>
 
-***
+---
 
 ### create()
 

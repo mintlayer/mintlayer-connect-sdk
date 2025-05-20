@@ -12,9 +12,10 @@
     "serve": "npx http-server . -p 8080"
   },
   "devDependencies": {
+    "prettier": "^3.5.3",
+    "ts-loader": "^9.0.0",
     "typescript": "^5.0.0",
     "webpack": "^5.0.0",
-    "webpack-cli": "^5.0.0",
-    "ts-loader": "^9.0.0"
+    "webpack-cli": "^5.0.0"
   }
 }

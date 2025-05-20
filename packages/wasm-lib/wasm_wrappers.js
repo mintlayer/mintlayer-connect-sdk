@@ -1,117 +1,139 @@
-let wasm;
+let wasm
 
 function addToExternrefTable0(obj) {
-    const idx = wasm.__externref_table_alloc();
-    wasm.__wbindgen_export_2.set(idx, obj);
-    return idx;
+  const idx = wasm.__externref_table_alloc()
+  wasm.__wbindgen_export_2.set(idx, obj)
+  return idx
 }
 
 function handleError(f, args) {
-    try {
-        return f.apply(this, args);
-    } catch (e) {
-        const idx = addToExternrefTable0(e);
-        wasm.__wbindgen_exn_store(idx);
-    }
+  try {
+    return f.apply(this, args)
+  } catch (e) {
+    const idx = addToExternrefTable0(e)
+    wasm.__wbindgen_exn_store(idx)
+  }
 }
 
-const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
+const cachedTextDecoder =
+  typeof TextDecoder !== 'undefined'
+    ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true })
+    : {
+        decode: () => {
+          throw Error('TextDecoder not available')
+        },
+      }
 
-if (typeof TextDecoder !== 'undefined') { cachedTextDecoder.decode(); };
+if (typeof TextDecoder !== 'undefined') {
+  cachedTextDecoder.decode()
+}
 
-let cachedUint8ArrayMemory0 = null;
+let cachedUint8ArrayMemory0 = null
 
 function getUint8ArrayMemory0() {
-    if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
-        cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
-    }
-    return cachedUint8ArrayMemory0;
+  if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
+    cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer)
+  }
+  return cachedUint8ArrayMemory0
 }
 
 function getStringFromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+  ptr = ptr >>> 0
+  return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len))
 }
 
 function isLikeNone(x) {
-    return x === undefined || x === null;
+  return x === undefined || x === null
 }
 
-let WASM_VECTOR_LEN = 0;
+let WASM_VECTOR_LEN = 0
 
-const cachedTextEncoder = (typeof TextEncoder !== 'undefined' ? new TextEncoder('utf-8') : { encode: () => { throw Error('TextEncoder not available') } } );
+const cachedTextEncoder =
+  typeof TextEncoder !== 'undefined'
+    ? new TextEncoder('utf-8')
+    : {
+        encode: () => {
+          throw Error('TextEncoder not available')
+        },
+      }
 
-const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
+const encodeString =
+  typeof cachedTextEncoder.encodeInto === 'function'
     ? function (arg, view) {
-    return cachedTextEncoder.encodeInto(arg, view);
-}
+        return cachedTextEncoder.encodeInto(arg, view)
+      }
     : function (arg, view) {
-    const buf = cachedTextEncoder.encode(arg);
-    view.set(buf);
-    return {
-        read: arg.length,
-        written: buf.length
-    };
-});
+        const buf = cachedTextEncoder.encode(arg)
+        view.set(buf)
+        return {
+          read: arg.length,
+          written: buf.length,
+        }
+      }
 
 function passStringToWasm0(arg, malloc, realloc) {
+  if (realloc === undefined) {
+    const buf = cachedTextEncoder.encode(arg)
+    const ptr = malloc(buf.length, 1) >>> 0
+    getUint8ArrayMemory0()
+      .subarray(ptr, ptr + buf.length)
+      .set(buf)
+    WASM_VECTOR_LEN = buf.length
+    return ptr
+  }
 
-    if (realloc === undefined) {
-        const buf = cachedTextEncoder.encode(arg);
-        const ptr = malloc(buf.length, 1) >>> 0;
-        getUint8ArrayMemory0().subarray(ptr, ptr + buf.length).set(buf);
-        WASM_VECTOR_LEN = buf.length;
-        return ptr;
+  let len = arg.length
+  let ptr = malloc(len, 1) >>> 0
+
+  const mem = getUint8ArrayMemory0()
+
+  let offset = 0
+
+  for (; offset < len; offset++) {
+    const code = arg.charCodeAt(offset)
+    if (code > 0x7f) break
+    mem[ptr + offset] = code
+  }
+
+  if (offset !== len) {
+    if (offset !== 0) {
+      arg = arg.slice(offset)
     }
+    ptr = realloc(ptr, len, (len = offset + arg.length * 3), 1) >>> 0
+    const view = getUint8ArrayMemory0().subarray(ptr + offset, ptr + len)
+    const ret = encodeString(arg, view)
 
-    let len = arg.length;
-    let ptr = malloc(len, 1) >>> 0;
+    offset += ret.written
+    ptr = realloc(ptr, len, offset, 1) >>> 0
+  }
 
-    const mem = getUint8ArrayMemory0();
-
-    let offset = 0;
-
-    for (; offset < len; offset++) {
-        const code = arg.charCodeAt(offset);
-        if (code > 0x7F) break;
-        mem[ptr + offset] = code;
-    }
-
-    if (offset !== len) {
-        if (offset !== 0) {
-            arg = arg.slice(offset);
-        }
-        ptr = realloc(ptr, len, len = offset + arg.length * 3, 1) >>> 0;
-        const view = getUint8ArrayMemory0().subarray(ptr + offset, ptr + len);
-        const ret = encodeString(arg, view);
-
-        offset += ret.written;
-        ptr = realloc(ptr, len, offset, 1) >>> 0;
-    }
-
-    WASM_VECTOR_LEN = offset;
-    return ptr;
+  WASM_VECTOR_LEN = offset
+  return ptr
 }
 
-let cachedDataViewMemory0 = null;
+let cachedDataViewMemory0 = null
 
 function getDataViewMemory0() {
-    if (cachedDataViewMemory0 === null || cachedDataViewMemory0.buffer.detached === true || (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)) {
-        cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
-    }
-    return cachedDataViewMemory0;
+  if (
+    cachedDataViewMemory0 === null ||
+    cachedDataViewMemory0.buffer.detached === true ||
+    (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)
+  ) {
+    cachedDataViewMemory0 = new DataView(wasm.memory.buffer)
+  }
+  return cachedDataViewMemory0
 }
 
 function passArray8ToWasm0(arg, malloc) {
-    const ptr = malloc(arg.length * 1, 1) >>> 0;
-    getUint8ArrayMemory0().set(arg, ptr / 1);
-    WASM_VECTOR_LEN = arg.length;
-    return ptr;
+  const ptr = malloc(arg.length * 1, 1) >>> 0
+  getUint8ArrayMemory0().set(arg, ptr / 1)
+  WASM_VECTOR_LEN = arg.length
+  return ptr
 }
 
 function getArrayU8FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
+  ptr = ptr >>> 0
+  return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len)
 }
 /**
  * A utxo can either come from a transaction or a block reward.
@@ -123,12 +145,12 @@ function getArrayU8FromWasm0(ptr, len) {
  * @returns {Uint8Array}
  */
 export function encode_outpoint_source_id(id, source) {
-    const ptr0 = passArray8ToWasm0(id, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_outpoint_source_id(ptr0, len0, source);
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(id, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_outpoint_source_id(ptr0, len0, source)
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -136,16 +158,16 @@ export function encode_outpoint_source_id(id, source) {
  * @returns {Uint8Array}
  */
 export function make_private_key() {
-    const ret = wasm.make_private_key();
-    var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v1;
+  const ret = wasm.make_private_key()
+  var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v1
 }
 
 function takeFromExternrefTable0(idx) {
-    const value = wasm.__wbindgen_export_2.get(idx);
-    wasm.__externref_table_dealloc(idx);
-    return value;
+  const value = wasm.__wbindgen_export_2.get(idx)
+  wasm.__externref_table_dealloc(idx)
+  return value
 }
 /**
  * Create the default account's extended private key for a given mnemonic
@@ -155,15 +177,15 @@ function takeFromExternrefTable0(idx) {
  * @returns {Uint8Array}
  */
 export function make_default_account_privkey(mnemonic, network) {
-    const ptr0 = passStringToWasm0(mnemonic, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.make_default_account_privkey(ptr0, len0, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passStringToWasm0(mnemonic, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.make_default_account_privkey(ptr0, len0, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -174,15 +196,15 @@ export function make_default_account_privkey(mnemonic, network) {
  * @returns {Uint8Array}
  */
 export function make_receiving_address(private_key_bytes, key_index) {
-    const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.make_receiving_address(ptr0, len0, key_index);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.make_receiving_address(ptr0, len0, key_index)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -193,15 +215,15 @@ export function make_receiving_address(private_key_bytes, key_index) {
  * @returns {Uint8Array}
  */
 export function make_change_address(private_key_bytes, key_index) {
-    const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.make_change_address(ptr0, len0, key_index);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.make_change_address(ptr0, len0, key_index)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -212,24 +234,25 @@ export function make_change_address(private_key_bytes, key_index) {
  * @returns {string}
  */
 export function pubkey_to_pubkeyhash_address(public_key_bytes, network) {
-    let deferred3_0;
-    let deferred3_1;
-    try {
-        const ptr0 = passArray8ToWasm0(public_key_bytes, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.pubkey_to_pubkeyhash_address(ptr0, len0, network);
-        var ptr2 = ret[0];
-        var len2 = ret[1];
-        if (ret[3]) {
-            ptr2 = 0; len2 = 0;
-            throw takeFromExternrefTable0(ret[2]);
-        }
-        deferred3_0 = ptr2;
-        deferred3_1 = len2;
-        return getStringFromWasm0(ptr2, len2);
-    } finally {
-        wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+  let deferred3_0
+  let deferred3_1
+  try {
+    const ptr0 = passArray8ToWasm0(public_key_bytes, wasm.__wbindgen_malloc)
+    const len0 = WASM_VECTOR_LEN
+    const ret = wasm.pubkey_to_pubkeyhash_address(ptr0, len0, network)
+    var ptr2 = ret[0]
+    var len2 = ret[1]
+    if (ret[3]) {
+      ptr2 = 0
+      len2 = 0
+      throw takeFromExternrefTable0(ret[2])
     }
+    deferred3_0 = ptr2
+    deferred3_1 = len2
+    return getStringFromWasm0(ptr2, len2)
+  } finally {
+    wasm.__wbindgen_free(deferred3_0, deferred3_1, 1)
+  }
 }
 
 /**
@@ -238,15 +261,15 @@ export function pubkey_to_pubkeyhash_address(public_key_bytes, network) {
  * @returns {Uint8Array}
  */
 export function public_key_from_private_key(private_key) {
-    const ptr0 = passArray8ToWasm0(private_key, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.public_key_from_private_key(ptr0, len0);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(private_key, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.public_key_from_private_key(ptr0, len0)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -255,15 +278,15 @@ export function public_key_from_private_key(private_key) {
  * @returns {Uint8Array}
  */
 export function extended_public_key_from_extended_private_key(private_key_bytes) {
-    const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.extended_public_key_from_extended_private_key(ptr0, len0);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.extended_public_key_from_extended_private_key(ptr0, len0)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -274,15 +297,15 @@ export function extended_public_key_from_extended_private_key(private_key_bytes)
  * @returns {Uint8Array}
  */
 export function make_receiving_address_public_key(extended_public_key_bytes, key_index) {
-    const ptr0 = passArray8ToWasm0(extended_public_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.make_receiving_address_public_key(ptr0, len0, key_index);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(extended_public_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.make_receiving_address_public_key(ptr0, len0, key_index)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -293,15 +316,15 @@ export function make_receiving_address_public_key(extended_public_key_bytes, key
  * @returns {Uint8Array}
  */
 export function make_change_address_public_key(extended_public_key_bytes, key_index) {
-    const ptr0 = passArray8ToWasm0(extended_public_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.make_change_address_public_key(ptr0, len0, key_index);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(extended_public_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.make_change_address_public_key(ptr0, len0, key_index)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -313,17 +336,17 @@ export function make_change_address_public_key(extended_public_key_bytes, key_in
  * @returns {Uint8Array}
  */
 export function sign_message_for_spending(private_key, message) {
-    const ptr0 = passArray8ToWasm0(private_key, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(message, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.sign_message_for_spending(ptr0, len0, ptr1, len1);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passArray8ToWasm0(private_key, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(message, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.sign_message_for_spending(ptr0, len0, ptr1, len1)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -338,17 +361,17 @@ export function sign_message_for_spending(private_key, message) {
  * @returns {boolean}
  */
 export function verify_signature_for_spending(public_key, signature, message) {
-    const ptr0 = passArray8ToWasm0(public_key, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(signature, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArray8ToWasm0(message, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.verify_signature_for_spending(ptr0, len0, ptr1, len1, ptr2, len2);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return ret[0] !== 0;
+  const ptr0 = passArray8ToWasm0(public_key, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(signature, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArray8ToWasm0(message, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ret = wasm.verify_signature_for_spending(ptr0, len0, ptr1, len1, ptr2, len2)
+  if (ret[2]) {
+    throw takeFromExternrefTable0(ret[1])
+  }
+  return ret[0] !== 0
 }
 
 /**
@@ -359,17 +382,17 @@ export function verify_signature_for_spending(public_key, signature, message) {
  * @returns {Uint8Array}
  */
 export function sign_challenge(private_key, message) {
-    const ptr0 = passArray8ToWasm0(private_key, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(message, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.sign_challenge(ptr0, len0, ptr1, len1);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passArray8ToWasm0(private_key, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(message, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.sign_challenge(ptr0, len0, ptr1, len1)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -389,17 +412,17 @@ export function sign_challenge(private_key, message) {
  * @returns {boolean}
  */
 export function verify_challenge(address, network, signed_challenge, message) {
-    const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(signed_challenge, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArray8ToWasm0(message, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.verify_challenge(ptr0, len0, network, ptr1, len1, ptr2, len2);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return ret[0] !== 0;
+  const ptr0 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(signed_challenge, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArray8ToWasm0(message, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ret = wasm.verify_challenge(ptr0, len0, network, ptr1, len1, ptr2, len2)
+  if (ret[2]) {
+    throw takeFromExternrefTable0(ret[1])
+  }
+  return ret[0] !== 0
 }
 
 /**
@@ -409,17 +432,17 @@ export function verify_challenge(address, network, signed_challenge, message) {
  * @returns {Uint8Array}
  */
 export function make_transaction_intent_message_to_sign(intent, transaction_id) {
-    const ptr0 = passStringToWasm0(intent, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(transaction_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.make_transaction_intent_message_to_sign(ptr0, len0, ptr1, len1);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passStringToWasm0(intent, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(transaction_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.make_transaction_intent_message_to_sign(ptr0, len0, ptr1, len1)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -438,25 +461,25 @@ export function make_transaction_intent_message_to_sign(intent, transaction_id) 
  * @returns {Uint8Array}
  */
 export function encode_signed_transaction_intent(signed_message, signatures) {
-    const ptr0 = passArray8ToWasm0(signed_message, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_signed_transaction_intent(ptr0, len0, signatures);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(signed_message, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_signed_transaction_intent(ptr0, len0, signatures)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 function passArrayJsValueToWasm0(array, malloc) {
-    const ptr = malloc(array.length * 4, 4) >>> 0;
-    for (let i = 0; i < array.length; i++) {
-        const add = addToExternrefTable0(array[i]);
-        getDataViewMemory0().setUint32(ptr + 4 * i, add, true);
-    }
-    WASM_VECTOR_LEN = array.length;
-    return ptr;
+  const ptr = malloc(array.length * 4, 4) >>> 0
+  for (let i = 0; i < array.length; i++) {
+    const add = addToExternrefTable0(array[i])
+    getDataViewMemory0().setUint32(ptr + 4 * i, add, true)
+  }
+  WASM_VECTOR_LEN = array.length
+  return ptr
 }
 /**
  * Verify a signed transaction intent.
@@ -475,22 +498,22 @@ function passArrayJsValueToWasm0(array, malloc) {
  * @param {Network} network
  */
 export function verify_transaction_intent(expected_signed_message, encoded_signed_intent, input_destinations, network) {
-    const ptr0 = passArray8ToWasm0(expected_signed_message, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(encoded_signed_intent, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayJsValueToWasm0(input_destinations, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.verify_transaction_intent(ptr0, len0, ptr1, len1, ptr2, len2, network);
-    if (ret[1]) {
-        throw takeFromExternrefTable0(ret[0]);
-    }
+  const ptr0 = passArray8ToWasm0(expected_signed_message, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(encoded_signed_intent, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArrayJsValueToWasm0(input_destinations, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ret = wasm.verify_transaction_intent(ptr0, len0, ptr1, len1, ptr2, len2, network)
+  if (ret[1]) {
+    throw takeFromExternrefTable0(ret[0])
+  }
 }
 
 function _assertClass(instance, klass) {
-    if (!(instance instanceof klass)) {
-        throw new Error(`expected instance of ${klass.name}`);
-    }
+  if (!(instance instanceof klass)) {
+    throw new Error(`expected instance of ${klass.name}`)
+  }
 }
 /**
  * Given a destination address, an amount and a network type (mainnet, testnet, etc), this function
@@ -501,17 +524,17 @@ function _assertClass(instance, klass) {
  * @returns {Uint8Array}
  */
 export function encode_output_transfer(amount, address, network) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_transfer(ptr0, ptr1, len1, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_transfer(ptr0, ptr1, len1, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -524,19 +547,19 @@ export function encode_output_transfer(amount, address, network) {
  * @returns {Uint8Array}
  */
 export function encode_output_token_transfer(amount, address, token_id, network) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_token_transfer(ptr0, ptr1, len1, ptr2, len2, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v4;
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len2 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_token_transfer(ptr0, ptr1, len1, ptr2, len2, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v4
 }
 
 /**
@@ -549,8 +572,8 @@ export function encode_output_token_transfer(amount, address, token_id, network)
  * @returns {bigint}
  */
 export function staking_pool_spend_maturity_block_count(current_block_height, network) {
-    const ret = wasm.staking_pool_spend_maturity_block_count(current_block_height, network);
-    return BigInt.asUintN(64, ret);
+  const ret = wasm.staking_pool_spend_maturity_block_count(current_block_height, network)
+  return BigInt.asUintN(64, ret)
 }
 
 /**
@@ -561,10 +584,10 @@ export function staking_pool_spend_maturity_block_count(current_block_height, ne
  * @returns {Uint8Array}
  */
 export function encode_lock_for_block_count(block_count) {
-    const ret = wasm.encode_lock_for_block_count(block_count);
-    var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v1;
+  const ret = wasm.encode_lock_for_block_count(block_count)
+  var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v1
 }
 
 /**
@@ -575,10 +598,10 @@ export function encode_lock_for_block_count(block_count) {
  * @returns {Uint8Array}
  */
 export function encode_lock_for_seconds(total_seconds) {
-    const ret = wasm.encode_lock_for_seconds(total_seconds);
-    var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v1;
+  const ret = wasm.encode_lock_for_seconds(total_seconds)
+  var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v1
 }
 
 /**
@@ -589,10 +612,10 @@ export function encode_lock_for_seconds(total_seconds) {
  * @returns {Uint8Array}
  */
 export function encode_lock_until_time(timestamp_since_epoch_in_seconds) {
-    const ret = wasm.encode_lock_until_time(timestamp_since_epoch_in_seconds);
-    var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v1;
+  const ret = wasm.encode_lock_until_time(timestamp_since_epoch_in_seconds)
+  var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v1
 }
 
 /**
@@ -602,10 +625,10 @@ export function encode_lock_until_time(timestamp_since_epoch_in_seconds) {
  * @returns {Uint8Array}
  */
 export function encode_lock_until_height(block_height) {
-    const ret = wasm.encode_lock_until_height(block_height);
-    var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v1;
+  const ret = wasm.encode_lock_until_height(block_height)
+  var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v1
 }
 
 /**
@@ -619,19 +642,19 @@ export function encode_lock_until_height(block_height) {
  * @returns {Uint8Array}
  */
 export function encode_output_lock_then_transfer(amount, address, lock, network) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArray8ToWasm0(lock, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_lock_then_transfer(ptr0, ptr1, len1, ptr2, len2, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v4;
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArray8ToWasm0(lock, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_lock_then_transfer(ptr0, ptr1, len1, ptr2, len2, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v4
 }
 
 /**
@@ -646,21 +669,21 @@ export function encode_output_lock_then_transfer(amount, address, lock, network)
  * @returns {Uint8Array}
  */
 export function encode_output_token_lock_then_transfer(amount, address, token_id, lock, network) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArray8ToWasm0(lock, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_token_lock_then_transfer(ptr0, ptr1, len1, ptr2, len2, ptr3, len3, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v5;
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  const ptr1 = passStringToWasm0(address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len2 = WASM_VECTOR_LEN
+  const ptr3 = passArray8ToWasm0(lock, wasm.__wbindgen_malloc)
+  const len3 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_token_lock_then_transfer(ptr0, ptr1, len1, ptr2, len2, ptr3, len3, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v5
 }
 
 /**
@@ -669,15 +692,15 @@ export function encode_output_token_lock_then_transfer(amount, address, token_id
  * @returns {Uint8Array}
  */
 export function encode_output_coin_burn(amount) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    const ret = wasm.encode_output_coin_burn(ptr0);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  const ret = wasm.encode_output_coin_burn(ptr0)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -689,17 +712,17 @@ export function encode_output_coin_burn(amount) {
  * @returns {Uint8Array}
  */
 export function encode_output_token_burn(amount, token_id, network) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    const ptr1 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_token_burn(ptr0, ptr1, len1, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  const ptr1 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_token_burn(ptr0, ptr1, len1, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -712,17 +735,17 @@ export function encode_output_token_burn(amount, token_id, network) {
  * @returns {Uint8Array}
  */
 export function encode_output_create_delegation(pool_id, owner_address, network) {
-    const ptr0 = passStringToWasm0(pool_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(owner_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_create_delegation(ptr0, len0, ptr1, len1, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passStringToWasm0(pool_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(owner_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_create_delegation(ptr0, len0, ptr1, len1, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -734,17 +757,17 @@ export function encode_output_create_delegation(pool_id, owner_address, network)
  * @returns {Uint8Array}
  */
 export function encode_output_delegate_staking(amount, delegation_id, network) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    const ptr1 = passStringToWasm0(delegation_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_delegate_staking(ptr0, ptr1, len1, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  const ptr1 = passStringToWasm0(delegation_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_delegate_staking(ptr0, ptr1, len1, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -759,24 +782,43 @@ export function encode_output_delegate_staking(amount, delegation_id, network) {
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_stake_pool_data(value, staker, vrf_public_key, decommission_key, margin_ratio_per_thousand, cost_per_block, network) {
-    _assertClass(value, Amount);
-    var ptr0 = value.__destroy_into_raw();
-    const ptr1 = passStringToWasm0(staker, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passStringToWasm0(vrf_public_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passStringToWasm0(decommission_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len3 = WASM_VECTOR_LEN;
-    _assertClass(cost_per_block, Amount);
-    var ptr4 = cost_per_block.__destroy_into_raw();
-    const ret = wasm.encode_stake_pool_data(ptr0, ptr1, len1, ptr2, len2, ptr3, len3, margin_ratio_per_thousand, ptr4, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v6;
+export function encode_stake_pool_data(
+  value,
+  staker,
+  vrf_public_key,
+  decommission_key,
+  margin_ratio_per_thousand,
+  cost_per_block,
+  network,
+) {
+  _assertClass(value, Amount)
+  var ptr0 = value.__destroy_into_raw()
+  const ptr1 = passStringToWasm0(staker, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passStringToWasm0(vrf_public_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len2 = WASM_VECTOR_LEN
+  const ptr3 = passStringToWasm0(decommission_key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len3 = WASM_VECTOR_LEN
+  _assertClass(cost_per_block, Amount)
+  var ptr4 = cost_per_block.__destroy_into_raw()
+  const ret = wasm.encode_stake_pool_data(
+    ptr0,
+    ptr1,
+    len1,
+    ptr2,
+    len2,
+    ptr3,
+    len3,
+    margin_ratio_per_thousand,
+    ptr4,
+    network,
+  )
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v6
 }
 
 /**
@@ -790,17 +832,17 @@ export function encode_stake_pool_data(value, staker, vrf_public_key, decommissi
  * @returns {Uint8Array}
  */
 export function encode_output_create_stake_pool(pool_id, pool_data, network) {
-    const ptr0 = passStringToWasm0(pool_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(pool_data, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_create_stake_pool(ptr0, len0, ptr1, len1, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passStringToWasm0(pool_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(pool_data, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_create_stake_pool(ptr0, len0, ptr1, len1, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -810,8 +852,8 @@ export function encode_output_create_stake_pool(pool_id, pool_data, network) {
  * @returns {Amount}
  */
 export function fungible_token_issuance_fee(_current_block_height, network) {
-    const ret = wasm.fungible_token_issuance_fee(_current_block_height, network);
-    return Amount.__wrap(ret);
+  const ret = wasm.fungible_token_issuance_fee(_current_block_height, network)
+  return Amount.__wrap(ret)
 }
 
 /**
@@ -823,8 +865,8 @@ export function fungible_token_issuance_fee(_current_block_height, network) {
  * @returns {Amount}
  */
 export function nft_issuance_fee(current_block_height, network) {
-    const ret = wasm.nft_issuance_fee(current_block_height, network);
-    return Amount.__wrap(ret);
+  const ret = wasm.nft_issuance_fee(current_block_height, network)
+  return Amount.__wrap(ret)
 }
 
 /**
@@ -837,8 +879,8 @@ export function nft_issuance_fee(current_block_height, network) {
  * @returns {Amount}
  */
 export function token_supply_change_fee(current_block_height, network) {
-    const ret = wasm.token_supply_change_fee(current_block_height, network);
-    return Amount.__wrap(ret);
+  const ret = wasm.token_supply_change_fee(current_block_height, network)
+  return Amount.__wrap(ret)
 }
 
 /**
@@ -850,8 +892,8 @@ export function token_supply_change_fee(current_block_height, network) {
  * @returns {Amount}
  */
 export function token_freeze_fee(current_block_height, network) {
-    const ret = wasm.token_freeze_fee(current_block_height, network);
-    return Amount.__wrap(ret);
+  const ret = wasm.token_freeze_fee(current_block_height, network)
+  return Amount.__wrap(ret)
 }
 
 /**
@@ -863,8 +905,8 @@ export function token_freeze_fee(current_block_height, network) {
  * @returns {Amount}
  */
 export function token_change_authority_fee(current_block_height, network) {
-    const ret = wasm.token_change_authority_fee(current_block_height, network);
-    return Amount.__wrap(ret);
+  const ret = wasm.token_change_authority_fee(current_block_height, network)
+  return Amount.__wrap(ret)
 }
 
 /**
@@ -881,25 +923,48 @@ export function token_change_authority_fee(current_block_height, network) {
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_output_issue_fungible_token(authority, token_ticker, metadata_uri, number_of_decimals, total_supply, supply_amount, is_token_freezable, _current_block_height, network) {
-    const ptr0 = passStringToWasm0(authority, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(token_ticker, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passStringToWasm0(metadata_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len2 = WASM_VECTOR_LEN;
-    let ptr3 = 0;
-    if (!isLikeNone(supply_amount)) {
-        _assertClass(supply_amount, Amount);
-        ptr3 = supply_amount.__destroy_into_raw();
-    }
-    const ret = wasm.encode_output_issue_fungible_token(ptr0, len0, ptr1, len1, ptr2, len2, number_of_decimals, total_supply, ptr3, is_token_freezable, _current_block_height, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v5;
+export function encode_output_issue_fungible_token(
+  authority,
+  token_ticker,
+  metadata_uri,
+  number_of_decimals,
+  total_supply,
+  supply_amount,
+  is_token_freezable,
+  _current_block_height,
+  network,
+) {
+  const ptr0 = passStringToWasm0(authority, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(token_ticker, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passStringToWasm0(metadata_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len2 = WASM_VECTOR_LEN
+  let ptr3 = 0
+  if (!isLikeNone(supply_amount)) {
+    _assertClass(supply_amount, Amount)
+    ptr3 = supply_amount.__destroy_into_raw()
+  }
+  const ret = wasm.encode_output_issue_fungible_token(
+    ptr0,
+    len0,
+    ptr1,
+    len1,
+    ptr2,
+    len2,
+    number_of_decimals,
+    total_supply,
+    ptr3,
+    is_token_freezable,
+    _current_block_height,
+    network,
+  )
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v5
 }
 
 /**
@@ -909,24 +974,25 @@ export function encode_output_issue_fungible_token(authority, token_ticker, meta
  * @returns {string}
  */
 export function get_token_id(inputs, network) {
-    let deferred3_0;
-    let deferred3_1;
-    try {
-        const ptr0 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.get_token_id(ptr0, len0, network);
-        var ptr2 = ret[0];
-        var len2 = ret[1];
-        if (ret[3]) {
-            ptr2 = 0; len2 = 0;
-            throw takeFromExternrefTable0(ret[2]);
-        }
-        deferred3_0 = ptr2;
-        deferred3_1 = len2;
-        return getStringFromWasm0(ptr2, len2);
-    } finally {
-        wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+  let deferred3_0
+  let deferred3_1
+  try {
+    const ptr0 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc)
+    const len0 = WASM_VECTOR_LEN
+    const ret = wasm.get_token_id(ptr0, len0, network)
+    var ptr2 = ret[0]
+    var len2 = ret[1]
+    if (ret[3]) {
+      ptr2 = 0
+      len2 = 0
+      throw takeFromExternrefTable0(ret[2])
     }
+    deferred3_0 = ptr2
+    deferred3_1 = len2
+    return getStringFromWasm0(ptr2, len2)
+  } finally {
+    wasm.__wbindgen_free(deferred3_0, deferred3_1, 1)
+  }
 }
 
 /**
@@ -946,34 +1012,72 @@ export function get_token_id(inputs, network) {
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_output_issue_nft(token_id, authority, name, ticker, description, media_hash, creator, media_uri, icon_uri, additional_metadata_uri, _current_block_height, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(authority, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passStringToWasm0(ticker, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passStringToWasm0(description, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ptr5 = passArray8ToWasm0(media_hash, wasm.__wbindgen_malloc);
-    const len5 = WASM_VECTOR_LEN;
-    var ptr6 = isLikeNone(creator) ? 0 : passArray8ToWasm0(creator, wasm.__wbindgen_malloc);
-    var len6 = WASM_VECTOR_LEN;
-    var ptr7 = isLikeNone(media_uri) ? 0 : passStringToWasm0(media_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len7 = WASM_VECTOR_LEN;
-    var ptr8 = isLikeNone(icon_uri) ? 0 : passStringToWasm0(icon_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len8 = WASM_VECTOR_LEN;
-    var ptr9 = isLikeNone(additional_metadata_uri) ? 0 : passStringToWasm0(additional_metadata_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len9 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_issue_nft(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, ptr6, len6, ptr7, len7, ptr8, len8, ptr9, len9, _current_block_height, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v11 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v11;
+export function encode_output_issue_nft(
+  token_id,
+  authority,
+  name,
+  ticker,
+  description,
+  media_hash,
+  creator,
+  media_uri,
+  icon_uri,
+  additional_metadata_uri,
+  _current_block_height,
+  network,
+) {
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(authority, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passStringToWasm0(name, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len2 = WASM_VECTOR_LEN
+  const ptr3 = passStringToWasm0(ticker, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len3 = WASM_VECTOR_LEN
+  const ptr4 = passStringToWasm0(description, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len4 = WASM_VECTOR_LEN
+  const ptr5 = passArray8ToWasm0(media_hash, wasm.__wbindgen_malloc)
+  const len5 = WASM_VECTOR_LEN
+  var ptr6 = isLikeNone(creator) ? 0 : passArray8ToWasm0(creator, wasm.__wbindgen_malloc)
+  var len6 = WASM_VECTOR_LEN
+  var ptr7 = isLikeNone(media_uri) ? 0 : passStringToWasm0(media_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  var len7 = WASM_VECTOR_LEN
+  var ptr8 = isLikeNone(icon_uri) ? 0 : passStringToWasm0(icon_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  var len8 = WASM_VECTOR_LEN
+  var ptr9 = isLikeNone(additional_metadata_uri)
+    ? 0
+    : passStringToWasm0(additional_metadata_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  var len9 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_issue_nft(
+    ptr0,
+    len0,
+    ptr1,
+    len1,
+    ptr2,
+    len2,
+    ptr3,
+    len3,
+    ptr4,
+    len4,
+    ptr5,
+    len5,
+    ptr6,
+    len6,
+    ptr7,
+    len7,
+    ptr8,
+    len8,
+    ptr9,
+    len9,
+    _current_block_height,
+    network,
+  )
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v11 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v11
 }
 
 /**
@@ -982,15 +1086,15 @@ export function encode_output_issue_nft(token_id, authority, name, ticker, descr
  * @returns {Uint8Array}
  */
 export function encode_output_data_deposit(data) {
-    const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_data_deposit(ptr0, len0);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(data, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_data_deposit(ptr0, len0)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1000,8 +1104,8 @@ export function encode_output_data_deposit(data) {
  * @returns {Amount}
  */
 export function data_deposit_fee(current_block_height, network) {
-    const ret = wasm.data_deposit_fee(current_block_height, network);
-    return Amount.__wrap(ret);
+  const ret = wasm.data_deposit_fee(current_block_height, network)
+  return Amount.__wrap(ret)
 }
 
 /**
@@ -1016,26 +1120,34 @@ export function data_deposit_fee(current_block_height, network) {
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_output_htlc(amount, token_id, secret_hash, spend_address, refund_address, refund_timelock, network) {
-    _assertClass(amount, Amount);
-    var ptr0 = amount.__destroy_into_raw();
-    var ptr1 = isLikeNone(token_id) ? 0 : passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len1 = WASM_VECTOR_LEN;
-    const ptr2 = passStringToWasm0(secret_hash, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passStringToWasm0(spend_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passStringToWasm0(refund_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ptr5 = passArray8ToWasm0(refund_timelock, wasm.__wbindgen_malloc);
-    const len5 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_output_htlc(ptr0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v7 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v7;
+export function encode_output_htlc(
+  amount,
+  token_id,
+  secret_hash,
+  spend_address,
+  refund_address,
+  refund_timelock,
+  network,
+) {
+  _assertClass(amount, Amount)
+  var ptr0 = amount.__destroy_into_raw()
+  var ptr1 = isLikeNone(token_id) ? 0 : passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  var len1 = WASM_VECTOR_LEN
+  const ptr2 = passStringToWasm0(secret_hash, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len2 = WASM_VECTOR_LEN
+  const ptr3 = passStringToWasm0(spend_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len3 = WASM_VECTOR_LEN
+  const ptr4 = passStringToWasm0(refund_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len4 = WASM_VECTOR_LEN
+  const ptr5 = passArray8ToWasm0(refund_timelock, wasm.__wbindgen_malloc)
+  const len5 = WASM_VECTOR_LEN
+  const ret = wasm.encode_output_htlc(ptr0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v7 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v7
 }
 
 /**
@@ -1048,17 +1160,17 @@ export function encode_output_htlc(amount, token_id, secret_hash, spend_address,
  * @returns {Uint8Array}
  */
 export function extract_htlc_secret(signed_tx_bytes, strict_byte_size, htlc_outpoint_source_id, htlc_output_index) {
-    const ptr0 = passArray8ToWasm0(signed_tx_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(htlc_outpoint_source_id, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.extract_htlc_secret(ptr0, len0, strict_byte_size, ptr1, len1, htlc_output_index);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passArray8ToWasm0(signed_tx_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(htlc_outpoint_source_id, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.extract_htlc_secret(ptr0, len0, strict_byte_size, ptr1, len1, htlc_output_index)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -1069,15 +1181,15 @@ export function extract_htlc_secret(signed_tx_bytes, strict_byte_size, htlc_outp
  * @returns {Uint8Array}
  */
 export function encode_input_for_utxo(outpoint_source_id, output_index) {
-    const ptr0 = passArray8ToWasm0(outpoint_source_id, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_utxo(ptr0, len0, output_index);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(outpoint_source_id, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_utxo(ptr0, len0, output_index)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1091,17 +1203,17 @@ export function encode_input_for_utxo(outpoint_source_id, output_index) {
  * @returns {Uint8Array}
  */
 export function encode_input_for_withdraw_from_delegation(delegation_id, amount, nonce, network) {
-    const ptr0 = passStringToWasm0(delegation_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    _assertClass(amount, Amount);
-    var ptr1 = amount.__destroy_into_raw();
-    const ret = wasm.encode_input_for_withdraw_from_delegation(ptr0, len0, ptr1, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passStringToWasm0(delegation_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  _assertClass(amount, Amount)
+  var ptr1 = amount.__destroy_into_raw()
+  const ret = wasm.encode_input_for_withdraw_from_delegation(ptr0, len0, ptr1, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -1118,17 +1230,17 @@ export function encode_input_for_withdraw_from_delegation(delegation_id, amount,
  * @returns {number}
  */
 export function estimate_transaction_size(inputs, input_utxos_destinations, outputs, network) {
-    const ptr0 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayJsValueToWasm0(input_utxos_destinations, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArray8ToWasm0(outputs, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.estimate_transaction_size(ptr0, len0, ptr1, len1, ptr2, len2, network);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return ret[0] >>> 0;
+  const ptr0 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArrayJsValueToWasm0(input_utxos_destinations, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArray8ToWasm0(outputs, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ret = wasm.estimate_transaction_size(ptr0, len0, ptr1, len1, ptr2, len2, network)
+  if (ret[2]) {
+    throw takeFromExternrefTable0(ret[1])
+  }
+  return ret[0] >>> 0
 }
 
 /**
@@ -1140,17 +1252,17 @@ export function estimate_transaction_size(inputs, input_utxos_destinations, outp
  * @returns {Uint8Array}
  */
 export function encode_transaction(inputs, outputs, flags) {
-    const ptr0 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(outputs, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_transaction(ptr0, len0, ptr1, len1, flags);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(outputs, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_transaction(ptr0, len0, ptr1, len1, flags)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -1158,10 +1270,10 @@ export function encode_transaction(inputs, outputs, flags) {
  * @returns {Uint8Array}
  */
 export function encode_witness_no_signature() {
-    const ret = wasm.encode_witness_no_signature();
-    var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v1;
+  const ret = wasm.encode_witness_no_signature()
+  var v1 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v1
 }
 
 /**
@@ -1176,22 +1288,30 @@ export function encode_witness_no_signature() {
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_witness(sighashtype, private_key_bytes, input_owner_destination, transaction_bytes, inputs, input_num, network) {
-    const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(input_owner_destination, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_witness(sighashtype, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, input_num, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v5;
+export function encode_witness(
+  sighashtype,
+  private_key_bytes,
+  input_owner_destination,
+  transaction_bytes,
+  inputs,
+  input_num,
+  network,
+) {
+  const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(input_owner_destination, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ptr3 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc)
+  const len3 = WASM_VECTOR_LEN
+  const ret = wasm.encode_witness(sighashtype, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, input_num, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v5 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v5
 }
 
 /**
@@ -1207,24 +1327,47 @@ export function encode_witness(sighashtype, private_key_bytes, input_owner_desti
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_witness_htlc_secret(sighashtype, private_key_bytes, input_owner_destination, transaction_bytes, inputs, input_num, secret, network) {
-    const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(input_owner_destination, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArray8ToWasm0(secret, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_witness_htlc_secret(sighashtype, ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, input_num, ptr4, len4, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v6;
+export function encode_witness_htlc_secret(
+  sighashtype,
+  private_key_bytes,
+  input_owner_destination,
+  transaction_bytes,
+  inputs,
+  input_num,
+  secret,
+  network,
+) {
+  const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(input_owner_destination, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ptr3 = passArray8ToWasm0(inputs, wasm.__wbindgen_malloc)
+  const len3 = WASM_VECTOR_LEN
+  const ptr4 = passArray8ToWasm0(secret, wasm.__wbindgen_malloc)
+  const len4 = WASM_VECTOR_LEN
+  const ret = wasm.encode_witness_htlc_secret(
+    sighashtype,
+    ptr0,
+    len0,
+    ptr1,
+    len1,
+    ptr2,
+    len2,
+    ptr3,
+    len3,
+    input_num,
+    ptr4,
+    len4,
+    network,
+  )
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v6
 }
 
 /**
@@ -1236,15 +1379,15 @@ export function encode_witness_htlc_secret(sighashtype, private_key_bytes, input
  * @returns {Uint8Array}
  */
 export function encode_multisig_challenge(public_keys_bytes, min_required_signatures, network) {
-    const ptr0 = passArray8ToWasm0(public_keys_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_multisig_challenge(ptr0, len0, min_required_signatures, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passArray8ToWasm0(public_keys_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_multisig_challenge(ptr0, len0, min_required_signatures, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1264,24 +1407,49 @@ export function encode_multisig_challenge(public_keys_bytes, min_required_signat
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_witness_htlc_multisig(sighashtype, private_key_bytes, key_index, input_witness, multisig_challenge, transaction_bytes, utxos, input_num, network) {
-    const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(input_witness, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArray8ToWasm0(multisig_challenge, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArray8ToWasm0(utxos, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_witness_htlc_multisig(sighashtype, ptr0, len0, key_index, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, input_num, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v6;
+export function encode_witness_htlc_multisig(
+  sighashtype,
+  private_key_bytes,
+  key_index,
+  input_witness,
+  multisig_challenge,
+  transaction_bytes,
+  utxos,
+  input_num,
+  network,
+) {
+  const ptr0 = passArray8ToWasm0(private_key_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(input_witness, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ptr2 = passArray8ToWasm0(multisig_challenge, wasm.__wbindgen_malloc)
+  const len2 = WASM_VECTOR_LEN
+  const ptr3 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc)
+  const len3 = WASM_VECTOR_LEN
+  const ptr4 = passArray8ToWasm0(utxos, wasm.__wbindgen_malloc)
+  const len4 = WASM_VECTOR_LEN
+  const ret = wasm.encode_witness_htlc_multisig(
+    sighashtype,
+    ptr0,
+    len0,
+    key_index,
+    ptr1,
+    len1,
+    ptr2,
+    len2,
+    ptr3,
+    len3,
+    ptr4,
+    len4,
+    input_num,
+    network,
+  )
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v6
 }
 
 /**
@@ -1291,17 +1459,17 @@ export function encode_witness_htlc_multisig(sighashtype, private_key_bytes, key
  * @returns {Uint8Array}
  */
 export function encode_signed_transaction(transaction_bytes, signatures) {
-    const ptr0 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArray8ToWasm0(signatures, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_signed_transaction(ptr0, len0, ptr1, len1);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passArray8ToWasm0(signatures, wasm.__wbindgen_malloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_signed_transaction(ptr0, len0, ptr1, len1)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -1319,24 +1487,25 @@ export function encode_signed_transaction(transaction_bytes, signatures) {
  * @returns {string}
  */
 export function get_transaction_id(transaction_bytes, strict_byte_size) {
-    let deferred3_0;
-    let deferred3_1;
-    try {
-        const ptr0 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.get_transaction_id(ptr0, len0, strict_byte_size);
-        var ptr2 = ret[0];
-        var len2 = ret[1];
-        if (ret[3]) {
-            ptr2 = 0; len2 = 0;
-            throw takeFromExternrefTable0(ret[2]);
-        }
-        deferred3_0 = ptr2;
-        deferred3_1 = len2;
-        return getStringFromWasm0(ptr2, len2);
-    } finally {
-        wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
+  let deferred3_0
+  let deferred3_1
+  try {
+    const ptr0 = passArray8ToWasm0(transaction_bytes, wasm.__wbindgen_malloc)
+    const len0 = WASM_VECTOR_LEN
+    const ret = wasm.get_transaction_id(ptr0, len0, strict_byte_size)
+    var ptr2 = ret[0]
+    var len2 = ret[1]
+    if (ret[3]) {
+      ptr2 = 0
+      len2 = 0
+      throw takeFromExternrefTable0(ret[2])
     }
+    deferred3_0 = ptr2
+    deferred3_1 = len2
+    return getStringFromWasm0(ptr2, len2)
+  } finally {
+    wasm.__wbindgen_free(deferred3_0, deferred3_1, 1)
+  }
 }
 
 /**
@@ -1348,15 +1517,15 @@ export function get_transaction_id(transaction_bytes, strict_byte_size) {
  * @returns {Amount}
  */
 export function effective_pool_balance(network, pledge_amount, pool_balance) {
-    _assertClass(pledge_amount, Amount);
-    var ptr0 = pledge_amount.__destroy_into_raw();
-    _assertClass(pool_balance, Amount);
-    var ptr1 = pool_balance.__destroy_into_raw();
-    const ret = wasm.effective_pool_balance(network, ptr0, ptr1);
-    if (ret[2]) {
-        throw takeFromExternrefTable0(ret[1]);
-    }
-    return Amount.__wrap(ret[0]);
+  _assertClass(pledge_amount, Amount)
+  var ptr0 = pledge_amount.__destroy_into_raw()
+  _assertClass(pool_balance, Amount)
+  var ptr1 = pool_balance.__destroy_into_raw()
+  const ret = wasm.effective_pool_balance(network, ptr0, ptr1)
+  if (ret[2]) {
+    throw takeFromExternrefTable0(ret[1])
+  }
+  return Amount.__wrap(ret[0])
 }
 
 /**
@@ -1368,17 +1537,17 @@ export function effective_pool_balance(network, pledge_amount, pool_balance) {
  * @returns {Uint8Array}
  */
 export function encode_input_for_mint_tokens(token_id, amount, nonce, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    _assertClass(amount, Amount);
-    var ptr1 = amount.__destroy_into_raw();
-    const ret = wasm.encode_input_for_mint_tokens(ptr0, len0, ptr1, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  _assertClass(amount, Amount)
+  var ptr1 = amount.__destroy_into_raw()
+  const ret = wasm.encode_input_for_mint_tokens(ptr0, len0, ptr1, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -1389,15 +1558,15 @@ export function encode_input_for_mint_tokens(token_id, amount, nonce, network) {
  * @returns {Uint8Array}
  */
 export function encode_input_for_unmint_tokens(token_id, nonce, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_unmint_tokens(ptr0, len0, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_unmint_tokens(ptr0, len0, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1408,15 +1577,15 @@ export function encode_input_for_unmint_tokens(token_id, nonce, network) {
  * @returns {Uint8Array}
  */
 export function encode_input_for_lock_token_supply(token_id, nonce, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_lock_token_supply(ptr0, len0, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_lock_token_supply(ptr0, len0, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1428,15 +1597,15 @@ export function encode_input_for_lock_token_supply(token_id, nonce, network) {
  * @returns {Uint8Array}
  */
 export function encode_input_for_freeze_token(token_id, is_token_unfreezable, nonce, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_freeze_token(ptr0, len0, is_token_unfreezable, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_freeze_token(ptr0, len0, is_token_unfreezable, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1447,15 +1616,15 @@ export function encode_input_for_freeze_token(token_id, is_token_unfreezable, no
  * @returns {Uint8Array}
  */
 export function encode_input_for_unfreeze_token(token_id, nonce, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_unfreeze_token(ptr0, len0, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_unfreeze_token(ptr0, len0, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1467,17 +1636,17 @@ export function encode_input_for_unfreeze_token(token_id, nonce, network) {
  * @returns {Uint8Array}
  */
 export function encode_input_for_change_token_authority(token_id, new_authority, nonce, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(new_authority, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_change_token_authority(ptr0, len0, ptr1, len1, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(new_authority, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_change_token_authority(ptr0, len0, ptr1, len1, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -1489,17 +1658,17 @@ export function encode_input_for_change_token_authority(token_id, new_authority,
  * @returns {Uint8Array}
  */
 export function encode_input_for_change_token_metadata_uri(token_id, new_metadata_uri, nonce, network) {
-    const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passStringToWasm0(new_metadata_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_change_token_metadata_uri(ptr0, len0, ptr1, len1, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v3;
+  const ptr0 = passStringToWasm0(token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ptr1 = passStringToWasm0(new_metadata_uri, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len1 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_change_token_metadata_uri(ptr0, len0, ptr1, len1, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v3 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v3
 }
 
 /**
@@ -1515,24 +1684,35 @@ export function encode_input_for_change_token_metadata_uri(token_id, new_metadat
  * @param {Network} network
  * @returns {Uint8Array}
  */
-export function encode_create_order_output(ask_amount, ask_token_id, give_amount, give_token_id, conclude_address, network) {
-    _assertClass(ask_amount, Amount);
-    var ptr0 = ask_amount.__destroy_into_raw();
-    var ptr1 = isLikeNone(ask_token_id) ? 0 : passStringToWasm0(ask_token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len1 = WASM_VECTOR_LEN;
-    _assertClass(give_amount, Amount);
-    var ptr2 = give_amount.__destroy_into_raw();
-    var ptr3 = isLikeNone(give_token_id) ? 0 : passStringToWasm0(give_token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    var len3 = WASM_VECTOR_LEN;
-    const ptr4 = passStringToWasm0(conclude_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_create_order_output(ptr0, ptr1, len1, ptr2, ptr3, len3, ptr4, len4, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v6;
+export function encode_create_order_output(
+  ask_amount,
+  ask_token_id,
+  give_amount,
+  give_token_id,
+  conclude_address,
+  network,
+) {
+  _assertClass(ask_amount, Amount)
+  var ptr0 = ask_amount.__destroy_into_raw()
+  var ptr1 = isLikeNone(ask_token_id)
+    ? 0
+    : passStringToWasm0(ask_token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  var len1 = WASM_VECTOR_LEN
+  _assertClass(give_amount, Amount)
+  var ptr2 = give_amount.__destroy_into_raw()
+  var ptr3 = isLikeNone(give_token_id)
+    ? 0
+    : passStringToWasm0(give_token_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  var len3 = WASM_VECTOR_LEN
+  const ptr4 = passStringToWasm0(conclude_address, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len4 = WASM_VECTOR_LEN
+  const ret = wasm.encode_create_order_output(ptr0, ptr1, len1, ptr2, ptr3, len3, ptr4, len4, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v6
 }
 
 /**
@@ -1546,19 +1726,19 @@ export function encode_create_order_output(ask_amount, ask_token_id, give_amount
  * @returns {Uint8Array}
  */
 export function encode_input_for_fill_order(order_id, fill_amount, destination, nonce, network) {
-    const ptr0 = passStringToWasm0(order_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    _assertClass(fill_amount, Amount);
-    var ptr1 = fill_amount.__destroy_into_raw();
-    const ptr2 = passStringToWasm0(destination, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_fill_order(ptr0, len0, ptr1, ptr2, len2, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v4;
+  const ptr0 = passStringToWasm0(order_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  _assertClass(fill_amount, Amount)
+  var ptr1 = fill_amount.__destroy_into_raw()
+  const ptr2 = passStringToWasm0(destination, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len2 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_fill_order(ptr0, len0, ptr1, ptr2, len2, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v4 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v4
 }
 
 /**
@@ -1569,15 +1749,15 @@ export function encode_input_for_fill_order(order_id, fill_amount, destination, 
  * @returns {Uint8Array}
  */
 export function encode_input_for_conclude_order(order_id, nonce, network) {
-    const ptr0 = passStringToWasm0(order_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.encode_input_for_conclude_order(ptr0, len0, nonce, network);
-    if (ret[3]) {
-        throw takeFromExternrefTable0(ret[2]);
-    }
-    var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
-    return v2;
+  const ptr0 = passStringToWasm0(order_id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+  const len0 = WASM_VECTOR_LEN
+  const ret = wasm.encode_input_for_conclude_order(ptr0, len0, nonce, network)
+  if (ret[3]) {
+    throw takeFromExternrefTable0(ret[2])
+  }
+  var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice()
+  wasm.__wbindgen_free(ret[0], ret[1] * 1, 1)
+  return v2
 }
 
 /**
@@ -1585,67 +1765,85 @@ export function encode_input_for_conclude_order(order_id, nonce, network) {
  * @enum {0 | 1}
  */
 export const FreezableToken = Object.freeze({
-    No: 0, "0": "No",
-    Yes: 1, "1": "Yes",
-});
+  No: 0,
+  0: 'No',
+  Yes: 1,
+  1: 'Yes',
+})
 /**
  * The network, for which an operation to be done. Mainnet, testnet, etc.
  * @enum {0 | 1 | 2 | 3}
  */
 export const Network = Object.freeze({
-    Mainnet: 0, "0": "Mainnet",
-    Testnet: 1, "1": "Testnet",
-    Regtest: 2, "2": "Regtest",
-    Signet: 3, "3": "Signet",
-});
+  Mainnet: 0,
+  0: 'Mainnet',
+  Testnet: 1,
+  1: 'Testnet',
+  Regtest: 2,
+  2: 'Regtest',
+  Signet: 3,
+  3: 'Signet',
+})
 /**
  * The part of the transaction that will be committed in the signature. Similar to bitcoin's sighash.
  * @enum {0 | 1 | 2 | 3}
  */
 export const SignatureHashType = Object.freeze({
-    ALL: 0, "0": "ALL",
-    NONE: 1, "1": "NONE",
-    SINGLE: 2, "2": "SINGLE",
-    ANYONECANPAY: 3, "3": "ANYONECANPAY",
-});
+  ALL: 0,
+  0: 'ALL',
+  NONE: 1,
+  1: 'NONE',
+  SINGLE: 2,
+  2: 'SINGLE',
+  ANYONECANPAY: 3,
+  3: 'ANYONECANPAY',
+})
 /**
  * A utxo can either come from a transaction or a block reward. This enum signifies that.
  * @enum {0 | 1}
  */
 export const SourceId = Object.freeze({
-    Transaction: 0, "0": "Transaction",
-    BlockReward: 1, "1": "BlockReward",
-});
+  Transaction: 0,
+  0: 'Transaction',
+  BlockReward: 1,
+  1: 'BlockReward',
+})
 /**
  * Indicates whether a token can be unfrozen once frozen
  * @enum {0 | 1}
  */
 export const TokenUnfreezable = Object.freeze({
-    No: 0, "0": "No",
-    Yes: 1, "1": "Yes",
-});
+  No: 0,
+  0: 'No',
+  Yes: 1,
+  1: 'Yes',
+})
 /**
  * The token supply of a specific token, set on issuance
  * @enum {0 | 1 | 2}
  */
 export const TotalSupply = Object.freeze({
-    /**
-     * Can be issued with no limit, but then can be locked to have a fixed supply.
-     */
-    Lockable: 0, "0": "Lockable",
-    /**
-     * Unlimited supply, no limits except for numeric limits due to u128
-     */
-    Unlimited: 1, "1": "Unlimited",
-    /**
-     * On issuance, the total number of coins is fixed
-     */
-    Fixed: 2, "2": "Fixed",
-});
+  /**
+   * Can be issued with no limit, but then can be locked to have a fixed supply.
+   */
+  Lockable: 0,
+  0: 'Lockable',
+  /**
+   * Unlimited supply, no limits except for numeric limits due to u128
+   */
+  Unlimited: 1,
+  1: 'Unlimited',
+  /**
+   * On issuance, the total number of coins is fixed
+   */
+  Fixed: 2,
+  2: 'Fixed',
+})
 
-const AmountFinalization = (typeof FinalizationRegistry === 'undefined')
+const AmountFinalization =
+  typeof FinalizationRegistry === 'undefined'
     ? { register: () => {}, unregister: () => {} }
-    : new FinalizationRegistry(ptr => wasm.__wbg_amount_free(ptr >>> 0, 1));
+    : new FinalizationRegistry((ptr) => wasm.__wbg_amount_free(ptr >>> 0, 1))
 /**
  * Amount type abstraction. The amount type is stored in a string
  * since JavaScript number type cannot fit 128-bit integers.
@@ -1653,290 +1851,298 @@ const AmountFinalization = (typeof FinalizationRegistry === 'undefined')
  * Atoms are the smallest, indivisible amount of a coin or token.
  */
 export class Amount {
+  static __wrap(ptr) {
+    ptr = ptr >>> 0
+    const obj = Object.create(Amount.prototype)
+    obj.__wbg_ptr = ptr
+    AmountFinalization.register(obj, obj.__wbg_ptr, obj)
+    return obj
+  }
 
-    static __wrap(ptr) {
-        ptr = ptr >>> 0;
-        const obj = Object.create(Amount.prototype);
-        obj.__wbg_ptr = ptr;
-        AmountFinalization.register(obj, obj.__wbg_ptr, obj);
-        return obj;
-    }
+  __destroy_into_raw() {
+    const ptr = this.__wbg_ptr
+    this.__wbg_ptr = 0
+    AmountFinalization.unregister(this)
+    return ptr
+  }
 
-    __destroy_into_raw() {
-        const ptr = this.__wbg_ptr;
-        this.__wbg_ptr = 0;
-        AmountFinalization.unregister(this);
-        return ptr;
+  free() {
+    const ptr = this.__destroy_into_raw()
+    wasm.__wbg_amount_free(ptr, 0)
+  }
+  /**
+   * @param {string} atoms
+   * @returns {Amount}
+   */
+  static from_atoms(atoms) {
+    const ptr0 = passStringToWasm0(atoms, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+    const len0 = WASM_VECTOR_LEN
+    const ret = wasm.amount_from_atoms(ptr0, len0)
+    return Amount.__wrap(ret)
+  }
+  /**
+   * @returns {string}
+   */
+  atoms() {
+    let deferred1_0
+    let deferred1_1
+    try {
+      const ptr = this.__destroy_into_raw()
+      const ret = wasm.amount_atoms(ptr)
+      deferred1_0 = ret[0]
+      deferred1_1 = ret[1]
+      return getStringFromWasm0(ret[0], ret[1])
+    } finally {
+      wasm.__wbindgen_free(deferred1_0, deferred1_1, 1)
     }
-
-    free() {
-        const ptr = this.__destroy_into_raw();
-        wasm.__wbg_amount_free(ptr, 0);
-    }
-    /**
-     * @param {string} atoms
-     * @returns {Amount}
-     */
-    static from_atoms(atoms) {
-        const ptr0 = passStringToWasm0(atoms, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ret = wasm.amount_from_atoms(ptr0, len0);
-        return Amount.__wrap(ret);
-    }
-    /**
-     * @returns {string}
-     */
-    atoms() {
-        let deferred1_0;
-        let deferred1_1;
-        try {
-            const ptr = this.__destroy_into_raw();
-            const ret = wasm.amount_atoms(ptr);
-            deferred1_0 = ret[0];
-            deferred1_1 = ret[1];
-            return getStringFromWasm0(ret[0], ret[1]);
-        } finally {
-            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
-        }
-    }
+  }
 }
 
 async function __wbg_load(module, imports) {
-    if (typeof Response === 'function' && module instanceof Response) {
-        if (typeof WebAssembly.instantiateStreaming === 'function') {
-            try {
-                return await WebAssembly.instantiateStreaming(module, imports);
-
-            } catch (e) {
-                if (module.headers.get('Content-Type') != 'application/wasm') {
-                    console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", e);
-
-                } else {
-                    throw e;
-                }
-            }
-        }
-
-        const bytes = await module.arrayBuffer();
-        return await WebAssembly.instantiate(bytes, imports);
-
-    } else {
-        const instance = await WebAssembly.instantiate(module, imports);
-
-        if (instance instanceof WebAssembly.Instance) {
-            return { instance, module };
-
+  if (typeof Response === 'function' && module instanceof Response) {
+    if (typeof WebAssembly.instantiateStreaming === 'function') {
+      try {
+        return await WebAssembly.instantiateStreaming(module, imports)
+      } catch (e) {
+        if (module.headers.get('Content-Type') != 'application/wasm') {
+          console.warn(
+            '`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n',
+            e,
+          )
         } else {
-            return instance;
+          throw e
         }
+      }
     }
+
+    const bytes = await module.arrayBuffer()
+    return await WebAssembly.instantiate(bytes, imports)
+  } else {
+    const instance = await WebAssembly.instantiate(module, imports)
+
+    if (instance instanceof WebAssembly.Instance) {
+      return { instance, module }
+    } else {
+      return instance
+    }
+  }
 }
 
 function __wbg_get_imports() {
-    const imports = {};
-    imports.wbg = {};
-    imports.wbg.__wbg_buffer_609cc3eee51ed158 = function(arg0) {
-        const ret = arg0.buffer;
-        return ret;
-    };
-    imports.wbg.__wbg_call_672a4d21634d4a24 = function() { return handleError(function (arg0, arg1) {
-        const ret = arg0.call(arg1);
-        return ret;
-    }, arguments) };
-    imports.wbg.__wbg_call_7cccdd69e0791ae2 = function() { return handleError(function (arg0, arg1, arg2) {
-        const ret = arg0.call(arg1, arg2);
-        return ret;
-    }, arguments) };
-    imports.wbg.__wbg_crypto_ed58b8e10a292839 = function(arg0) {
-        const ret = arg0.crypto;
-        return ret;
-    };
-    imports.wbg.__wbg_getRandomValues_bcb4912f16000dc4 = function() { return handleError(function (arg0, arg1) {
-        arg0.getRandomValues(arg1);
-    }, arguments) };
-    imports.wbg.__wbg_msCrypto_0a36e2ec3a343d26 = function(arg0) {
-        const ret = arg0.msCrypto;
-        return ret;
-    };
-    imports.wbg.__wbg_new_a12002a7f91c75be = function(arg0) {
-        const ret = new Uint8Array(arg0);
-        return ret;
-    };
-    imports.wbg.__wbg_newnoargs_105ed471475aaf50 = function(arg0, arg1) {
-        const ret = new Function(getStringFromWasm0(arg0, arg1));
-        return ret;
-    };
-    imports.wbg.__wbg_newwithbyteoffsetandlength_d97e637ebe145a9a = function(arg0, arg1, arg2) {
-        const ret = new Uint8Array(arg0, arg1 >>> 0, arg2 >>> 0);
-        return ret;
-    };
-    imports.wbg.__wbg_newwithlength_a381634e90c276d4 = function(arg0) {
-        const ret = new Uint8Array(arg0 >>> 0);
-        return ret;
-    };
-    imports.wbg.__wbg_node_02999533c4ea02e3 = function(arg0) {
-        const ret = arg0.node;
-        return ret;
-    };
-    imports.wbg.__wbg_process_5c1d670bc53614b8 = function(arg0) {
-        const ret = arg0.process;
-        return ret;
-    };
-    imports.wbg.__wbg_randomFillSync_ab2cfe79ebbf2740 = function() { return handleError(function (arg0, arg1) {
-        arg0.randomFillSync(arg1);
-    }, arguments) };
-    imports.wbg.__wbg_require_79b1e9274cde3c87 = function() { return handleError(function () {
-        const ret = module.require;
-        return ret;
-    }, arguments) };
-    imports.wbg.__wbg_set_65595bdd868b3009 = function(arg0, arg1, arg2) {
-        arg0.set(arg1, arg2 >>> 0);
-    };
-    imports.wbg.__wbg_static_accessor_GLOBAL_88a902d13a557d07 = function() {
-        const ret = typeof global === 'undefined' ? null : global;
-        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-    };
-    imports.wbg.__wbg_static_accessor_GLOBAL_THIS_56578be7e9f832b0 = function() {
-        const ret = typeof globalThis === 'undefined' ? null : globalThis;
-        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-    };
-    imports.wbg.__wbg_static_accessor_SELF_37c5d418e4bf5819 = function() {
-        const ret = typeof self === 'undefined' ? null : self;
-        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-    };
-    imports.wbg.__wbg_static_accessor_WINDOW_5de37043a91a9c40 = function() {
-        const ret = typeof window === 'undefined' ? null : window;
-        return isLikeNone(ret) ? 0 : addToExternrefTable0(ret);
-    };
-    imports.wbg.__wbg_stringify_f7ed6987935b4a24 = function() { return handleError(function (arg0) {
-        const ret = JSON.stringify(arg0);
-        return ret;
-    }, arguments) };
-    imports.wbg.__wbg_subarray_aa9065fa9dc5df96 = function(arg0, arg1, arg2) {
-        const ret = arg0.subarray(arg1 >>> 0, arg2 >>> 0);
-        return ret;
-    };
-    imports.wbg.__wbg_versions_c71aa1626a93e0a1 = function(arg0) {
-        const ret = arg0.versions;
-        return ret;
-    };
-    imports.wbg.__wbindgen_init_externref_table = function() {
-        const table = wasm.__wbindgen_export_2;
-        const offset = table.grow(4);
-        table.set(0, undefined);
-        table.set(offset + 0, undefined);
-        table.set(offset + 1, null);
-        table.set(offset + 2, true);
-        table.set(offset + 3, false);
-        ;
-    };
-    imports.wbg.__wbindgen_is_function = function(arg0) {
-        const ret = typeof(arg0) === 'function';
-        return ret;
-    };
-    imports.wbg.__wbindgen_is_object = function(arg0) {
-        const val = arg0;
-        const ret = typeof(val) === 'object' && val !== null;
-        return ret;
-    };
-    imports.wbg.__wbindgen_is_string = function(arg0) {
-        const ret = typeof(arg0) === 'string';
-        return ret;
-    };
-    imports.wbg.__wbindgen_is_undefined = function(arg0) {
-        const ret = arg0 === undefined;
-        return ret;
-    };
-    imports.wbg.__wbindgen_memory = function() {
-        const ret = wasm.memory;
-        return ret;
-    };
-    imports.wbg.__wbindgen_string_get = function(arg0, arg1) {
-        const obj = arg1;
-        const ret = typeof(obj) === 'string' ? obj : undefined;
-        var ptr1 = isLikeNone(ret) ? 0 : passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        var len1 = WASM_VECTOR_LEN;
-        getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
-        getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
-    };
-    imports.wbg.__wbindgen_string_new = function(arg0, arg1) {
-        const ret = getStringFromWasm0(arg0, arg1);
-        return ret;
-    };
-    imports.wbg.__wbindgen_throw = function(arg0, arg1) {
-        throw new Error(getStringFromWasm0(arg0, arg1));
-    };
+  const imports = {}
+  imports.wbg = {}
+  imports.wbg.__wbg_buffer_609cc3eee51ed158 = function (arg0) {
+    const ret = arg0.buffer
+    return ret
+  }
+  imports.wbg.__wbg_call_672a4d21634d4a24 = function () {
+    return handleError(function (arg0, arg1) {
+      const ret = arg0.call(arg1)
+      return ret
+    }, arguments)
+  }
+  imports.wbg.__wbg_call_7cccdd69e0791ae2 = function () {
+    return handleError(function (arg0, arg1, arg2) {
+      const ret = arg0.call(arg1, arg2)
+      return ret
+    }, arguments)
+  }
+  imports.wbg.__wbg_crypto_ed58b8e10a292839 = function (arg0) {
+    const ret = arg0.crypto
+    return ret
+  }
+  imports.wbg.__wbg_getRandomValues_bcb4912f16000dc4 = function () {
+    return handleError(function (arg0, arg1) {
+      arg0.getRandomValues(arg1)
+    }, arguments)
+  }
+  imports.wbg.__wbg_msCrypto_0a36e2ec3a343d26 = function (arg0) {
+    const ret = arg0.msCrypto
+    return ret
+  }
+  imports.wbg.__wbg_new_a12002a7f91c75be = function (arg0) {
+    const ret = new Uint8Array(arg0)
+    return ret
+  }
+  imports.wbg.__wbg_newnoargs_105ed471475aaf50 = function (arg0, arg1) {
+    const ret = new Function(getStringFromWasm0(arg0, arg1))
+    return ret
+  }
+  imports.wbg.__wbg_newwithbyteoffsetandlength_d97e637ebe145a9a = function (arg0, arg1, arg2) {
+    const ret = new Uint8Array(arg0, arg1 >>> 0, arg2 >>> 0)
+    return ret
+  }
+  imports.wbg.__wbg_newwithlength_a381634e90c276d4 = function (arg0) {
+    const ret = new Uint8Array(arg0 >>> 0)
+    return ret
+  }
+  imports.wbg.__wbg_node_02999533c4ea02e3 = function (arg0) {
+    const ret = arg0.node
+    return ret
+  }
+  imports.wbg.__wbg_process_5c1d670bc53614b8 = function (arg0) {
+    const ret = arg0.process
+    return ret
+  }
+  imports.wbg.__wbg_randomFillSync_ab2cfe79ebbf2740 = function () {
+    return handleError(function (arg0, arg1) {
+      arg0.randomFillSync(arg1)
+    }, arguments)
+  }
+  imports.wbg.__wbg_require_79b1e9274cde3c87 = function () {
+    return handleError(function () {
+      const ret = module.require
+      return ret
+    }, arguments)
+  }
+  imports.wbg.__wbg_set_65595bdd868b3009 = function (arg0, arg1, arg2) {
+    arg0.set(arg1, arg2 >>> 0)
+  }
+  imports.wbg.__wbg_static_accessor_GLOBAL_88a902d13a557d07 = function () {
+    const ret = typeof global === 'undefined' ? null : global
+    return isLikeNone(ret) ? 0 : addToExternrefTable0(ret)
+  }
+  imports.wbg.__wbg_static_accessor_GLOBAL_THIS_56578be7e9f832b0 = function () {
+    const ret = typeof globalThis === 'undefined' ? null : globalThis
+    return isLikeNone(ret) ? 0 : addToExternrefTable0(ret)
+  }
+  imports.wbg.__wbg_static_accessor_SELF_37c5d418e4bf5819 = function () {
+    const ret = typeof self === 'undefined' ? null : self
+    return isLikeNone(ret) ? 0 : addToExternrefTable0(ret)
+  }
+  imports.wbg.__wbg_static_accessor_WINDOW_5de37043a91a9c40 = function () {
+    const ret = typeof window === 'undefined' ? null : window
+    return isLikeNone(ret) ? 0 : addToExternrefTable0(ret)
+  }
+  imports.wbg.__wbg_stringify_f7ed6987935b4a24 = function () {
+    return handleError(function (arg0) {
+      const ret = JSON.stringify(arg0)
+      return ret
+    }, arguments)
+  }
+  imports.wbg.__wbg_subarray_aa9065fa9dc5df96 = function (arg0, arg1, arg2) {
+    const ret = arg0.subarray(arg1 >>> 0, arg2 >>> 0)
+    return ret
+  }
+  imports.wbg.__wbg_versions_c71aa1626a93e0a1 = function (arg0) {
+    const ret = arg0.versions
+    return ret
+  }
+  imports.wbg.__wbindgen_init_externref_table = function () {
+    const table = wasm.__wbindgen_export_2
+    const offset = table.grow(4)
+    table.set(0, undefined)
+    table.set(offset + 0, undefined)
+    table.set(offset + 1, null)
+    table.set(offset + 2, true)
+    table.set(offset + 3, false)
+  }
+  imports.wbg.__wbindgen_is_function = function (arg0) {
+    const ret = typeof arg0 === 'function'
+    return ret
+  }
+  imports.wbg.__wbindgen_is_object = function (arg0) {
+    const val = arg0
+    const ret = typeof val === 'object' && val !== null
+    return ret
+  }
+  imports.wbg.__wbindgen_is_string = function (arg0) {
+    const ret = typeof arg0 === 'string'
+    return ret
+  }
+  imports.wbg.__wbindgen_is_undefined = function (arg0) {
+    const ret = arg0 === undefined
+    return ret
+  }
+  imports.wbg.__wbindgen_memory = function () {
+    const ret = wasm.memory
+    return ret
+  }
+  imports.wbg.__wbindgen_string_get = function (arg0, arg1) {
+    const obj = arg1
+    const ret = typeof obj === 'string' ? obj : undefined
+    var ptr1 = isLikeNone(ret) ? 0 : passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc)
+    var len1 = WASM_VECTOR_LEN
+    getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true)
+    getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true)
+  }
+  imports.wbg.__wbindgen_string_new = function (arg0, arg1) {
+    const ret = getStringFromWasm0(arg0, arg1)
+    return ret
+  }
+  imports.wbg.__wbindgen_throw = function (arg0, arg1) {
+    throw new Error(getStringFromWasm0(arg0, arg1))
+  }
 
-    return imports;
+  return imports
 }
 
-function __wbg_init_memory(imports, memory) {
-
-}
+function __wbg_init_memory(imports, memory) {}
 
 function __wbg_finalize_init(instance, module) {
-    wasm = instance.exports;
-    __wbg_init.__wbindgen_wasm_module = module;
-    cachedDataViewMemory0 = null;
-    cachedUint8ArrayMemory0 = null;
+  wasm = instance.exports
+  __wbg_init.__wbindgen_wasm_module = module
+  cachedDataViewMemory0 = null
+  cachedUint8ArrayMemory0 = null
 
-
-    wasm.__wbindgen_start();
-    return wasm;
+  wasm.__wbindgen_start()
+  return wasm
 }
 
 function initSync(module) {
-    if (wasm !== undefined) return wasm;
+  if (wasm !== undefined) return wasm
 
-
-    if (typeof module !== 'undefined') {
-        if (Object.getPrototypeOf(module) === Object.prototype) {
-            ({module} = module)
-        } else {
-            console.warn('using deprecated parameters for `initSync()`; pass a single object instead')
-        }
+  if (typeof module !== 'undefined') {
+    if (Object.getPrototypeOf(module) === Object.prototype) {
+      ;({ module } = module)
+    } else {
+      console.warn('using deprecated parameters for `initSync()`; pass a single object instead')
     }
+  }
 
-    const imports = __wbg_get_imports();
+  const imports = __wbg_get_imports()
 
-    __wbg_init_memory(imports);
+  __wbg_init_memory(imports)
 
-    if (!(module instanceof WebAssembly.Module)) {
-        module = new WebAssembly.Module(module);
-    }
+  if (!(module instanceof WebAssembly.Module)) {
+    module = new WebAssembly.Module(module)
+  }
 
-    const instance = new WebAssembly.Instance(module, imports);
+  const instance = new WebAssembly.Instance(module, imports)
 
-    return __wbg_finalize_init(instance, module);
+  return __wbg_finalize_init(instance, module)
 }
 
 async function __wbg_init(module_or_path) {
-    if (wasm !== undefined) return wasm;
+  if (wasm !== undefined) return wasm
 
-
-    if (typeof module_or_path !== 'undefined') {
-        if (Object.getPrototypeOf(module_or_path) === Object.prototype) {
-            ({module_or_path} = module_or_path)
-        } else {
-            console.warn('using deprecated parameters for the initialization function; pass a single object instead')
-        }
+  if (typeof module_or_path !== 'undefined') {
+    if (Object.getPrototypeOf(module_or_path) === Object.prototype) {
+      ;({ module_or_path } = module_or_path)
+    } else {
+      console.warn('using deprecated parameters for the initialization function; pass a single object instead')
     }
+  }
 
-    if (typeof module_or_path === 'undefined') {
-        module_or_path = new URL('wasm_wrappers_bg.wasm', import.meta.url);
-    }
-    const imports = __wbg_get_imports();
+  if (typeof module_or_path === 'undefined') {
+    module_or_path = new URL('wasm_wrappers_bg.wasm', import.meta.url)
+  }
+  const imports = __wbg_get_imports()
 
-    if (typeof module_or_path === 'string' || (typeof Request === 'function' && module_or_path instanceof Request) || (typeof URL === 'function' && module_or_path instanceof URL)) {
-        module_or_path = fetch(module_or_path);
-    }
+  if (
+    typeof module_or_path === 'string' ||
+    (typeof Request === 'function' && module_or_path instanceof Request) ||
+    (typeof URL === 'function' && module_or_path instanceof URL)
+  ) {
+    module_or_path = fetch(module_or_path)
+  }
 
-    __wbg_init_memory(imports);
+  __wbg_init_memory(imports)
 
-    const { instance, module } = await __wbg_load(await module_or_path, imports);
+  const { instance, module } = await __wbg_load(await module_or_path, imports)
 
-    return __wbg_finalize_init(instance, module);
+  return __wbg_finalize_init(instance, module)
 }
 
-export { initSync };
-export default __wbg_init;
+export { initSync }
+export default __wbg_init

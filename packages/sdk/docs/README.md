@@ -1,6 +1,6 @@
 **@mintlayer/sdk**
 
-***
+---
 
 ## Classes
 

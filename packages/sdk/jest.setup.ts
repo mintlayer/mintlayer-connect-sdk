@@ -1,3 +1,3 @@
-import fetchMock from 'jest-fetch-mock';
-import 'whatwg-fetch';
-fetchMock.enableMocks();
+import fetchMock from 'jest-fetch-mock'
+import 'whatwg-fetch'
+fetchMock.enableMocks()

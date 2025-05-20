@@ -1,8 +1,8 @@
-import path from 'path';
-import { fileURLToPath } from 'url';
+import path from 'path'
+import { fileURLToPath } from 'url'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export default {
   entry: './src/index.ts',
@@ -31,4 +31,4 @@ export default {
     outputModule: true,
     asyncWebAssembly: true,
   },
-};
+}

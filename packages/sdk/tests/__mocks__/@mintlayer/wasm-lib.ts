@@ -1,11 +1,11 @@
-const wasm = require('../pkg-node');
+const wasm = require('../pkg-node')
 
 async function initWasm() {
-  return;
+  return
 }
 
 module.exports = {
   __esModule: true,
   ...wasm,
   default: initWasm,
-};
+}
