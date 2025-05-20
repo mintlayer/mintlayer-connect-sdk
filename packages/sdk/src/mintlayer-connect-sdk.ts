@@ -1,44 +1,44 @@
 // @ts-nocheck
 import initWasm, {
-  get_transaction_id,
-  nft_issuance_fee,
-  token_supply_change_fee,
-  get_token_id,
-  fungible_token_issuance_fee,
-  Network,
-  token_freeze_fee,
-  token_change_authority_fee,
-  encode_outpoint_source_id,
-  SourceId,
-  encode_input_for_utxo,
+  Amount,
+  data_deposit_fee,
+  encode_create_order_output,
+  encode_input_for_change_token_authority,
+  encode_input_for_change_token_metadata_uri,
   encode_input_for_conclude_order,
   encode_input_for_fill_order,
-  encode_input_for_mint_tokens,
-  encode_input_for_unmint_tokens,
-  encode_input_for_lock_token_supply,
-  encode_input_for_change_token_authority,
   encode_input_for_freeze_token,
+  encode_input_for_lock_token_supply,
+  encode_input_for_mint_tokens,
   encode_input_for_unfreeze_token,
-  encode_output_transfer,
-  encode_output_token_transfer,
-  estimate_transaction_size,
-  Amount,
-  encode_lock_until_time,
+  encode_input_for_unmint_tokens,
+  encode_input_for_utxo,
   encode_lock_for_block_count,
-  encode_output_token_lock_then_transfer,
-  encode_output_lock_then_transfer,
-  encode_output_issue_nft,
-  data_deposit_fee,
-  encode_input_for_change_token_metadata_uri,
-  TokenUnfreezable,
-  encode_create_order_output,
-  encode_output_token_burn,
-  encode_transaction,
+  encode_lock_until_time,
+  encode_outpoint_source_id,
   encode_output_coin_burn,
-  FreezableToken,
-  TotalSupply,
-  encode_output_issue_fungible_token,
   encode_output_data_deposit,
+  encode_output_issue_fungible_token,
+  encode_output_issue_nft,
+  encode_output_lock_then_transfer,
+  encode_output_token_burn,
+  encode_output_token_lock_then_transfer,
+  encode_output_token_transfer,
+  encode_output_transfer,
+  encode_transaction,
+  estimate_transaction_size,
+  FreezableToken,
+  fungible_token_issuance_fee,
+  get_token_id,
+  get_transaction_id,
+  Network,
+  nft_issuance_fee,
+  SourceId,
+  token_change_authority_fee,
+  token_freeze_fee,
+  token_supply_change_fee,
+  TokenUnfreezable,
+  TotalSupply,
 } from '@mintlayer/wasm-lib'
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -153,7 +153,6 @@ interface BuildTransactionParams {
 
 interface ClientOptions {
   network?: 'mainnet' | 'testnet'
-  autoRestore?: boolean
 }
 
 class Client {
@@ -198,7 +197,7 @@ class Client {
       encoded = BASE58_ALPHABET[Number(remainder)] + encoded
     }
 
-    for (let byte of bytes) {
+    for (const byte of bytes) {
       if (byte === 0) {
         encoded = '1' + encoded
       } else {
@@ -409,6 +408,7 @@ class Client {
     this.ensureInitialized()
     if (typeof window !== 'undefined' && window.mojito?.connect) {
       const addresses = await window.mojito.connect()
+      console.log('addresses', addresses)
       this.connectedAddresses = addresses
       return addresses
     } else {
@@ -439,7 +439,7 @@ class Client {
 
       if (addressData?.[this.network]?.receiving?.length) {
         this.connectedAddresses = addressData[this.network].receiving
-        console.log('[Mintlayer SDK] Session restored')
+        console.log('[Mintlayer SDK] Session restored:', this.connectedAddresses)
         return true
       }
 
@@ -721,6 +721,8 @@ class Client {
 
     const data = await response.json()
     const utxos: UtxoEntry[] = data.utxos
+
+    console.log('[Mintlayer Connect SDK] UTXOs:', utxos)
 
     let fee = 0n
     const inputs: Input[] = []
@@ -1068,20 +1070,30 @@ class Client {
     }
 
     if (type === 'CreateOrder') {
-      const { ask_amount, ask_token, give_amount, give_token, conclude_destination } = params
-      const give_token_details = { number_of_decimals: 11 } // TODO
-      const ask_token_details = { number_of_decimals: 11 } // TODO
+      const {
+        ask_amount,
+        ask_token,
+        give_amount,
+        give_token,
+        conclude_destination,
+        ask_token_details,
+        give_token_details,
+      } = params
 
       if (give_token === 'Coin') {
         input_amount_coin_req += BigInt(give_amount! * Math.pow(10, 11))
       } else {
         input_amount_token_req += BigInt(give_amount! * Math.pow(10, give_token_details.number_of_decimals))
+        send_token = {
+          token_id: give_token,
+          number_of_decimals: give_token_details.number_of_decimals,
+        }
       }
 
       outputs.push({
         type: 'CreateOrder',
         ask_balance: {
-          atoms: (ask_amount! * Math.pow(10, 11)).toString(),
+          atoms: (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
           decimal: ask_amount!.toString(),
         },
         ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'Token' },
@@ -1096,17 +1108,18 @@ class Client {
           decimal: ask_amount!.toString(),
         },
         initially_given: {
-          atoms: (give_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
+          atoms: (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString(),
           decimal: give_amount!.toString(),
         },
       })
     }
 
     if (type === 'ConcludeOrder') {
-      const { order_id, nonce, conclude_destination } = params.order
+      const { order_id, nonce, conclude_destination, give_currency, give_balance } = params.order
       inputs.push({
         input: {
-          type: 'ConcludeOrder',
+          input_type: 'AccountCommand',
+          command: 'ConcludeOrder',
           destination: conclude_destination,
           order_id: order_id,
           nonce: nonce,
@@ -1114,60 +1127,42 @@ class Client {
         utxo: null,
       })
 
-      const order_details = {
-        order_id: order_id,
-        ask_currency: 'Coin',
-        give_currency: 'Coin',
-        ask_amount: 0,
-        give_amount: 0,
-      }
-
       outputs.push({
         type: 'Transfer',
-        destination: params.to,
+        destination: conclude_destination,
         value: {
-          ...(order_details.ask_currency === 'Coin'
+          ...(give_currency === 'Coin'
             ? { type: 'Coin' }
             : {
                 type: 'TokenV1',
-                token_id: order_details.ask_currency.token_id,
+                token_id: give_currency.token_id,
               }),
           amount: {
-            decimal: params.amount!.toString(),
-            atoms: (params.amount! * Math.pow(10, 11)).toString(),
-          },
-        },
-      })
-
-      outputs.push({
-        type: 'Transfer',
-        destination: params.to,
-        value: {
-          ...(order_details.give_currency === 'Coin'
-            ? { type: 'Coin' }
-            : {
-                type: 'TokenV1',
-                token_id: order_details.give_currency.token_id,
-              }),
-          amount: {
-            decimal: params.amount!.toString(),
-            atoms: (params.amount! * Math.pow(10, 11)).toString(),
+            decimal: give_balance.decimal,
+            atoms: give_balance.atoms,
           },
         },
       })
     }
 
     if (type === 'FillOrder') {
-      const { order_id, amount, destination, order_details } = params
+      const { order_id, amount, destination, order_details, ask_token_details } = params
 
-      const amount_atoms = amount! * Math.pow(10, 11)
-
+      if (order_details.ask_currency.type === 'Coin') {
+        input_amount_coin_req += BigInt(amount! * Math.pow(10, 11))
+      } else {
+        input_amount_token_req += BigInt(amount! * Math.pow(10, ask_token_details.number_of_decimals))
+        send_token = {
+          token_id: order_details.ask_currency.token_id,
+          number_of_decimals: ask_token_details.number_of_decimals,
+        }
+      }
       inputs.push({
         input: {
           input_type: 'AccountCommand',
           command: 'FillOrder',
           order_id: order_id,
-          fill_atoms: amount_atoms.toString(),
+          fill_atoms: (amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
           destination: destination,
           nonce: order_details.nonce.toString(),
         },
@@ -1267,6 +1262,8 @@ class Client {
     }
 
     const HEXRepresentation_unsigned = transaction.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '')
+
+    console.log('[Mintlayer Connect SDK] Transaction JSON:', JSONRepresentation)
 
     return {
       JSONRepresentation,
@@ -1690,9 +1687,44 @@ class Client {
     give_amount: number
   }): Promise<any> {
     this.ensureInitialized()
+    const token_ids = [ask_token, give_token]
+
+    const token_details = await Promise.allSettled(
+      token_ids.map(async (token_id) => {
+        if (token_id) {
+          const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
+          if (!request.ok) {
+            throw new Error('Failed to fetch token')
+          }
+          const token = await request.json()
+          return { ...token }
+        }
+        return { number_of_decimals: 11 }
+      }),
+    )
+
+    token_details.forEach((token, i) => {
+      if (token.status === 'fulfilled') {
+        token_details[i] = token.value
+      } else {
+        token_details[i] = { number_of_decimals: 11 }
+      }
+    })
+
+    const ask_token_details = token_details[0]
+    const give_token_details = token_details[1]
+
     const tx = await this.buildTransaction({
       type: 'CreateOrder',
-      params: { conclude_destination, ask_token, ask_amount, give_token, give_amount },
+      params: {
+        conclude_destination,
+        ask_token,
+        ask_amount,
+        give_token,
+        give_amount,
+        ask_token_details,
+        give_token_details,
+      },
     })
     return this.signTransaction(tx)
   }
@@ -1713,9 +1745,36 @@ class Client {
     }
     const data = await response.json()
     const order_details = data
+
+    const token_ids = [order_details.ask_currency.token_id, order_details.give_currency.token_id]
+    const token_details = await Promise.allSettled(
+      token_ids.map(async (token_id) => {
+        if (token_id) {
+          const request = await fetch(`${this.getApiServer()}/token/${token_id}`)
+          if (!request.ok) {
+            throw new Error('Failed to fetch token')
+          }
+          const token = await request.json()
+          return { ...token }
+        }
+        return { number_of_decimals: 11 }
+      }),
+    )
+
+    token_details.forEach((token, i) => {
+      if (token.status === 'fulfilled') {
+        token_details[i] = token.value
+      } else {
+        token_details[i] = { number_of_decimals: 11 }
+      }
+    })
+
+    const ask_token_details = token_details[0]
+    const give_token_details = token_details[1]
+
     const tx = await this.buildTransaction({
       type: 'FillOrder',
-      params: { order_id, amount, order_details, destination },
+      params: { order_id, amount, order_details, destination, ask_token_details, give_token_details },
     })
     return this.signTransaction(tx)
   }
@@ -1741,7 +1800,10 @@ class Client {
     const data = await response.json()
     const order = data
 
-    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order } })
+    const tx = await this.buildTransaction({
+      type: 'ConcludeOrder',
+      params: { order },
+    })
     return this.signTransaction(tx)
   }
 
