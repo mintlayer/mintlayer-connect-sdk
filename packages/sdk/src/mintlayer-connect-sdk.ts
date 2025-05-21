@@ -34,7 +34,11 @@ import initWasm, {
   encode_create_order_output,
   encode_output_token_burn,
   encode_transaction,
-  encode_output_coin_burn, FreezableToken, TotalSupply, encode_output_issue_fungible_token, encode_output_data_deposit,
+  encode_output_coin_burn,
+  FreezableToken,
+  TotalSupply,
+  encode_output_issue_fungible_token,
+  encode_output_data_deposit,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -44,20 +48,20 @@ const NETWORKS = {
   testnet: 1,
   regtest: 2,
   signet: 3,
-}
+};
 
 function mergeUint8Arrays(arrays: any) {
-  const totalLength = arrays.reduce((sum: any, arr: any) => sum + arr.length, 0)
+  const totalLength = arrays.reduce((sum: any, arr: any) => sum + arr.length, 0);
 
-  const result = new Uint8Array(totalLength)
+  const result = new Uint8Array(totalLength);
 
-  let offset = 0
+  let offset = 0;
   for (const arr of arrays) {
-    result.set(arr, offset)
-    offset += arr.length
+    result.set(arr, offset);
+    offset += arr.length;
   }
 
-  return result
+  return result;
 }
 
 interface Amount {
@@ -179,7 +183,12 @@ class Client {
   private stringToBase58(str: string): string {
     const bytes = new TextEncoder().encode(str);
 
-    let num = BigInt('0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''));
+    let num = BigInt(
+      '0x' +
+        Array.from(bytes)
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join(''),
+    );
 
     let encoded = '';
     const base = BigInt(58);
@@ -246,7 +255,7 @@ class Client {
   }
 
   private stringToHex(str: string): string {
-    if(!str) {
+    if (!str) {
       return '';
     }
 
@@ -257,69 +266,39 @@ class Client {
     return hex;
   }
 
-  private getOutputs ({
-                                amount,
-                                address,
-                                networkType,
-                                type = 'Transfer',
-                                lock,
-                                chainTip,
-                                tokenId,
-                                utxo,
-                              }: any) {
+  private getOutputs({ amount, address, networkType, type = 'Transfer', lock, chainTip, tokenId, utxo }: any) {
     if (type === 'LockThenTransfer' && !lock) {
-      throw new Error('LockThenTransfer requires a lock')
+      throw new Error('LockThenTransfer requires a lock');
     }
 
-    const amountInstace = Amount.from_atoms(amount)
+    const amountInstace = Amount.from_atoms(amount);
 
-    const networkIndex = NETWORKS[networkType]
+    const networkIndex = NETWORKS[networkType];
     if (type === 'Transfer') {
       if (tokenId) {
-        return encode_output_token_transfer(
-          amountInstace,
-          address,
-          tokenId,
-          networkIndex,
-        )
+        return encode_output_token_transfer(amountInstace, address, tokenId, networkIndex);
       } else {
-        return encode_output_transfer(amountInstace, address, networkIndex)
+        return encode_output_transfer(amountInstace, address, networkIndex);
       }
     }
     if (type === 'LockThenTransfer') {
-      let lockEncoded
+      let lockEncoded;
       if (lock.type === 'UntilTime') {
-        lockEncoded = encode_lock_until_time(BigInt(lock.content.timestamp))
+        lockEncoded = encode_lock_until_time(BigInt(lock.content.timestamp));
       }
       if (lock.type === 'ForBlockCount') {
-        lockEncoded = encode_lock_for_block_count(BigInt(lock.content))
+        lockEncoded = encode_lock_for_block_count(BigInt(lock.content));
       }
       if (tokenId) {
-        return encode_output_token_lock_then_transfer(
-          amountInstace,
-          address,
-          tokenId,
-          lockEncoded,
-          networkIndex,
-        )
+        return encode_output_token_lock_then_transfer(amountInstace, address, tokenId, lockEncoded, networkIndex);
       } else {
-        return encode_output_lock_then_transfer(
-          amountInstace,
-          address,
-          lockEncoded,
-          networkIndex,
-        )
+        return encode_output_lock_then_transfer(amountInstace, address, lockEncoded, networkIndex);
       }
     }
     if (type === 'spendFromDelegation') {
-      const stakingMaturity = getStakingMaturity(chainTip, networkType)
-      const encodedLockForBlock = encode_lock_for_block_count(stakingMaturity)
-      return encode_output_lock_then_transfer(
-        amountInstace,
-        address,
-        encodedLockForBlock,
-        networkIndex,
-      )
+      const stakingMaturity = getStakingMaturity(chainTip, networkType);
+      const encodedLockForBlock = encode_lock_for_block_count(stakingMaturity);
+      return encode_output_lock_then_transfer(amountInstace, address, encodedLockForBlock, networkIndex);
     }
 
     if (type === 'IssueNft') {
@@ -336,7 +315,7 @@ class Client {
         utxo.utxo.data.additional_metadata_uri.string,
         BigInt(Number(chainTip)),
         networkIndex,
-      )
+      );
     }
   }
 
@@ -344,7 +323,7 @@ class Client {
     const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
     const filteredUtxos = utxos
       .map((utxo) => {
-        if(utxo.utxo.type === 'IssueNft') {
+        if (utxo.utxo.type === 'IssueNft') {
           return {
             ...utxo,
             utxo: {
@@ -352,7 +331,7 @@ class Client {
               value: {
                 amount: {
                   atoms: 1,
-                  decimal: 1
+                  decimal: 1,
                 },
                 type: 'TokenV1',
                 token_id: utxo.utxo.token_id,
@@ -712,7 +691,13 @@ class Client {
     }
   }
 
-  async buildTransaction({ type = 'Transfer', params }: { type?: string; params: BuildTransactionParams }): Promise<Transaction> {
+  async buildTransaction({
+    type = 'Transfer',
+    params,
+  }: {
+    type?: string;
+    params: BuildTransactionParams;
+  }): Promise<Transaction> {
     this.ensureInitialized();
     if (!params) throw new Error('Missing params');
 
@@ -769,22 +754,22 @@ class Client {
           ...(token_id === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id,
-            }),
+                type: 'TokenV1',
+                token_id,
+              }),
           ...(token_id === 'Coin'
             ? {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                },
               }
-            }
             : {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
-              }
-            }),
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
+                },
+              }),
         },
       });
     }
@@ -809,9 +794,9 @@ class Client {
           ...(token_id === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id,
-            }),
+                type: 'TokenV1',
+                token_id,
+              }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
@@ -1099,19 +1084,13 @@ class Client {
           atoms: (ask_amount! * Math.pow(10, 11)).toString(),
           decimal: ask_amount!.toString(),
         },
-        ask_currency:
-          ask_token === 'Coin'
-            ? { type: 'Coin' }
-            : { token_id: ask_token, type: 'Token' },
+        ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'Token' },
         conclude_destination,
         give_balance: {
           atoms: (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString(),
           decimal: give_amount!.toString(),
         },
-        give_currency:
-          give_token === 'Coin'
-            ? { type: 'Coin' }
-            : { token_id: give_token, type: 'Token' },
+        give_currency: give_token === 'Coin' ? { type: 'Coin' } : { token_id: give_token, type: 'Token' },
         initially_asked: {
           atoms: (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
           decimal: ask_amount!.toString(),
@@ -1150,9 +1129,9 @@ class Client {
           ...(order_details.ask_currency === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id: order_details.ask_currency.token_id,
-            }),
+                type: 'TokenV1',
+                token_id: order_details.ask_currency.token_id,
+              }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
@@ -1167,9 +1146,9 @@ class Client {
           ...(order_details.give_currency === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id: order_details.give_currency.token_id,
-            }),
+                type: 'TokenV1',
+                token_id: order_details.give_currency.token_id,
+              }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
@@ -1200,7 +1179,9 @@ class Client {
     input_amount_coin_req += fee;
 
     const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null);
-    const inputObjToken = send_token?.token_id ? this.selectUTXOs(utxos, input_amount_token_req, 'Transfer', send_token.token_id) : [];
+    const inputObjToken = send_token?.token_id
+      ? this.selectUTXOs(utxos, input_amount_token_req, 'Transfer', send_token.token_id)
+      : [];
 
     const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
     const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
@@ -1257,32 +1238,35 @@ class Client {
       mergeUint8Arrays(BINRepresentation.inputs),
       mergeUint8Arrays(BINRepresentation.outputs),
       BigInt(0),
-    )
+    );
 
     const transaction_id = get_transaction_id(transaction);
 
     // some operations need to be recoded with given data
     // if outputs include issueNft type
-    if(outputs.some((output) => output.type === 'IssueNft')) {
+    if (outputs.some((output) => output.type === 'IssueNft')) {
       // need to modify the transaction outout exact that object
       try {
-        get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+        get_token_id(
+          mergeUint8Arrays(BINRepresentation.inputs),
+          this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
+        );
       } catch (error) {
         throw new Error('Error while getting token id');
       }
-      const token_id = get_token_id(mergeUint8Arrays(BINRepresentation.inputs), this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
+      const token_id = get_token_id(
+        mergeUint8Arrays(BINRepresentation.inputs),
+        this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
+      );
       const index = outputs.findIndex((output) => output.type === 'IssueNft');
       const output = outputs[index];
       outputs[index] = {
         ...output,
         token_id: token_id,
-      }
+      };
     }
 
-    const HEXRepresentation_unsigned = transaction.reduce(
-      (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
-      '',
-    );
+    const HEXRepresentation_unsigned = transaction.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '');
 
     return {
       JSONRepresentation,
@@ -1292,47 +1276,33 @@ class Client {
     };
   }
 
-  getTransactionBINrepresentation(
-    transactionJSONrepresentation,
-    _network,
-  ) {
-    const network = _network
-    const networkType = network === 1 ? 'testnet' : 'mainnet'
+  getTransactionBINrepresentation(transactionJSONrepresentation, _network) {
+    const network = _network;
+    const networkType = network === 1 ? 'testnet' : 'mainnet';
     // Binarisation
     // calculate fee and prepare as much transaction as possible
-    const inputs = transactionJSONrepresentation.inputs
+    const inputs = transactionJSONrepresentation.inputs;
     const transactionStrings = inputs
       .filter(({ input }) => input.input_type === 'UTXO')
       .map(({ input }) => ({
         transaction: input.source_id,
         index: input.index,
-      }))
+      }));
     const transactionBytes = transactionStrings.map((transaction) => ({
-      bytes: Uint8Array.from(
-        transaction.transaction.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))
-      ),
+      bytes: Uint8Array.from(transaction.transaction.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))),
       index: transaction.index,
     }));
     const outpointedSourceIds = transactionBytes.map((transaction) => ({
-      source_id: encode_outpoint_source_id(
-        transaction.bytes,
-        SourceId.Transaction,
-      ),
+      source_id: encode_outpoint_source_id(transaction.bytes, SourceId.Transaction),
       index: transaction.index,
-    }))
-    const inputsIds = outpointedSourceIds.map((source) =>
-      encode_input_for_utxo(source.source_id, source.index),
-    )
+    }));
+    const inputsIds = outpointedSourceIds.map((source) => encode_input_for_utxo(source.source_id, source.index));
 
     const inputCommands = transactionJSONrepresentation.inputs
       .filter(({ input }) => input.input_type === 'AccountCommand')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
-          return encode_input_for_conclude_order(
-            input.order_id,
-            BigInt(input.nonce.toString()),
-            network,
-          )
+          return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), network);
         }
         if (input.command === 'FillOrder') {
           return encode_input_for_fill_order(
@@ -1341,7 +1311,7 @@ class Client {
             input.destination,
             BigInt(input.nonce.toString()),
             network,
-          )
+          );
         }
         if (input.command === 'MintTokens') {
           return encode_input_for_mint_tokens(
@@ -1349,21 +1319,13 @@ class Client {
             Amount.from_atoms(input.amount.atoms.toString()),
             input.nonce.toString(),
             network,
-          )
+          );
         }
         if (input.command === 'UnmintTokens') {
-          return encode_input_for_unmint_tokens(
-            input.token_id,
-            input.nonce.toString(),
-            network,
-          )
+          return encode_input_for_unmint_tokens(input.token_id, input.nonce.toString(), network);
         }
         if (input.command === 'LockTokenSupply') {
-          return encode_input_for_lock_token_supply(
-            input.token_id,
-            input.nonce.toString(),
-            network,
-          )
+          return encode_input_for_lock_token_supply(input.token_id, input.nonce.toString(), network);
         }
         if (input.command === 'ChangeTokenAuthority') {
           return encode_input_for_change_token_authority(
@@ -1371,7 +1333,7 @@ class Client {
             input.new_authority,
             input.nonce.toString(),
             network,
-          )
+          );
         }
         if (input.command === 'ChangeMetadataUri') {
           return encode_input_for_change_token_metadata_uri(
@@ -1379,7 +1341,7 @@ class Client {
             input.new_metadata_uri,
             input.nonce.toString(),
             network,
-          )
+          );
         }
         if (input.command === 'FreezeToken') {
           return encode_input_for_freeze_token(
@@ -1387,166 +1349,135 @@ class Client {
             input.is_unfreezable ? TokenUnfreezable.Yes : TokenUnfreezable.No,
             input.nonce.toString(),
             network,
-          )
+          );
         }
         if (input.command === 'UnfreezeToken') {
-          return encode_input_for_unfreeze_token(
-            input.token_id,
-            input.nonce.toString(),
-            network,
-          )
+          return encode_input_for_unfreeze_token(input.token_id, input.nonce.toString(), network);
         }
-      })
+      });
 
-    const inputsArray = [...inputCommands, ...inputsIds]
+    const inputsArray = [...inputCommands, ...inputsIds];
 
-    const outputsArrayItems = transactionJSONrepresentation.outputs.map(
-      (output) => {
-        if (output.type === 'Transfer') {
-          return this.getOutputs({
-            amount: BigInt(output.value.amount.atoms).toString(),
-            address: output.destination,
-            networkType: this.network,
-            ...(output?.value?.token_id
-              ? { tokenId: output.value.token_id }
-              : {}),
-          })
-        }
-        if (output.type === 'LockThenTransfer') {
-          return this.getOutputs({
-            type: 'LockThenTransfer',
-            lock: output.lock,
-            amount: BigInt(output.value.amount.atoms).toString(),
-            address: output.destination,
-            networkType: this.network,
-            ...(output?.value?.token_id
-              ? { tokenId: output.value.token_id }
-              : {}),
-          })
-        }
-        if (output.type === 'CreateOrder') {
-          return encode_create_order_output(
-            Amount.from_atoms(output.ask_balance.atoms.toString()), //ask_amount
-            output.ask_currency.token_id || null, // ask_token_id
-            Amount.from_atoms(output.give_balance.atoms.toString()), //give_amount
-            output.give_currency.token_id || null, //give_token_id
-            output.conclude_destination, // conclude_address
+    const outputsArrayItems = transactionJSONrepresentation.outputs.map((output) => {
+      if (output.type === 'Transfer') {
+        return this.getOutputs({
+          amount: BigInt(output.value.amount.atoms).toString(),
+          address: output.destination,
+          networkType: this.network,
+          ...(output?.value?.token_id ? { tokenId: output.value.token_id } : {}),
+        });
+      }
+      if (output.type === 'LockThenTransfer') {
+        return this.getOutputs({
+          type: 'LockThenTransfer',
+          lock: output.lock,
+          amount: BigInt(output.value.amount.atoms).toString(),
+          address: output.destination,
+          networkType: this.network,
+          ...(output?.value?.token_id ? { tokenId: output.value.token_id } : {}),
+        });
+      }
+      if (output.type === 'CreateOrder') {
+        return encode_create_order_output(
+          Amount.from_atoms(output.ask_balance.atoms.toString()), //ask_amount
+          output.ask_currency.token_id || null, // ask_token_id
+          Amount.from_atoms(output.give_balance.atoms.toString()), //give_amount
+          output.give_currency.token_id || null, //give_token_id
+          output.conclude_destination, // conclude_address
+          network, // network
+        );
+      }
+      if (output.type === 'BurnToken') {
+        if (output.value.token_id) {
+          return encode_output_token_burn(
+            Amount.from_atoms(output.value.amount.atoms.toString()), // amount
+            output.value.token_id, // token_id
             network, // network
-          )
+          );
         }
-        if (output.type === 'BurnToken') {
-          if (output.value.token_id) {
-            return encode_output_token_burn(
-              Amount.from_atoms(output.value.amount.atoms.toString()), // amount
-              output.value.token_id, // token_id
-              network, // network
-            )
-          }
-          if (output.value.type === 'Coin') {
-            return encode_output_coin_burn(
-              Amount.from_atoms(output.value.amount.atoms.toString()), // amount
-            )
-          }
+        if (output.value.type === 'Coin') {
+          return encode_output_coin_burn(
+            Amount.from_atoms(output.value.amount.atoms.toString()), // amount
+          );
         }
-        if (output.type === 'IssueNft') {
-          const {
-            name,
-            ticker,
-            description,
-            media_hash,
-            creator,
-            media_uri,
-            icon_uri,
-            additional_metadata_uri,
-          } = output.data
+      }
+      if (output.type === 'IssueNft') {
+        const { name, ticker, description, media_hash, creator, media_uri, icon_uri, additional_metadata_uri } =
+          output.data;
 
-          const {
-            destination: address,
-            token_id,
-          } = output
+        const { destination: address, token_id } = output;
 
-          const chainTip = '200000' // TODO unhardcode
+        const chainTip = '200000'; // TODO unhardcode
 
-          return encode_output_issue_nft(
-            token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
-            address,
-            name.string,
-            ticker.string,
-            description.string,
-            media_hash.string,
-            null, // TODO: check for public key, key hash is not working
-            media_uri.string,
-            icon_uri.string,
-            additional_metadata_uri.string,
-            BigInt(chainTip),
-            network,
-          )
-        }
-        if (output.type === 'IssueFungibleToken') {
-          const {
-            authority,
-            is_freezable,
-            metadata_uri,
-            number_of_decimals,
-            token_ticker,
-            total_supply,
-          } = output
+        return encode_output_issue_nft(
+          token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
+          address,
+          name.string,
+          ticker.string,
+          description.string,
+          media_hash.string,
+          null, // TODO: check for public key, key hash is not working
+          media_uri.string,
+          icon_uri.string,
+          additional_metadata_uri.string,
+          BigInt(chainTip),
+          network,
+        );
+      }
+      if (output.type === 'IssueFungibleToken') {
+        const { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, total_supply } = output;
 
-          const chainTip = '200000' // TODO: unhardcode height
+        const chainTip = '200000'; // TODO: unhardcode height
 
-          const is_token_freezable =
-            is_freezable === true ? FreezableToken.Yes : FreezableToken.No
+        const is_token_freezable = is_freezable === true ? FreezableToken.Yes : FreezableToken.No;
 
-          const supply_amount =
-            total_supply.type === 'Fixed'
-              ? Amount.from_atoms(total_supply.amount.atoms.toString())
-              : null
+        const supply_amount =
+          total_supply.type === 'Fixed' ? Amount.from_atoms(total_supply.amount.atoms.toString()) : null;
 
-          const total_supply_type =
-            total_supply.type === 'Fixed'
-              ? TotalSupply.Fixed
-              : total_supply.type === 'Lockable'
-                ? TotalSupply.Lockable
-                : TotalSupply.Unlimited
+        const total_supply_type =
+          total_supply.type === 'Fixed'
+            ? TotalSupply.Fixed
+            : total_supply.type === 'Lockable'
+              ? TotalSupply.Lockable
+              : TotalSupply.Unlimited;
 
-          // const encoder = new TextEncoder()
+        // const encoder = new TextEncoder()
 
-          return encode_output_issue_fungible_token(
-            authority, // ok
-            token_ticker.string, // ok
-            metadata_uri.string, // ok
-            parseInt(number_of_decimals), // ok
-            total_supply_type, // ok
-            supply_amount, // ok
-            is_token_freezable, // ok
-            BigInt(chainTip), // ok
-            network,
-          )
-        }
+        return encode_output_issue_fungible_token(
+          authority, // ok
+          token_ticker.string, // ok
+          metadata_uri.string, // ok
+          parseInt(number_of_decimals), // ok
+          total_supply_type, // ok
+          supply_amount, // ok
+          is_token_freezable, // ok
+          BigInt(chainTip), // ok
+          network,
+        );
+      }
 
-        if (output.type === 'DataDeposit') {
-          return encode_output_data_deposit(new TextEncoder().encode(output.data))
-        }
-      },
-    )
-    const outputsArray = outputsArrayItems
+      if (output.type === 'DataDeposit') {
+        return encode_output_data_deposit(new TextEncoder().encode(output.data));
+      }
+    });
+    const outputsArray = outputsArrayItems;
 
     const inputAddresses = transactionJSONrepresentation.inputs
       .filter(({ input }) => input.input_type === 'UTXO')
-      .map((input) => input?.utxo?.destination || input?.destination)
+      .map((input) => input?.utxo?.destination || input?.destination);
 
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
       inputAddresses,
       mergeUint8Arrays(outputsArray),
       network,
-    )
+    );
 
     return {
       inputs: inputsArray,
       outputs: outputsArray,
       transactionsize,
-    }
+    };
   }
 
   async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<any> {
@@ -1591,13 +1522,13 @@ class Client {
     this.ensureInitialized();
     const description = tokenData.description;
 
-    if(description.length >= 70) {
+    if (description.length >= 70) {
       throw new Error('Description is too long. Max length is 70 characters.');
     }
 
     const descriptionBase58 = this.stringToBase58(description);
 
-    if(descriptionBase58.length >= 100) {
+    if (descriptionBase58.length >= 100) {
       throw new Error('Description is too long.');
     }
 
@@ -1607,14 +1538,14 @@ class Client {
   }
 
   async issueToken({
-                     authority,
-                     is_freezable,
-                     metadata_uri,
-                     number_of_decimals,
-                     token_ticker,
-                     supply_type,
-                     supply_amount,
-                   }: {
+    authority,
+    is_freezable,
+    metadata_uri,
+    number_of_decimals,
+    token_ticker,
+    supply_type,
+    supply_amount,
+  }: {
     authority: string;
     is_freezable: boolean;
     metadata_uri: string;
@@ -1631,7 +1562,15 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async mintToken({ destination, amount, token_id }: { destination: string; amount: number; token_id: string }): Promise<any> {
+  async mintToken({
+    destination,
+    amount,
+    token_id,
+  }: {
+    destination: string;
+    amount: number;
+    token_id: string;
+  }): Promise<any> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -1640,7 +1579,10 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({ type: 'MintToken', params: { destination, amount, token_id, token_details } });
+    const tx = await this.buildTransaction({
+      type: 'MintToken',
+      params: { destination, amount, token_id, token_details },
+    });
     return this.signTransaction(tx);
   }
 
@@ -1679,11 +1621,20 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({ type: 'ChangeTokenAuthority', params: { token_id, new_authority, token_details } });
+    const tx = await this.buildTransaction({
+      type: 'ChangeTokenAuthority',
+      params: { token_id, new_authority, token_details },
+    });
     return this.signTransaction(tx);
   }
 
-  async changeMetadataUri({ token_id, new_metadata_uri }: { token_id: string; new_metadata_uri: string }): Promise<any> {
+  async changeMetadataUri({
+    token_id,
+    new_metadata_uri,
+  }: {
+    token_id: string;
+    new_metadata_uri: string;
+  }): Promise<any> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -1692,7 +1643,10 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({ type: 'ChangeMetadataUri', params: { token_id, new_metadata_uri, token_details } });
+    const tx = await this.buildTransaction({
+      type: 'ChangeMetadataUri',
+      params: { token_id, new_metadata_uri, token_details },
+    });
     return this.signTransaction(tx);
   }
 
@@ -1705,7 +1659,10 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({ type: 'FreezeToken', params: { token_id, is_unfreezable, token_details } });
+    const tx = await this.buildTransaction({
+      type: 'FreezeToken',
+      params: { token_id, is_unfreezable, token_details },
+    });
     return this.signTransaction(tx);
   }
 
@@ -1723,12 +1680,12 @@ class Client {
   }
 
   async createOrder({
-                      conclude_destination,
-                      ask_token,
-                      ask_amount,
-                      give_token,
-                      give_amount,
-                    }: {
+    conclude_destination,
+    ask_token,
+    ask_amount,
+    give_token,
+    give_amount,
+  }: {
     conclude_destination: string;
     ask_token: string;
     ask_amount: number;
@@ -1736,11 +1693,22 @@ class Client {
     give_amount: number;
   }): Promise<any> {
     this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'CreateOrder', params: { conclude_destination, ask_token, ask_amount, give_token, give_amount } });
+    const tx = await this.buildTransaction({
+      type: 'CreateOrder',
+      params: { conclude_destination, ask_token, ask_amount, give_token, give_amount },
+    });
     return this.signTransaction(tx);
   }
 
-  async fillOrder({ order_id, amount, destination }: { order_id: string; amount: number; destination: string }): Promise<any> {
+  async fillOrder({
+    order_id,
+    amount,
+    destination,
+  }: {
+    order_id: string;
+    amount: number;
+    destination: string;
+  }): Promise<any> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
     if (!response.ok) {
@@ -1748,7 +1716,10 @@ class Client {
     }
     const data = await response.json();
     const order_details = data;
-    const tx = await this.buildTransaction({ type: 'FillOrder', params: { order_id, amount, order_details, destination } });
+    const tx = await this.buildTransaction({
+      type: 'FillOrder',
+      params: { order_id, amount, order_details, destination },
+    });
     return this.signTransaction(tx);
   }
 
@@ -1777,7 +1748,17 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async bridgeRequest({ destination, amount, token_id, intent }: { destination: string; amount: number; token_id: string; intent: string }): Promise<any> {
+  async bridgeRequest({
+    destination,
+    amount,
+    token_id,
+    intent,
+  }: {
+    destination: string;
+    amount: number;
+    token_id: string;
+    intent: string;
+  }): Promise<any> {
     this.ensureInitialized();
     let token_details: Record<string, any> = token_id ? { token_id } : {};
 
@@ -1790,7 +1771,10 @@ class Client {
       token_details = { ...token };
     }
 
-    const tx = await this.buildTransaction({ type: 'Transfer', params: { to: destination, amount, token_id, token_details } });
+    const tx = await this.buildTransaction({
+      type: 'Transfer',
+      params: { to: destination, amount, token_id, token_details },
+    });
     return this.signTransaction({ ...tx, intent });
   }
 
@@ -1822,13 +1806,29 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async delegationStake({ pool_id, delegation_id, amount }: { pool_id: string; delegation_id: string; amount: number }): Promise<any> {
+  async delegationStake({
+    pool_id,
+    delegation_id,
+    amount,
+  }: {
+    pool_id: string;
+    delegation_id: string;
+    amount: number;
+  }): Promise<any> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'DelegationStake', params: { delegation_id, pool_id, amount } });
     return this.signTransaction(tx);
   }
 
-  async delegationWithdraw({ pool_id, delegation_id, amount }: { pool_id: string; delegation_id: string; amount: number }): Promise<any> {
+  async delegationWithdraw({
+    pool_id,
+    delegation_id,
+    amount,
+  }: {
+    pool_id: string;
+    delegation_id: string;
+    amount: number;
+  }): Promise<any> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'DelegationWithdraw', params: { delegation_id, pool_id, amount } });
     return this.signTransaction(tx);
