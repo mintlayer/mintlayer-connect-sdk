@@ -1637,7 +1637,7 @@ class Client {
         this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
       );
       const index = outputs.findIndex((output) => output.type === 'IssueNft');
-      const output = outputs[index];
+      const output = outputs[index] as IssueNftOutput;
       outputs[index] = {
         ...output,
         token_id: token_id,
@@ -1871,17 +1871,19 @@ class Client {
 
   async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<any> {
     this.ensureInitialized();
-    const amount = 1;
-    let token_details: Record<string, any> = token_id ? { token_id } : {};
-    if (token_id) {
-      const request = await fetch(`${this.getApiServer()}/nft/${token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      const token = await request.json();
-      token_details = token;
-      token_details.number_of_decimals = 0; // that's NFT
+
+    if(!token_id) {
+      throw new Error('Token ID is required for NFT transfer');
     }
+
+    const amount = 1;
+    const request = await fetch(`${this.getApiServer()}/nft/${token_id}`);
+    if (!request.ok) {
+      throw new Error('Failed to fetch token');
+    }
+    const token = await request.json();
+    const token_details: TokenDetails = token;
+    token_details.number_of_decimals = 0; // that's NFT
     const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
     return this.signTransaction(tx);
   }
