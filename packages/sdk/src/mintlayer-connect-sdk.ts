@@ -848,7 +848,7 @@ class Client {
     const address = this.connectedAddresses;
     const currentAddress = address[this.network];
 
-    if (this.connectedAddresses[this.network].receiving.length > 0) {
+    if (this.connectedAddresses[this.network].receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
     try {
@@ -885,7 +885,7 @@ class Client {
     const address = this.connectedAddresses;
     const currentAddress = address[this.network];
 
-    if (this.connectedAddresses[this.network].receiving.length > 0) {
+    if (this.connectedAddresses[this.network].receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
 
@@ -940,7 +940,7 @@ class Client {
 
   async getDelegations(): Promise<any[]> {
     this.ensureInitialized();
-    if (this.connectedAddresses[this.network].receiving.length > 0) {
+    if (this.connectedAddresses[this.network].receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
     const address = this.connectedAddresses;
@@ -973,7 +973,7 @@ class Client {
 
   async getTokensOwned(): Promise<any[]> {
     this.ensureInitialized();
-    if (this.connectedAddresses[this.network].receiving.length > 0) {
+    if (this.connectedAddresses[this.network].receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
     const address = this.connectedAddresses;
