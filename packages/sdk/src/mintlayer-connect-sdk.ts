@@ -207,7 +207,13 @@ type TransferOutput = {
   type: 'Transfer';
   destination: string;
   value: Value;
-  lock?: {
+};
+
+type LockThenTransferOutput = {
+  type: 'LockThenTransfer';
+  destination: string;
+  value: Value;
+  lock: {
     type: 'ForBlockCount' | 'UntilTime';
     content: string;
   };
@@ -241,17 +247,21 @@ type DataDepositOutput = {
   data: string;
 };
 
+type TotalSupplyValue = {
+  type: 'Unlimited' | 'Lockable';
+} | {
+  type: 'Fixed';
+  amount: AmountFields;
+};
+
 type IssueFungibleTokenOutput = {
   type: 'IssueFungibleToken';
   authority: string;
   is_freezable: boolean;
   metadata_uri: { hex: string; string: string };
-  number_of_decimals: number | string;
+  number_of_decimals: number;
   token_ticker: { hex: string; string: string };
-  total_supply: {
-    type: 'Unlimited' | 'Fixed' | 'Lockable';
-    amount?: AmountFields;
-  };
+  total_supply: TotalSupplyValue;
 };
 
 type IssueNftOutput = {
@@ -273,9 +283,9 @@ type IssueNftOutput = {
 type CreateOrderOutput = {
   type: 'CreateOrder';
   ask_balance: { atoms: string | number; decimal: string };
-  ask_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
+  ask_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
   give_balance: { atoms: string | number; decimal: string };
-  give_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
+  give_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
   initially_asked: { atoms: string; decimal: string };
   initially_given: { atoms: string; decimal: string };
   conclude_destination: string;
@@ -283,6 +293,7 @@ type CreateOrderOutput = {
 
 type Output =
   | TransferOutput
+  | LockThenTransferOutput
   | BurnTokenOutput
   | DataDepositOutput
   | IssueFungibleTokenOutput
@@ -467,6 +478,16 @@ type BuildTransactionParams =
       order_id: string;
       nonce: number;
       conclude_destination: string;
+      ask_balance: AmountFields;
+      ask_currency: {
+        type: 'Coin' | 'TokenV1';
+        token_id?: string;
+      };
+      give_balance: AmountFields;
+      give_currency: {
+        type: 'Coin' | 'TokenV1';
+        token_id?: string;
+      };
     };
     to: string;
     amount: number;
@@ -1449,13 +1470,13 @@ class Client {
           atoms: (ask_amount! * Math.pow(10, 11)).toString(),
           decimal: ask_amount!.toString(),
         },
-        ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'Token' },
+        ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'TokenV1' },
         conclude_destination,
         give_balance: {
           atoms: (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString(),
           decimal: give_amount!.toString(),
         },
-        give_currency: give_token === 'Coin' ? { type: 'Coin' } : { token_id: give_token, type: 'Token' },
+        give_currency: give_token === 'Coin' ? { type: 'Coin' } : { token_id: give_token, type: 'TokenV1' },
         initially_asked: {
           atoms: (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
           decimal: ask_amount!.toString(),
@@ -1468,7 +1489,7 @@ class Client {
     }
 
     if (type === 'ConcludeOrder') {
-      const { order_id, nonce, conclude_destination, ask_currency, give_currency, ask_amount, give_amount } = params.order;
+      const { order_id, nonce, conclude_destination, ask_currency, give_currency, ask_balance, give_balance } = params.order;
       inputs.push({
         input: {
           type: 'ConcludeOrder',
@@ -1483,7 +1504,7 @@ class Client {
         type: 'Transfer',
         destination: params.to,
         value: {
-          ...(ask_currency === 'Coin'
+          ...(ask_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
                 type: 'TokenV1',
@@ -1500,7 +1521,7 @@ class Client {
         type: 'Transfer',
         destination: params.to,
         value: {
-          ...(give_currency === 'Coin'
+          ...(give_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
                 type: 'TokenV1',
@@ -1638,20 +1659,17 @@ class Client {
     // Binarisation
     // calculate fee and prepare as much transaction as possible
     const inputs = transactionJSONrepresentation.inputs;
-    const transactionStrings = (inputs as UtxoInput[])
+    const outpointedSourceIds = (inputs as UtxoInput[])
       .filter(({ input }) => input.input_type === 'UTXO')
-      .map(({ input }) => ({
-        transaction: input.source_id,
-        index: input.index,
-      }));
-    const transactionBytes = transactionStrings.map((transaction) => ({
-      bytes: Uint8Array.from(transaction.transaction.match(/.{1,2}/g).map((byte: any) => parseInt(byte, 16))),
-      index: transaction.index,
-    }));
-    const outpointedSourceIds = transactionBytes.map((transaction) => ({
-      source_id: encode_outpoint_source_id(transaction.bytes, SourceId.Transaction),
-      index: transaction.index,
-    }));
+      .map(({ input }) => {
+        const bytes = Uint8Array.from(
+          input.source_id.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
+        );
+        return {
+          source_id: encode_outpoint_source_id(bytes, SourceId.Transaction),
+          index: input.index,
+        };
+      });
     const inputsIds = outpointedSourceIds.map((source) => encode_input_for_utxo(source.source_id, source.index));
 
     const inputCommands = (transactionJSONrepresentation.inputs as any[])
@@ -1720,7 +1738,7 @@ class Client {
           amount: BigInt(output.value.amount.atoms).toString(),
           address: output.destination,
           networkType: this.network,
-          ...(output?.value?.token_id ? { tokenId: output.value.token_id } : {}),
+          ...(output.value.type === 'Coin' ? {} : { tokenId: output.value.token_id }),
         });
       }
       if (output.type === 'LockThenTransfer') {
@@ -1730,21 +1748,21 @@ class Client {
           amount: BigInt(output.value.amount.atoms).toString(),
           address: output.destination,
           networkType: this.network,
-          ...(output?.value?.token_id ? { tokenId: output.value.token_id } : {}),
+          ...(output.value.type === 'Coin' ? {} : { tokenId: output.value.token_id }),
         });
       }
       if (output.type === 'CreateOrder') {
         return encode_create_order_output(
           Amount.from_atoms(output.ask_balance.atoms.toString()), //ask_amount
-          output.ask_currency.token_id || null, // ask_token_id
+          output.ask_currency.type === 'TokenV1' ? output.ask_currency.token_id : null, // ask_token_id
           Amount.from_atoms(output.give_balance.atoms.toString()), //give_amount
-          output.give_currency.token_id || null, //give_token_id
+          output.give_currency.type === 'TokenV1' ? output.give_currency.token_id : null, //give_token_id
           output.conclude_destination, // conclude_address
           network, // network
         );
       }
       if (output.type === 'BurnToken') {
-        if (output.value.token_id) {
+        if (output.value.type === 'TokenV1') {
           return encode_output_token_burn(
             Amount.from_atoms(output.value.amount.atoms.toString()), // amount
             output.value.token_id, // token_id
@@ -1803,7 +1821,7 @@ class Client {
           authority, // ok
           token_ticker.string, // ok
           metadata_uri.string, // ok
-          parseInt(number_of_decimals), // ok
+          number_of_decimals, // ok
           total_supply_type, // ok
           supply_amount, // ok
           is_token_freezable, // ok
@@ -1818,9 +1836,9 @@ class Client {
     });
     const outputsArray = outputsArrayItems;
 
-    const inputAddresses: string[] = transactionJSONrepresentation.inputs
+    const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
       .filter(({ input }) => input.input_type === 'UTXO')
-      .map((input) => input?.utxo?.destination || input?.destination);
+      .map((input) => input.utxo.destination);
 
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
@@ -2135,7 +2153,7 @@ class Client {
 
   async burn({ token_id, amount }: { token_id: string; amount: number }): Promise<any> {
     this.ensureInitialized();
-    let token_details: Record<string, any> | null = null;
+    let token_details: TokenDetails | undefined = undefined;
 
     if (token_id !== 'Coin' && token_id !== null) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
