@@ -42,13 +42,6 @@ import initWasm, {
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
-const NETWORKS = {
-  mainnet: 0,
-  testnet: 1,
-  regtest: 2,
-  signet: 3,
-};
-
 function mergeUint8Arrays(arrays: any) {
   const totalLength = arrays.reduce((sum: any, arr: any) => sum + arr.length, 0);
 
@@ -61,6 +54,10 @@ function mergeUint8Arrays(arrays: any) {
   }
 
   return result;
+}
+
+function stringToUint8Array(str: string): Uint8Array {
+  return new TextEncoder().encode(str);
 }
 
 type AmountFields= {
@@ -324,8 +321,8 @@ type TransferParams =
   | {
   amount: number;
   to: string;
-  token_id?: undefined;
-  token_details?: undefined;
+  token_id: undefined;
+  token_details: undefined;
 };
 
 
@@ -668,7 +665,7 @@ class Client {
         utxo.utxo.data.name.string,
         utxo.utxo.data.ticker.string,
         utxo.utxo.data.description.string,
-        Buffer.from(utxo.utxo.data.media_hash.hex, 'hex'),
+        stringToUint8Array(utxo.utxo.data.description.string),
         utxo.utxo.data.creator,
         utxo.utxo.data.media_uri.string,
         utxo.utxo.data.icon_uri.string,
@@ -1471,7 +1468,7 @@ class Client {
     }
 
     if (type === 'ConcludeOrder') {
-      const { order_id, nonce, conclude_destination } = params.order;
+      const { order_id, nonce, conclude_destination, ask_currency, give_currency, ask_amount, give_amount } = params.order;
       inputs.push({
         input: {
           type: 'ConcludeOrder',
@@ -1482,23 +1479,15 @@ class Client {
         utxo: null,
       });
 
-      const order_details = {
-        order_id: order_id,
-        ask_currency: 'Coin',
-        give_currency: 'Coin',
-        ask_amount: 0,
-        give_amount: 0,
-      };
-
       outputs.push({
         type: 'Transfer',
         destination: params.to,
         value: {
-          ...(order_details.ask_currency === 'Coin'
+          ...(ask_currency === 'Coin'
             ? { type: 'Coin' }
             : {
                 type: 'TokenV1',
-                token_id: order_details.ask_currency.token_id,
+                token_id: ask_currency.token_id,
               }),
           amount: {
             decimal: params.amount!.toString(),
@@ -1511,11 +1500,11 @@ class Client {
         type: 'Transfer',
         destination: params.to,
         value: {
-          ...(order_details.give_currency === 'Coin'
+          ...(give_currency === 'Coin'
             ? { type: 'Coin' }
             : {
                 type: 'TokenV1',
-                token_id: order_details.give_currency.token_id,
+                token_id: give_currency.token_id,
               }),
           amount: {
             decimal: params.amount!.toString(),
@@ -1575,14 +1564,14 @@ class Client {
       });
     }
 
-    if (changeAmountToken > 0) {
-      const decimals = send_token?.number_of_decimals;
+    if (changeAmountToken > 0 && send_token) {
+      const decimals = send_token.number_of_decimals;
 
       outputs.push({
         type: 'Transfer',
         value: {
           type: 'TokenV1',
-          token_id: send_token?.token_id,
+          token_id: send_token.token_id,
           amount: {
             atoms: changeAmountToken.toString(),
             decimal: (Number(changeAmountToken) / Math.pow(10, decimals!)).toString(),
@@ -1649,14 +1638,14 @@ class Client {
     // Binarisation
     // calculate fee and prepare as much transaction as possible
     const inputs = transactionJSONrepresentation.inputs;
-    const transactionStrings = inputs
+    const transactionStrings = (inputs as UtxoInput[])
       .filter(({ input }) => input.input_type === 'UTXO')
       .map(({ input }) => ({
         transaction: input.source_id,
         index: input.index,
       }));
     const transactionBytes = transactionStrings.map((transaction) => ({
-      bytes: Uint8Array.from(transaction.transaction.match(/.{1,2}/g).map((byte) => parseInt(byte, 16))),
+      bytes: Uint8Array.from(transaction.transaction.match(/.{1,2}/g).map((byte: any) => parseInt(byte, 16))),
       index: transaction.index,
     }));
     const outpointedSourceIds = transactionBytes.map((transaction) => ({
@@ -1665,7 +1654,7 @@ class Client {
     }));
     const inputsIds = outpointedSourceIds.map((source) => encode_input_for_utxo(source.source_id, source.index));
 
-    const inputCommands = transactionJSONrepresentation.inputs
+    const inputCommands = (transactionJSONrepresentation.inputs as any[])
       .filter(({ input }) => input.input_type === 'AccountCommand')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
@@ -1782,7 +1771,7 @@ class Client {
           name.string,
           ticker.string,
           description.string,
-          media_hash.string,
+          stringToUint8Array(media_hash.string),
           null, // TODO: check for public key, key hash is not working
           media_uri.string,
           icon_uri.string,
@@ -1796,7 +1785,7 @@ class Client {
 
         const chainTip = '200000'; // TODO: unhardcode height
 
-        const is_token_freezable = is_freezable === true ? FreezableToken.Yes : FreezableToken.No;
+        const is_token_freezable = is_freezable ? FreezableToken.Yes : FreezableToken.No;
 
         const supply_amount =
           total_supply.type === 'Fixed' ? Amount.from_atoms(total_supply.amount.atoms.toString()) : null;
@@ -1849,7 +1838,7 @@ class Client {
 
   async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<any> {
     this.ensureInitialized();
-    let token_details: Record<string, any> = token_id ? { token_id } : {};
+    let token_details: TokenDetails | undefined = undefined;
     if (token_id) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
       if (!request.ok) {
