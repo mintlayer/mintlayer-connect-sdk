@@ -232,10 +232,14 @@ type DelegateStakingOutput = {
 }
 
 type DelegationWithdrawInput = {
-  type: 'DelegationWithdraw';
-  delegation_id: string;
-  amount: AmountFields;
-}
+  input: {
+    input_type: 'Account';
+    account_type: 'DelegationBalance';
+    amount: AmountFields;
+    delegation_id: string;
+    nonce: number;
+  };
+};
 
 type BurnTokenOutput = {
   type: 'BurnToken';
@@ -332,8 +336,8 @@ type TransferParams =
   | {
   amount: number;
   to: string;
-  token_id: undefined;
-  token_details: undefined;
+  token_id?: undefined;
+  token_details?: undefined;
 };
 
 
@@ -479,18 +483,10 @@ type BuildTransactionParams =
       nonce: number;
       conclude_destination: string;
       ask_balance: AmountFields;
-      ask_currency: {
-        type: 'Coin' | 'TokenV1';
-        token_id?: string;
-      };
+      ask_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
       give_balance: AmountFields;
-      give_currency: {
-        type: 'Coin' | 'TokenV1';
-        token_id?: string;
-      };
+      give_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
     };
-    to: string;
-    amount: number;
   };
 }
   | {
@@ -508,15 +504,11 @@ type BuildTransactionParams =
 interface OrderData {
   order_id: string;
   ask_balance: AmountFields;
-  ask_currency: {
-    type: 'Coin' | 'TokenV1';
-    token_id?: string;
-  };
+  nonce: number;
+  conclude_destination: string;
+  ask_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
   give_balance: AmountFields;
-  give_currency: {
-    type: 'Coin' | 'TokenV1';
-    token_id?: string;
-  };
+  give_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
 }
 
 interface ClientOptions {
@@ -1437,18 +1429,20 @@ class Client {
     }
 
     if (type === 'DelegationWithdraw') {
-      const { pool_id, delegation_id, amount } = params;
+      const { delegation_id, amount } = params;
 
       const amount_atoms = amount! * Math.pow(10, 11);
 
       inputs.push({
         input: {
-          type: 'DelegationWithdraw',
+          input_type: "Account",
+          account_type: "DelegationBalance",
+          amount: {
+            atoms: amount_atoms.toString(),
+            decimal: amount.toString(),
+          },
           delegation_id,
-        },
-        amount: {
-          atoms: amount_atoms.toString(),
-          decimal: amount!.toString(),
+          nonce: 0
         },
       });
     }
@@ -1492,7 +1486,8 @@ class Client {
       const { order_id, nonce, conclude_destination, ask_currency, give_currency, ask_balance, give_balance } = params.order;
       inputs.push({
         input: {
-          type: 'ConcludeOrder',
+          input_type: "AccountCommand",
+          command: 'ConcludeOrder',
           destination: conclude_destination,
           order_id: order_id,
           nonce: nonce,
@@ -1502,7 +1497,7 @@ class Client {
 
       outputs.push({
         type: 'Transfer',
-        destination: params.to,
+        destination: conclude_destination,
         value: {
           ...(ask_currency.type === 'Coin'
             ? { type: 'Coin' }
@@ -1511,15 +1506,15 @@ class Client {
                 token_id: ask_currency.token_id,
               }),
           amount: {
-            decimal: params.amount!.toString(),
-            atoms: (params.amount! * Math.pow(10, 11)).toString(),
+            decimal: ask_balance.decimal,
+            atoms: ask_balance.atoms,
           },
         },
       });
 
       outputs.push({
         type: 'Transfer',
-        destination: params.to,
+        destination: conclude_destination,
         value: {
           ...(give_currency.type === 'Coin'
             ? { type: 'Coin' }
@@ -1528,8 +1523,8 @@ class Client {
                 token_id: give_currency.token_id,
               }),
           amount: {
-            decimal: params.amount!.toString(),
-            atoms: (params.amount! * Math.pow(10, 11)).toString(),
+            decimal: give_balance.decimal,
+            atoms: give_balance.atoms,
           },
         },
       });
@@ -1856,17 +1851,19 @@ class Client {
 
   async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<any> {
     this.ensureInitialized();
-    let token_details: TokenDetails | undefined = undefined;
     if (token_id) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
       if (!request.ok) {
         throw new Error('Failed to fetch token');
       }
       const token = await request.json();
-      token_details = { ...token };
+      const token_details: TokenDetails = token;
+      const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
+      return this.signTransaction(tx);
+    } else {
+      const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount } });
+      return this.signTransaction(tx);
     }
-    const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
-    return this.signTransaction(tx);
   }
 
   async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<any> {
@@ -1888,13 +1885,13 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async delegate({ poolId, amount }: { poolId: string; amount: number }): Promise<any> {
+  async delegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<any> {
     this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { poolId } });
+    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
     return this.signTransaction(tx);
   }
 
-  async issueNft(tokenData: Record<string, any>): Promise<any> {
+  async issueNft(tokenData: any): Promise<any> {
     this.ensureInitialized();
     const description = tokenData.description;
 
