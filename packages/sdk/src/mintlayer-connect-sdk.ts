@@ -767,8 +767,6 @@ class Client {
       utxo: item.utxo,
     }));
 
-    console.log('transformedInput', transformedInput);
-
     return transformedInput;
   }
 
