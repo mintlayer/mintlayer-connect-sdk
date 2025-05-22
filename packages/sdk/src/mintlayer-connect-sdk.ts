@@ -1,4 +1,3 @@
-// @ts-nocheck
 import initWasm, {
   get_transaction_id,
   nft_issuance_fee,
@@ -64,21 +63,23 @@ function mergeUint8Arrays(arrays: any) {
   return result;
 }
 
-interface Amount {
+type AmountFields= {
   atoms: string;
   decimal: string;
 }
 
-interface Value {
-  type: 'Coin' | 'TokenV1';
-  token_id?: string;
-  amount: Amount;
-}
+type Coin = {
+  type: 'Coin';
+  amount: AmountFields;
+};
 
-interface Utxo {
-  type: 'Transfer' | 'LockThenTransfer';
-  value: Value;
-}
+type Token = {
+  type: 'TokenV1';
+  token_id: string;
+  amount: AmountFields;
+};
+
+type Value = Coin | Token;
 
 interface Outpoint {
   id: string;
@@ -90,65 +91,414 @@ interface UtxoEntry {
   utxo: Utxo;
 }
 
-interface Input {
+type Utxo = {
+  type: 'Transfer' | 'LockThenTransfer' | 'IssueNft';
+  value: Value;
+  destination: string;
+  token_id?: string;
+  data?: any;
+};
+
+type UtxoInput = {
   input: {
-    [key: string]: any;
-    input_type: string;
+    index: number;
+    input_type: 'UTXO';
+    source_id: string;
+    source_type: string;
   };
-  utxo: Utxo | null;
+  utxo: Utxo;
+};
+
+type AccountCommandBase = {
+  input_type: 'AccountCommand';
+  nonce: number;
+  authority: string;
+  token_id: string;
+};
+
+type MintTokensInput = {
+  input: AccountCommandBase & {
+    command: 'MintTokens';
+    amount: AmountFields;
+  };
+  utxo: null;
+};
+
+type UnmintTokensInput = {
+  input: AccountCommandBase & {
+    command: 'UnmintTokens';
+    amount: AmountFields;
+  };
+  utxo: null;
+};
+
+type LockTokenSupplyInput = {
+  input: AccountCommandBase & {
+    command: 'LockTokenSupply';
+  };
+  utxo: null;
+};
+
+type ChangeTokenAuthorityInput = {
+  input: AccountCommandBase & {
+    command: 'ChangeTokenAuthority';
+    new_authority: string;
+  };
+  utxo: null;
+};
+
+type ChangeMetadataUriInput = {
+  input: AccountCommandBase & {
+    command: 'ChangeMetadataUri';
+    new_metadata_uri: string;
+  };
+  utxo: null;
+};
+
+type FreezeTokenInput = {
+  input: AccountCommandBase & {
+    command: 'FreezeToken';
+    is_unfreezable: boolean;
+  };
+  utxo: null;
+};
+
+type UnfreezeTokenInput = {
+  input: AccountCommandBase & {
+    command: 'UnfreezeToken';
+  };
+  utxo: null;
+};
+
+type FillOrderInput = {
+  input: {
+    input_type: 'AccountCommand';
+    command: 'FillOrder';
+    order_id: string;
+    fill_atoms: string;
+    destination: string;
+    nonce: string;
+  };
+  utxo: null;
+};
+
+type ConcludeOrderInput = {
+  input: {
+    input_type: 'AccountCommand';
+    command: 'ConcludeOrder';
+    order_id: string;
+    destination: string;
+    nonce: number;
+  };
+  utxo: null;
+};
+
+type Input =
+  | UtxoInput
+  | MintTokensInput
+  | UnmintTokensInput
+  | LockTokenSupplyInput
+  | ChangeTokenAuthorityInput
+  | ChangeMetadataUriInput
+  | FreezeTokenInput
+  | UnfreezeTokenInput
+  | FillOrderInput
+  | ConcludeOrderInput
+  | DelegationWithdrawInput;
+
+type TransferOutput = {
+  type: 'Transfer';
+  destination: string;
+  value: Value;
+  lock?: {
+    type: 'ForBlockCount' | 'UntilTime';
+    content: string;
+  };
+};
+
+type CreateDelegationIdOutput = {
+  type: 'CreateDelegationId';
+  destination: string;
+  pool_id: string;
 }
 
-interface Output {
-  type: string;
-  destination?: string;
-  value?: Value;
-  [key: string]: any;
+type DelegateStakingOutput = {
+  type: 'DelegateStaking';
+  delegation_id: string;
+  amount: AmountFields;
+}
+
+type DelegationWithdrawInput = {
+  type: 'DelegationWithdraw';
+  delegation_id: string;
+  amount: AmountFields;
+}
+
+type BurnTokenOutput = {
+  type: 'BurnToken';
+  value: Value;
+};
+
+type DataDepositOutput = {
+  type: 'DataDeposit';
+  data: string;
+};
+
+type IssueFungibleTokenOutput = {
+  type: 'IssueFungibleToken';
+  authority: string;
+  is_freezable: boolean;
+  metadata_uri: { hex: string; string: string };
+  number_of_decimals: number | string;
+  token_ticker: { hex: string; string: string };
+  total_supply: {
+    type: 'Unlimited' | 'Fixed' | 'Lockable';
+    amount?: AmountFields;
+  };
+};
+
+type IssueNftOutput = {
+  type: 'IssueNft';
+  destination: string;
+  token_id?: string;
+  data: {
+    name: { hex: string; string: string };
+    ticker: { hex: string; string: string };
+    description: { hex: string; string: string };
+    media_hash: { hex: string; string: string };
+    media_uri: { hex: string; string: string };
+    icon_uri: { hex: string; string: string };
+    additional_metadata_uri: { hex: string; string: string };
+    creator: string | null;
+  };
+};
+
+type CreateOrderOutput = {
+  type: 'CreateOrder';
+  ask_balance: { atoms: string | number; decimal: string };
+  ask_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
+  give_balance: { atoms: string | number; decimal: string };
+  give_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
+  initially_asked: { atoms: string; decimal: string };
+  initially_given: { atoms: string; decimal: string };
+  conclude_destination: string;
+};
+
+type Output =
+  | TransferOutput
+  | BurnTokenOutput
+  | DataDepositOutput
+  | IssueFungibleTokenOutput
+  | IssueNftOutput
+  | CreateOrderOutput
+  | CreateDelegationIdOutput
+  | DelegateStakingOutput;
+
+export interface TransactionJSONRepresentation {
+  inputs: Input[];
+  outputs: Output[];
 }
 
 interface Transaction {
-  JSONRepresentation: {
-    inputs: Input[];
-    outputs: Output[];
-  };
+  JSONRepresentation: TransactionJSONRepresentation;
   BINRepresentation: Record<string, any>;
-  HEXRepresentation_unsigned: Record<string, any>;
+  HEXRepresentation_unsigned: string;
+  intent?: string;
+  transaction_id: string;
 }
 
-interface BuildTransactionParams {
-  to?: string;
-  amount?: number;
-  token_id?: string;
-  token_details?: Record<string, any>;
-  destination?: string;
-  pool_id?: string;
-  delegation_id?: string;
-  data?: string;
-  authority?: string;
-  is_freezable?: boolean;
-  metadata_uri?: string;
-  number_of_decimals?: number;
-  token_ticker?: string;
-  supply_type?: 'Unlimited' | 'Lockable' | 'Fixed';
-  supply_amount?: number;
-  creator?: string;
-  additional_metadata_uri?: string;
-  description?: string;
-  icon_uri?: string;
-  media_hash?: string;
-  media_uri?: string;
-  name?: string;
-  ticker?: string;
-  new_authority?: string;
-  new_metadata_uri?: string;
-  is_unfreezable?: boolean;
-  conclude_destination?: string;
-  ask_token?: string;
-  ask_amount?: number;
-  give_token?: string;
-  give_amount?: number;
-  order_id?: string;
-  order_details?: Record<string, any>;
-  intent?: string;
+interface TokenDetails {
+  token_id: string;
+  number_of_decimals: number;
+  authority: string;
+  next_nonce?: number;
+}
+
+type TransferParams =
+  | {
+  amount: number;
+  to: string;
+  token_id: string;
+  token_details: TokenDetails;
+}
+  | {
+  amount: number;
+  to: string;
+  token_id?: undefined;
+  token_details?: undefined;
+};
+
+
+type BuildTransactionParams =
+  | {
+  type: 'Transfer';
+  params: TransferParams;
+}
+  | {
+  type: 'BurnToken';
+  params: {
+    amount: number;
+    token_id: string;
+    token_details?: TokenDetails;
+  };
+}
+  | {
+  type: 'IssueFungibleToken';
+  params: {
+    authority: string;
+    is_freezable: boolean;
+    metadata_uri: string;
+    number_of_decimals: number;
+    token_ticker: string;
+    supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
+    supply_amount?: number;
+  };
+}
+  | {
+  type: 'IssueNft';
+  params: {
+    destination: string;
+    creator?: string;
+    additional_metadata_uri: string;
+    description: string;
+    icon_uri: string;
+    media_hash: string;
+    media_uri: string;
+    name: string;
+    ticker: string;
+  };
+}
+  | {
+  type: 'MintToken';
+  params: {
+    amount: number;
+    destination: string;
+    token_id: string;
+    token_details: TokenDetails;
+  };
+}
+  | {
+  type: 'UnmintToken';
+  params: {
+    amount: number;
+    token_id: string;
+    token_details: TokenDetails;
+  };
+}
+  | {
+  type: 'FreezeToken';
+  params: {
+    token_id: string;
+    token_details: TokenDetails;
+    is_unfreezable: boolean;
+  };
+}
+  | {
+  type: 'LockTokenSupply';
+  params: {
+    token_id: string;
+    token_details: TokenDetails;
+    is_unfreezable?: boolean;
+  };
+}
+  | {
+  type: 'UnfreezeToken';
+  params: {
+    token_id: string;
+    token_details: TokenDetails;
+  };
+}
+  | {
+  type: 'ChangeMetadataUri';
+  params: {
+    token_id: string;
+    token_details: TokenDetails;
+    new_metadata_uri: string;
+  };
+}
+  | {
+  type: 'ChangeTokenAuthority';
+  params: {
+    token_id: string;
+    token_details: TokenDetails;
+    new_authority: string;
+  };
+}
+  | {
+  type: 'DataDeposit';
+  params: {
+    data: string;
+  };
+}
+  | {
+  type: 'CreateDelegationId';
+  params: {
+    destination: string;
+    pool_id: string;
+  };
+}
+  | {
+  type: 'DelegationStake';
+  params: {
+    pool_id: string;
+    delegation_id: string;
+    amount: number;
+  };
+}
+  | {
+  type: 'DelegationWithdraw';
+  params: {
+    pool_id: string;
+    delegation_id: string;
+    amount: number;
+  };
+}
+  | {
+  type: 'CreateOrder';
+  params: {
+    ask_amount: number;
+    ask_token: string;
+    give_amount: number;
+    give_token: string;
+    conclude_destination: string;
+  };
+}
+  | {
+  type: 'ConcludeOrder';
+  params: {
+    order: {
+      order_id: string;
+      nonce: number;
+      conclude_destination: string;
+    };
+    to: string;
+    amount: number;
+  };
+}
+  | {
+  type: 'FillOrder';
+  params: {
+    order_id: string;
+    amount: number;
+    destination: string;
+    order_details: {
+      nonce: number;
+    };
+  };
+};
+
+interface OrderData {
+  order_id: string;
+  ask_balance: AmountFields;
+  ask_currency: {
+    type: 'Coin' | 'TokenV1';
+    token_id?: string;
+  };
+  give_balance: AmountFields;
+  give_currency: {
+    type: 'Coin' | 'TokenV1';
+    token_id?: string;
+  };
 }
 
 interface ClientOptions {
@@ -158,13 +508,22 @@ interface ClientOptions {
 
 class Client {
   private network: 'mainnet' | 'testnet';
-  private connectedAddresses: string[];
+  private connectedAddresses: {
+    [key: string]: {
+      receiving: string[];
+      change: string[];
+    };
+  };
   private isInitialized: boolean;
 
   constructor(options: ClientOptions = {}) {
     this.network = options.network || 'mainnet';
-    this.connectedAddresses = [];
+    this.connectedAddresses = {};
     this.isInitialized = false;
+  }
+
+  private getMLNetwork(): Network {
+    return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet;
   }
 
   static async create(options: ClientOptions = { autoRestore: true }): Promise<Client> {
@@ -250,7 +609,7 @@ class Client {
     }
   }
 
-  private selectUTXOs(utxos: UtxoEntry[], amount: bigint, outputType: string, token_id: string | null): Input[] {
+  private selectUTXOs(utxos: UtxoEntry[], amount: bigint, outputType: string, token_id: string | null): UtxoInput[] {
     return this.selectUTXOsForTransfer(utxos, amount, token_id);
   }
 
@@ -266,14 +625,14 @@ class Client {
     return hex;
   }
 
-  private getOutputs({ amount, address, networkType, type = 'Transfer', lock, chainTip, tokenId, utxo }: any) {
+  private getOutputs({ amount, address, type = 'Transfer', lock, chainTip, tokenId, utxo }: any) {
     if (type === 'LockThenTransfer' && !lock) {
       throw new Error('LockThenTransfer requires a lock');
     }
 
     const amountInstace = Amount.from_atoms(amount);
 
-    const networkIndex = NETWORKS[networkType];
+    const networkIndex = this.getMLNetwork();
     if (type === 'Transfer') {
       if (tokenId) {
         return encode_output_token_transfer(amountInstace, address, tokenId, networkIndex);
@@ -282,7 +641,7 @@ class Client {
       }
     }
     if (type === 'LockThenTransfer') {
-      let lockEncoded;
+      let lockEncoded: Uint8Array = new Uint8Array();
       if (lock.type === 'UntilTime') {
         lockEncoded = encode_lock_until_time(BigInt(lock.content.timestamp));
       }
@@ -296,7 +655,8 @@ class Client {
       }
     }
     if (type === 'spendFromDelegation') {
-      const stakingMaturity = getStakingMaturity(chainTip, networkType);
+      // const stakingMaturity = getStakingMaturity(chainTip, networkType); // TODO: Get the staking maturity
+      const stakingMaturity = 0n; // TODO: Get the staking maturity
       const encodedLockForBlock = encode_lock_for_block_count(stakingMaturity);
       return encode_output_lock_then_transfer(amountInstace, address, encodedLockForBlock, networkIndex);
     }
@@ -319,23 +679,23 @@ class Client {
     }
   }
 
-  private selectUTXOsForTransfer(utxos: UtxoEntry[], amount: bigint, token_id: string | null): Input[] {
+  private selectUTXOsForTransfer(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
     const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
-    const filteredUtxos = utxos
+    const filteredUtxos: UtxoEntry[] = utxos
       .map((utxo) => {
         if (utxo.utxo.type === 'IssueNft') {
           return {
             ...utxo,
             utxo: {
               ...utxo.utxo,
-              value: {
-                amount: {
-                  atoms: 1,
-                  decimal: 1,
-                },
-                type: 'TokenV1',
-                token_id: utxo.utxo.token_id,
-              },
+              // value: {
+              //   amount: {
+              //     atoms: 1,
+              //     decimal: 1,
+              //   },
+              //   type: 'TokenV1',
+              //   token_id: utxo.utxo.token_id,
+              // },
             },
           };
         } else {
@@ -347,7 +707,9 @@ class Client {
         if (token_id === null) {
           return utxo.utxo.value.type === 'Coin';
         }
-        return utxo.utxo.value.token_id === token_id;
+        if (utxo.utxo.value.type === 'TokenV1') {
+          return utxo.utxo.value.token_id === token_id;
+        }
       });
 
     let balance = BigInt(0);
@@ -375,10 +737,12 @@ class Client {
       }
     }
 
-    const transformedInput: Input[] = utxosToSpend.map((item) => ({
+    const transformedInput: UtxoInput[] = utxosToSpend.map((item) => ({
       input: {
         ...item.outpoint,
         input_type: 'UTXO',
+        source_id: 'f', // TODO: Get the source id
+        source_type: 'UTXO',
       },
       utxo: item.utxo,
     }));
@@ -420,7 +784,7 @@ class Client {
     this.ensureInitialized();
     if (typeof window !== 'undefined' && window.mojito?.disconnect) {
       await window.mojito.disconnect();
-      this.connectedAddresses = [];
+      this.connectedAddresses = {};
     } else {
       throw new Error('Mojito extension not available');
     }
@@ -461,12 +825,12 @@ class Client {
     }
   }
 
-  async getAddresses(): Promise<string[]> {
+  getAddresses(): { receiving: string[]; change: string[] } {
     this.ensureInitialized();
-    if (this.connectedAddresses.length > 0) {
-      return this.connectedAddresses;
+    if (this.connectedAddresses[this.network].receiving.length > 0) {
+      return this.connectedAddresses[this.network];
     }
-    return [];
+    return { receiving: [], change: [] };
   }
 
   async getBalance(): Promise<number> {
@@ -474,8 +838,8 @@ class Client {
     const address = this.connectedAddresses;
     const currentAddress = address[this.network];
 
-    if (this.connectedAddresses.length === 0) {
-      // throw new Error('No addresses connected. Call connect first.');
+    if (this.connectedAddresses[this.network].receiving.length > 0) {
+      throw new Error('No addresses connected. Call connect first.');
     }
     try {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
@@ -511,8 +875,8 @@ class Client {
     const address = this.connectedAddresses;
     const currentAddress = address[this.network];
 
-    if (this.connectedAddresses.length === 0) {
-      // throw new Error('No addresses connected. Call connect first.');
+    if (this.connectedAddresses[this.network].receiving.length > 0) {
+      throw new Error('No addresses connected. Call connect first.');
     }
 
     try {
@@ -566,8 +930,8 @@ class Client {
 
   async getDelegations(): Promise<any[]> {
     this.ensureInitialized();
-    if (this.connectedAddresses.length === 0) {
-      // throw new Error('No addresses connected. Call connect first.');
+    if (this.connectedAddresses[this.network].receiving.length > 0) {
+      throw new Error('No addresses connected. Call connect first.');
     }
     const address = this.connectedAddresses;
     const currentAddress = address[this.network];
@@ -599,8 +963,8 @@ class Client {
 
   async getTokensOwned(): Promise<any[]> {
     this.ensureInitialized();
-    if (this.connectedAddresses.length === 0) {
-      // throw new Error('No addresses connected. Call connect first.');
+    if (this.connectedAddresses[this.network].receiving.length > 0) {
+      throw new Error('No addresses connected. Call connect first.');
     }
     const address = this.connectedAddresses;
     const currentAddress = address[this.network];
@@ -642,10 +1006,10 @@ class Client {
   getFeeForType(type: string): bigint {
     this.ensureInitialized();
     const block_height = 200000n; // TODO: Get the current block height
-    let fee = 0n;
+    let fee = Amount.from_atoms('0');
     switch (type) {
       case 'Transfer':
-        return BigInt(2 * Math.pow(10, 11).toString());
+        return BigInt(2 * Math.pow(10, 11));
       case 'BurnToken':
         return 0n;
       case 'IssueNft':
@@ -667,12 +1031,12 @@ class Client {
         fee = token_change_authority_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
         return BigInt(fee.atoms());
       case 'ChangeMetadataUri':
-        return BigInt(50 * Math.pow(10, 11).toString());
+        return BigInt(50 * Math.pow(10, 11));
       case 'FreezeToken':
         fee = token_freeze_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
         return BigInt(fee.atoms());
       case 'UnfreezeToken':
-        return BigInt(50 * Math.pow(10, 11).toString());
+        return BigInt(50 * Math.pow(10, 11));
       case 'DataDeposit':
         fee = data_deposit_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
         return BigInt(fee.atoms());
@@ -691,13 +1055,12 @@ class Client {
     }
   }
 
-  async buildTransaction({
-    type = 'Transfer',
-    params,
-  }: {
-    type?: string;
-    params: BuildTransactionParams;
-  }): Promise<Transaction> {
+  async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
+    const {
+      type,
+      params,
+    } = arg;
+
     this.ensureInitialized();
     if (!params) throw new Error('Missing params');
 
@@ -734,58 +1097,63 @@ class Client {
     fee += this.getFeeForType(type);
 
     if (type === 'Transfer') {
-      const token_id = params.token_id ? params.token_id : 'Coin';
-      const token_details = params.token_details;
+      const {
+        token_id,
+        token_details
+      } = params;
 
-      if (token_id === 'Coin') {
-        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
-      } else {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details?.number_of_decimals));
+      if (token_details) {
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details.number_of_decimals));
         send_token = {
           token_id,
-          number_of_decimals: token_details?.number_of_decimals,
+          number_of_decimals: token_details.number_of_decimals,
         };
+      } else {
+        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
       }
 
       outputs.push({
         type: 'Transfer',
         destination: params.to,
         value: {
-          ...(token_id === 'Coin'
-            ? { type: 'Coin' }
-            : {
-                type: 'TokenV1',
+          ...(token_details
+            ? { type: 'TokenV1',
                 token_id,
-              }),
-          ...(token_id === 'Coin'
-            ? {
-                amount: {
-                  decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
-                },
               }
             : {
-                amount: {
-                  decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, token_details?.number_of_decimals)).toString(),
-                },
+              type: 'Coin'
               }),
+          ...(token_details
+            ? {
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+              },
+            }
+            : {
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, 11)).toString(),
+              },
+            }),
         },
       });
     }
 
     if (type === 'BurnToken') {
-      const token_id = params.token_id;
-      const token_details = params.token_details;
+      const {
+        token_id,
+        token_details,
+      } = params;
 
-      if (token_id === 'Coin') {
-        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
-      } else {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals));
+      if (token_details) {
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details.number_of_decimals));
         send_token = {
           token_id,
-          number_of_decimals: token_details!.number_of_decimals,
+          number_of_decimals: token_details.number_of_decimals,
         };
+      } else {
+        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
       }
 
       outputs.push({
@@ -806,7 +1174,7 @@ class Client {
     }
 
     if (type === 'IssueFungibleToken') {
-      let total_supply: { type: string; amount?: Amount };
+      let total_supply: { type: "Unlimited" | "Lockable" } | { type: "Fixed"; amount: AmountFields };
 
       if (params.supply_type === 'Unlimited') {
         total_supply = { type: 'Unlimited' };
@@ -845,9 +1213,9 @@ class Client {
       outputs.push({
         type: 'IssueNft',
         destination: params.destination,
-        token_id: null,
+        token_id: '',
         data: {
-          creator: params.creator,
+          creator: params.creator || '', // Todo: Get the creator address
           additional_metadata_uri: {
             hex: this.stringToHex(params.additional_metadata_uri!),
             string: params.additional_metadata_uri,
@@ -961,9 +1329,9 @@ class Client {
           command: 'ChangeTokenAuthority',
           input_type: 'AccountCommand',
           new_authority: params.new_authority,
-          nonce: token_details!.next_nonce || 0,
+          nonce: token_details.next_nonce || 0,
           token_id: token_id,
-          authority: token_details!.authority,
+          authority: token_details.authority,
         },
         utxo: null,
       });
@@ -1175,7 +1543,7 @@ class Client {
       });
     }
 
-    fee += BigInt(2 * Math.pow(10, 11).toString());
+    fee += BigInt(2 * Math.pow(10, 11));
     input_amount_coin_req += fee;
 
     const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null);
@@ -1240,7 +1608,7 @@ class Client {
       BigInt(0),
     );
 
-    const transaction_id = get_transaction_id(transaction);
+    const transaction_id = get_transaction_id(transaction, true);
 
     // some operations need to be recoded with given data
     // if outputs include issueNft type
@@ -1276,9 +1644,8 @@ class Client {
     };
   }
 
-  getTransactionBINrepresentation(transactionJSONrepresentation, _network) {
+  getTransactionBINrepresentation(transactionJSONrepresentation: TransactionJSONRepresentation, _network: Network) {
     const network = _network;
-    const networkType = network === 1 ? 'testnet' : 'mainnet';
     // Binarisation
     // calculate fee and prepare as much transaction as possible
     const inputs = transactionJSONrepresentation.inputs;
@@ -1410,7 +1777,7 @@ class Client {
         const chainTip = '200000'; // TODO unhardcode
 
         return encode_output_issue_nft(
-          token_id || 'tmltk1qv3vwc9kft30e5qjw5xrp9gw82w2k0mmkypq8n4u0sh6xlejg84q5tphfn', // TODO unhardcode
+          token_id as string,
           address,
           name.string,
           ticker.string,
@@ -1462,7 +1829,7 @@ class Client {
     });
     const outputsArray = outputsArrayItems;
 
-    const inputAddresses = transactionJSONrepresentation.inputs
+    const inputAddresses: string[] = transactionJSONrepresentation.inputs
       .filter(({ input }) => input.input_type === 'UTXO')
       .map((input) => input?.utxo?.destination || input?.destination);
 
@@ -1741,8 +2108,7 @@ class Client {
     if (!response.ok) {
       throw new Error('Failed to fetch order');
     }
-    const data = await response.json();
-    const order = data;
+    const order: OrderData = await response.json();
 
     const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
     return this.signTransaction(tx);
@@ -1760,16 +2126,16 @@ class Client {
     intent: string;
   }): Promise<any> {
     this.ensureInitialized();
-    let token_details: Record<string, any> = token_id ? { token_id } : {};
 
-    if (token_id !== 'Coin' && token_id !== null) {
-      const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      const token = await request.json();
-      token_details = { ...token };
+    if(!token_id) {
+      throw new Error('Token is mandatory');
     }
+
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+    if (!request.ok) {
+      throw new Error('Failed to fetch token');
+    }
+    const token_details = await request.json();
 
     const tx = await this.buildTransaction({
       type: 'Transfer',
