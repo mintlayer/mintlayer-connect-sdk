@@ -619,7 +619,7 @@ class Client {
     }
   }
 
-  private selectUTXOs(utxos: UtxoEntry[], amount: bigint, outputType: string, token_id: string | null): UtxoInput[] {
+  private selectUTXOs(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
     return this.selectUTXOsForTransfer(utxos, amount, token_id);
   }
 
@@ -714,11 +714,15 @@ class Client {
       })
       .filter((utxo) => transferableUtxoTypes.includes(utxo.utxo.type))
       .filter((utxo) => {
-        if (token_id === null) {
-          return utxo.utxo.value.type === 'Coin';
-        }
-        if (utxo.utxo.value.type === 'TokenV1') {
-          return utxo.utxo.value.token_id === token_id;
+        if (utxo.utxo.type === 'IssueNft') {
+          return utxo.utxo.token_id === token_id;
+        } else {
+          if (token_id === null) {
+            return utxo.utxo.value.type === 'Coin';
+          }
+          if (utxo.utxo.value.type === 'TokenV1') {
+            return utxo.utxo.value.token_id === token_id;
+          }
         }
       });
 
@@ -1551,9 +1555,9 @@ class Client {
     fee += BigInt(2 * Math.pow(10, 11));
     input_amount_coin_req += fee;
 
-    const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, 'Transfer', null);
+    const inputObjCoin = this.selectUTXOs(utxos, input_amount_coin_req, null);
     const inputObjToken = send_token?.token_id
-      ? this.selectUTXOs(utxos, input_amount_token_req, 'Transfer', send_token.token_id)
+      ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
       : [];
 
     const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
