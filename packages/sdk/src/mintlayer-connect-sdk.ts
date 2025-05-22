@@ -532,16 +532,28 @@ class Client {
   };
   private isInitialized: boolean;
 
+  /**
+   * Creates a new Client instance.
+   * @param options
+   */
   constructor(options: ClientOptions = {}) {
     this.network = options.network || 'mainnet';
     this.connectedAddresses = {};
     this.isInitialized = false;
   }
 
+  /**
+   * Returns the wasm-applicable network type for the current client instance.
+   * @private
+   */
   private getMLNetwork(): Network {
     return this.network === 'mainnet' ? Network.Mainnet : Network.Testnet;
   }
 
+  /**
+   * Creates a new Client instance and initializes it.
+   * @param options
+   */
   static async create(options: ClientOptions = { autoRestore: true }): Promise<Client> {
     console.log('Create client');
     const client = new Client(options);
@@ -555,6 +567,11 @@ class Client {
     return client;
   }
 
+  /**
+   * Converts a string to a base58 encoded string.
+   * @param str
+   * @private
+   */
   private stringToBase58(str: string): string {
     const bytes = new TextEncoder().encode(str);
 
@@ -584,12 +601,20 @@ class Client {
     return encoded;
   }
 
+  /**
+   * Returns the API server URL based on the network.
+   * @private
+   */
   private getApiServer(): string {
     return this.network === 'testnet'
       ? 'https://api-server-lovelace.mintlayer.org/api/v2'
       : 'https://api-server.mintlayer.org/api/v2';
   }
 
+  /**
+   * Initializes the SDK.
+   * @private
+   */
   private async init(): Promise<void> {
     if (this.isInitialized) {
       console.log('[Mintlayer Connect SDK] Already initialized');
@@ -619,16 +644,101 @@ class Client {
     }
   }
 
+  /**
+   * Ensures that the SDK is initialized.
+   * @private
+   */
   private ensureInitialized(): void {
     if (!this.isInitialized) {
       throw new Error('SDK not initialized. Use Client.create() to initialize the SDK.');
     }
   }
 
+  /**
+   * Select required UTXOs for the transaction based on provided amount and token ID.
+   * @param utxos
+   * @param amount
+   * @param token_id
+   * @private
+   */
   private selectUTXOs(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
-    return this.selectUTXOsForTransfer(utxos, amount, token_id);
+    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
+    const filteredUtxos: UtxoEntry[] = utxos
+      .map((utxo) => {
+        if (utxo.utxo.type === 'IssueNft') {
+          return {
+            ...utxo,
+            utxo: {
+              ...utxo.utxo,
+              // value: {
+              //   amount: {
+              //     atoms: 1,
+              //     decimal: 1,
+              //   },
+              //   type: 'TokenV1',
+              //   token_id: utxo.utxo.token_id,
+              // },
+            },
+          };
+        } else {
+          return utxo;
+        }
+      })
+      .filter((utxo) => transferableUtxoTypes.includes(utxo.utxo.type))
+      .filter((utxo) => {
+        if (utxo.utxo.type === 'IssueNft') {
+          return utxo.utxo.token_id === token_id;
+        } else {
+          if (token_id === null) {
+            return utxo.utxo.value.type === 'Coin';
+          }
+          if (utxo.utxo.value.type === 'TokenV1') {
+            return utxo.utxo.value.token_id === token_id;
+          }
+        }
+      });
+
+    let balance = BigInt(0);
+    const utxosToSpend: UtxoEntry[] = [];
+    let lastIndex = 0;
+
+    filteredUtxos.sort((a, b) => {
+      return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
+    });
+
+    for (let i = 0; i < filteredUtxos.length; i++) {
+      lastIndex = i;
+      const utxoBalance = BigInt(filteredUtxos[i].utxo.value.amount.atoms);
+      if (balance < amount) {
+        balance += utxoBalance;
+        utxosToSpend.push(filteredUtxos[i]);
+      } else {
+        break;
+      }
+    }
+
+    if (balance === amount) {
+      if (filteredUtxos[lastIndex + 1]) {
+        utxosToSpend.push(filteredUtxos[lastIndex + 1]);
+      }
+    }
+
+    const transformedInput: UtxoInput[] = utxosToSpend.map((item: UtxoEntry) => ({
+      input: {
+        ...item.outpoint,
+        input_type: 'UTXO',
+      },
+      utxo: item.utxo,
+    }));
+
+    return transformedInput;
   }
 
+  /**
+   * Converts a string to a hex string.
+   * @param str
+   * @private
+   */
   private stringToHex(str: string): string {
     if (!str) {
       return '';
@@ -641,6 +751,17 @@ class Client {
     return hex;
   }
 
+  /**
+   * Encodes the outputs for the transaction.
+   * @param amount
+   * @param address
+   * @param type
+   * @param lock
+   * @param chainTip
+   * @param tokenId
+   * @param utxo
+   * @private
+   */
   private getOutputs({ amount, address, type = 'Transfer', lock, chainTip, tokenId, utxo }: any) {
     if (type === 'LockThenTransfer' && !lock) {
       throw new Error('LockThenTransfer requires a lock');
@@ -695,83 +816,15 @@ class Client {
     }
   }
 
-  private selectUTXOsForTransfer(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
-    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
-    const filteredUtxos: UtxoEntry[] = utxos
-      .map((utxo) => {
-        if (utxo.utxo.type === 'IssueNft') {
-          return {
-            ...utxo,
-            utxo: {
-              ...utxo.utxo,
-              // value: {
-              //   amount: {
-              //     atoms: 1,
-              //     decimal: 1,
-              //   },
-              //   type: 'TokenV1',
-              //   token_id: utxo.utxo.token_id,
-              // },
-            },
-          };
-        } else {
-          return utxo;
-        }
-      })
-      .filter((utxo) => transferableUtxoTypes.includes(utxo.utxo.type))
-      .filter((utxo) => {
-        if (utxo.utxo.type === 'IssueNft') {
-          return utxo.utxo.token_id === token_id;
-        } else {
-          if (token_id === null) {
-            return utxo.utxo.value.type === 'Coin';
-          }
-          if (utxo.utxo.value.type === 'TokenV1') {
-            return utxo.utxo.value.token_id === token_id;
-          }
-        }
-      });
-
-    console.log('filteredUtxos', filteredUtxos);
-
-    let balance = BigInt(0);
-    const utxosToSpend: UtxoEntry[] = [];
-    let lastIndex = 0;
-
-    filteredUtxos.sort((a, b) => {
-      return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
-    });
-
-    for (let i = 0; i < filteredUtxos.length; i++) {
-      lastIndex = i;
-      const utxoBalance = BigInt(filteredUtxos[i].utxo.value.amount.atoms);
-      if (balance < amount) {
-        balance += utxoBalance;
-        utxosToSpend.push(filteredUtxos[i]);
-      } else {
-        break;
-      }
-    }
-
-    if (balance === amount) {
-      if (filteredUtxos[lastIndex + 1]) {
-        utxosToSpend.push(filteredUtxos[lastIndex + 1]);
-      }
-    }
-
-    const transformedInput: UtxoInput[] = utxosToSpend.map((item: UtxoEntry) => ({
-      input: {
-        ...item.outpoint,
-        input_type: 'UTXO',
-      },
-      utxo: item.utxo,
-    }));
-
-    return transformedInput;
-  }
-
+  /**
+   * Returns the transaction ID.
+   */
   readonly isMintlayer: boolean = true;
 
+  /**
+   * Sets the network for the client.
+   * @param net
+   */
   setNetwork(net: 'mainnet' | 'testnet'): void {
     if (net !== 'testnet' && net !== 'mainnet') {
       throw new Error('Invalid network. Use "testnet" or "mainnet".');
@@ -780,15 +833,26 @@ class Client {
     console.log(`[Mintlayer Connect SDK] Network set to: ${this.network}`);
   }
 
+  /**
+   * Returns the current network.
+   * @returns {string} The current network.
+   */
   getNetwork(): 'mainnet' | 'testnet' {
     return this.network;
   }
 
+  /**
+   * Checks if the client is connected to the wallet.
+   * @returns {boolean} True if connected, false otherwise.
+   */
   isConnected() {
     this.ensureInitialized();
     return this.connectedAddresses[this.network]?.receiving?.length > 0;
   }
 
+  /**
+   * Connects to the wallet and retrieves the connected addresses.
+   */
   async connect(): Promise<string[]> {
     this.ensureInitialized();
     if (typeof window !== 'undefined' && window.mojito?.connect) {
@@ -800,6 +864,9 @@ class Client {
     }
   }
 
+  /**
+   * Disconnects from the wallet and clears the connected addresses.
+   */
   async disconnect(): Promise<void> {
     this.ensureInitialized();
     if (typeof window !== 'undefined' && window.mojito?.disconnect) {
@@ -810,6 +877,9 @@ class Client {
     }
   }
 
+  /**
+   * Restores the session from the wallet.
+   */
   async restore(): Promise<boolean> {
     this.ensureInitialized();
 
@@ -835,6 +905,11 @@ class Client {
     }
   }
 
+  /**
+   * Requests a method from the wallet.
+   * @param method
+   * @param params
+   */
   async request({ method, params }: { method: string; params?: Record<string, any> }): Promise<any> {
     this.ensureInitialized();
 
@@ -845,6 +920,9 @@ class Client {
     }
   }
 
+  /**
+   * Returns the connected addresses.
+   */
   getAddresses(): { receiving: string[]; change: string[] } {
     this.ensureInitialized();
     if (this.connectedAddresses[this.network].receiving.length > 0) {
@@ -853,6 +931,10 @@ class Client {
     return { receiving: [], change: [] };
   }
 
+  /**
+   * Returns the connected address for the current network.
+   * @returns {number} Balance.
+   */
   async getBalance(): Promise<number> {
     this.ensureInitialized();
     const address = this.connectedAddresses;
@@ -887,6 +969,9 @@ class Client {
     }
   }
 
+  /**
+   * Returns the balances for coin and all tokens of the connected addresses.
+   */
   async getBalances(): Promise<{
     coin: number;
     token: Record<string, number>;
@@ -948,6 +1033,9 @@ class Client {
     }
   }
 
+  /**
+   * Returns the delegations for the connected addresses.
+   */
   async getDelegations(): Promise<any[]> {
     this.ensureInitialized();
     if (this.connectedAddresses[this.network].receiving.length === 0) {
@@ -981,6 +1069,9 @@ class Client {
     }
   }
 
+  /**
+   * Returns the tokens owned by the connected addresses.
+   */
   async getTokensOwned(): Promise<any[]> {
     this.ensureInitialized();
     if (this.connectedAddresses[this.network].receiving.length === 0) {
@@ -1014,6 +1105,9 @@ class Client {
     }
   }
 
+  /**
+   * Returns the total amount of delegations for the connected addresses.
+   */
   async getDelegationsTotal(): Promise<number> {
     this.ensureInitialized();
     const delegations = await this.getDelegations();
@@ -1023,6 +1117,11 @@ class Client {
     return totalDelegation;
   }
 
+  /**
+   * Returns the fee for a specific transaction type.
+   * @param type
+   * @returns {bigint} Fee in atoms.
+   */
   getFeeForType(type: string): bigint {
     this.ensureInitialized();
     const block_height = 200000n; // TODO: Get the current block height
@@ -1075,6 +1174,10 @@ class Client {
     }
   }
 
+  /**
+   * Builds a transaction based on the provided parameters.
+   * @param arg
+   */
   async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
     const {
       type,
@@ -1659,6 +1762,11 @@ class Client {
     };
   }
 
+  /**
+   * Returns the transaction binary representation.
+   * @param transactionJSONrepresentation
+   * @param _network
+   */
   getTransactionBINrepresentation(transactionJSONrepresentation: TransactionJSONRepresentation, _network: Network) {
     const network = _network;
     // Binarisation
@@ -1859,6 +1967,12 @@ class Client {
     };
   }
 
+  /**
+   * Transfers coin or token to a given address.
+   * @param to
+   * @param amount
+   * @param token_id
+   */
   async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<any> {
     this.ensureInitialized();
     if (token_id) {
@@ -1876,6 +1990,11 @@ class Client {
     }
   }
 
+  /**
+   * Transfers NFT to a given address.
+   * @param to
+   * @param token_id
+   */
   async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<any> {
     this.ensureInitialized();
 
