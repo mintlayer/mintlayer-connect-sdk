@@ -83,8 +83,14 @@ interface Outpoint {
   index: number;
 }
 
+interface UtxoOutpoint {
+  index: number;
+  source_type: SourceId;
+  source_id: string;
+}
+
 interface UtxoEntry {
-  outpoint: Outpoint;
+  outpoint: UtxoOutpoint;
   utxo: Utxo;
 }
 
@@ -101,7 +107,7 @@ type UtxoInput = {
     index: number;
     input_type: 'UTXO';
     source_id: string;
-    source_type: string;
+    source_type: SourceId;
   };
   utxo: Utxo;
 };
@@ -726,6 +732,8 @@ class Client {
         }
       });
 
+    console.log('filteredUtxos', filteredUtxos);
+
     let balance = BigInt(0);
     const utxosToSpend: UtxoEntry[] = [];
     let lastIndex = 0;
@@ -751,15 +759,15 @@ class Client {
       }
     }
 
-    const transformedInput: UtxoInput[] = utxosToSpend.map((item) => ({
+    const transformedInput: UtxoInput[] = utxosToSpend.map((item: UtxoEntry) => ({
       input: {
         ...item.outpoint,
         input_type: 'UTXO',
-        source_id: 'f', // TODO: Get the source id
-        source_type: 'UTXO',
       },
       utxo: item.utxo,
     }));
+
+    console.log('transformedInput', transformedInput);
 
     return transformedInput;
   }
