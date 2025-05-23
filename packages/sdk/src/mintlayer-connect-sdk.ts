@@ -2338,6 +2338,10 @@ class Client {
       const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
       const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error('Failed to fetch delegation id');
+      }
+
       const delegationIdMap = data.reduce((acc: { [key: string]: string }, item: any) => {
         acc[item.spend_destination] = item.delegation_id;
         return acc;

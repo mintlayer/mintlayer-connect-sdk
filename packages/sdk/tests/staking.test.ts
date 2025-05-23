@@ -89,3 +89,52 @@ test('delegate staking providing only pool_id - snaphsot', async () => {
 
   expect(result).toMatchSnapshot();
 })
+
+test('delegate staking providing only wrong pool_id', async () => {
+  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/pool/wrong_pool_id/delegations', async () => {
+    return {
+      body: JSON.stringify({"error":"Invalid pool Id"}),
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    };
+  });
+
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  await client.connect();
+
+  await expect(client.delegationStake({
+    pool_id: 'wrong_pool_id',
+    amount: 10,
+  })).rejects.toThrow('Failed to fetch delegation id')
+})
+
+test('delegate staking providing only pool_id user not delegated to', async () => {
+  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/pool/tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxka/delegations', async () => {
+    return {
+      body: JSON.stringify([
+        {
+          "balance": {
+            "atoms": "0",
+            "decimal": "0"
+          },
+          "creation_block_height": 195930,
+          "delegation_id": "tdelg1d57nmkp24k0rh0fgsjnjy78wxql8wvgr420ncdsesvssvdgfcg6sx6262w",
+          "next_nonce": 0,
+          "spend_destination": "tmt1q86huq7e03hmk6wj8sf7hezqgnshhtwy6s8gz3ut" // not belonging to the user
+        }
+      ]),
+    };
+  });
+
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  await client.connect();
+
+  await expect(client.delegationStake({
+    pool_id: 'tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxka', // pool_id user not delegated to
+    amount: 10,
+  })).rejects.toThrow('No delegation id found for the given pool id')
+})
