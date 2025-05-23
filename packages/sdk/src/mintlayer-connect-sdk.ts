@@ -38,6 +38,8 @@ import initWasm, {
   TotalSupply,
   encode_output_issue_fungible_token,
   encode_output_data_deposit,
+  encode_output_create_delegation,
+  encode_output_delegate_staking,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -456,9 +458,8 @@ type BuildTransactionParams =
   };
 }
   | {
-  type: 'DelegationStake';
+  type: 'DelegateStaking';
   params: {
-    pool_id: string;
     delegation_id: string;
     amount: number;
   };
@@ -1161,6 +1162,8 @@ class Client {
         return BigInt(fee.atoms());
       case 'CreateDelegationId':
         return 0n;
+      case 'DelegateStaking':
+        return 0n;
       case 'DelegationStake':
         return 0n;
       case 'CreateOrder':
@@ -1525,8 +1528,8 @@ class Client {
       });
     }
 
-    if (type === 'DelegationStake') {
-      const { pool_id, delegation_id, amount } = params;
+    if (type === 'DelegateStaking') {
+      const { delegation_id, amount } = params;
 
       const amount_atoms = amount! * Math.pow(10, 11);
       input_amount_coin_req += BigInt(amount! * Math.pow(10, 11));
@@ -1946,6 +1949,14 @@ class Client {
       if (output.type === 'DataDeposit') {
         return encode_output_data_deposit(new TextEncoder().encode(output.data));
       }
+
+      if (output.type === 'CreateDelegationId') {
+        return encode_output_create_delegation(output.pool_id, output.destination, network);
+      }
+
+      if (output.type === 'DelegateStaking') {
+        return encode_output_delegate_staking(Amount.from_atoms(output.amount.atoms), output.delegation_id, network);
+      }
     });
     const outputsArray = outputsArrayItems;
 
@@ -2307,18 +2318,49 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async delegationStake({
-    pool_id,
-    delegation_id,
-    amount,
-  }: {
-    pool_id: string;
-    delegation_id: string;
-    amount: number;
-  }): Promise<any> {
+  async delegationStake(
+    params:
+      | { pool_id: string; amount: number; delegation_id?: undefined }
+      | { delegation_id: string; amount: number; pool_id?: undefined }
+  ): Promise<any> {
     this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'DelegationStake', params: { delegation_id, pool_id, amount } });
-    return this.signTransaction(tx);
+
+    const amount = params.amount;
+    const delegation_id = params.delegation_id;
+    const pool_id = params.pool_id;
+
+    if(delegation_id) {
+      const tx = await this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id, amount } });
+      return this.signTransaction(tx);
+    }
+
+    if(pool_id) {
+      const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
+      const data = await response.json();
+
+      const delegationIdMap = data.reduce((acc: { [key: string]: string }, item: any) => {
+        acc[item.spend_destination] = item.delegation_id;
+        return acc;
+      }, {});
+
+      const addresses = this.getAddresses();
+      const allAddresses = [...addresses.receiving, ...addresses.change];
+
+      // find the first delegation id for the given pool id
+      const first_delegation_id = allAddresses.reduce((acc: string | null, address: string) => {
+        if (delegationIdMap[address]) {
+          return delegationIdMap[address];
+        }
+        return acc;
+      }, null);
+
+      if(!first_delegation_id) {
+        throw new Error('No delegation id found for the given pool id');
+      }
+
+      const tx = await this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id: first_delegation_id, amount } });
+      return this.signTransaction(tx);
+    }
   }
 
   async delegationWithdraw({

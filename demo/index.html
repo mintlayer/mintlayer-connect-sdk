@@ -467,10 +467,13 @@
   }
 
   async function createDelegation() {
+    const pool_id = document.getElementById('delegation_create_pool_id').value;
+    const destination = document.getElementById('delegation_create_destination').value;
+
     try {
-      const delegateResult = await window.mintlayer.request({
-        method: 'delegate',
-        params: { poolId: 'tpool106xgru3kyxzuhhsx666gvktd5y34ucke2wkkwqzysc29jk0ul82qzj4tzh' }
+      const delegateResult = await window.mintlayer.delegationCreate({
+        pool_id,
+        destination
       });
       displayOutput(`Delegate: ${JSON.stringify(delegateResult, null, 2)}`);
     } catch (error) {
@@ -859,8 +862,8 @@
     const delegation_id = document.getElementById('delegation_stake_delegation_id').value;
     const amount = document.getElementById('delegation_stake_amount').value;
 
-    if (!pool_id || !amount) {
-      displayOutput('Please provide both pool ID and amount to stake.');
+    if (!amount || (!pool_id && !delegation_id)) {
+      displayOutput('Please provide pool ID or delegation_id amount to stake.');
       return;
     }
 
