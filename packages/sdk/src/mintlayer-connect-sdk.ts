@@ -2482,6 +2482,13 @@ class Client {
     });
   }
 
+  previewUtxoChange(tx: Transaction): { spent: UtxoEntry[], created: UtxoEntry[] } {
+    const spent: UtxoEntry[] = [];
+    const created: UtxoEntry[] = [];
+
+    return { spent, created };
+  }
+
   async getXPub(): Promise<string> {
     this.ensureInitialized();
     console.warn('[Mintlayer SDK] Warning: Sharing xPub exposes all derived addresses. Use with caution.');
