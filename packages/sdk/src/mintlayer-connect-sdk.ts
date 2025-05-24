@@ -2482,6 +2482,17 @@ class Client {
     });
   }
 
+  /**
+   * Returns a preview of UTXO changes (spent/created) for a built transaction.
+   *
+   * ⚠️ WARNING: This is *only* a local simulation based on the unsigned transaction.
+   * If the transaction is not successfully broadcast to the network, these changes are NOT real.
+   *
+   * Use this method very carefully.
+   *
+   * @param tx - The transaction to preview.
+   * @return { spent: UtxoEntry[], created: UtxoEntry[] } An object containing arrays of spent and created UTXOs.
+   */
   previewUtxoChange(tx: Transaction): { spent: UtxoEntry[], created: UtxoEntry[] } {
     const spent: UtxoEntry[] = [];
     const created: UtxoEntry[] = [];
