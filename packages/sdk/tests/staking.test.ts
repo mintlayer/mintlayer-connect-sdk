@@ -48,6 +48,7 @@ test('create delegation - snapshot', async () => {
   const result = await spy.mock.results[0]?.value;
 
   expect(result).toMatchSnapshot();
+  spy.mockRestore();
 });
 
 test('delegate staking - snaphsot', async () => {
@@ -65,9 +66,10 @@ test('delegate staking - snaphsot', async () => {
   const result = await spy.mock.results[0]?.value;
 
   expect(result).toMatchSnapshot();
+  spy.mockRestore();
 })
 
-test('delegate staking providing only pool_id - snaphsot', async () => {
+test('delegate staking providing only pool_id - snapshot', async () => {
   fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/pool/tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxkc/delegations', async () => {
     return {
       body: JSON.stringify(pool_01),
@@ -88,6 +90,7 @@ test('delegate staking providing only pool_id - snaphsot', async () => {
   const result = await spy.mock.results[0]?.value;
 
   expect(result).toMatchSnapshot();
+  spy.mockRestore();
 })
 
 test('delegate staking providing only wrong pool_id', async () => {
@@ -137,4 +140,22 @@ test('delegate staking providing only pool_id user not delegated to', async () =
     pool_id: 'tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxka', // pool_id user not delegated to
     amount: 10,
   })).rejects.toThrow('No delegation id found for the given pool id')
+})
+
+test('staking withdraw - snapshot', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.delegationWithdraw({
+    delegation_id: 'tdelg1d57nmkp24k0rh0fgsjnjy78wxql8wvgr420ncdsesvssvdgfcg6sx6262w',
+    amount: 10,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  expect(result).toMatchSnapshot();
+  spy.mockRestore();
 })

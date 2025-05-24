@@ -18,6 +18,7 @@ import initWasm, {
   encode_input_for_change_token_authority,
   encode_input_for_freeze_token,
   encode_input_for_unfreeze_token,
+  encode_input_for_withdraw_from_delegation,
   encode_output_transfer,
   encode_output_token_transfer,
   estimate_transaction_size,
@@ -1822,7 +1823,7 @@ class Client {
     const inputsIds = outpointedSourceIds.map((source) => encode_input_for_utxo(source.source_id, source.index));
 
     const inputCommands = (transactionJSONrepresentation.inputs as any[])
-      .filter(({ input }) => input.input_type === 'AccountCommand')
+      .filter(({ input }) => input.input_type === 'AccountCommand' || input.input_type === 'Account')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
           return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), network);
@@ -1876,6 +1877,14 @@ class Client {
         }
         if (input.command === 'UnfreezeToken') {
           return encode_input_for_unfreeze_token(input.token_id, input.nonce.toString(), network);
+        }
+        if (input.account_type === 'DelegationBalance') {
+          return encode_input_for_withdraw_from_delegation(
+            input.delegation_id,
+            Amount.from_atoms(input.amount.atoms.toString()),
+            BigInt(input.nonce.toString()),
+            network,
+          );
         }
       });
 
