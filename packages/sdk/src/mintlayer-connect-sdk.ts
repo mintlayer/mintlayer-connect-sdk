@@ -1129,7 +1129,7 @@ class Client {
 
   /**
    * Returns the fee for a specific transaction type.
-   * @param type
+   * @param {string} type
    * @returns {bigint} Fee in atoms.
    */
   getFeeForType(type: string): bigint {
@@ -1190,7 +1190,7 @@ class Client {
 
   /**
    * Builds a transaction based on the provided parameters.
-   * @param arg
+   * @param{BuildTransactionParams} arg
    */
   async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
     const {
