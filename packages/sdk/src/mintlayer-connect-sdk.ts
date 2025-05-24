@@ -1129,7 +1129,7 @@ class Client {
 
   /**
    * Returns the fee for a specific transaction type.
-   * @param type
+   * @param {string} type
    * @returns {bigint} Fee in atoms.
    */
   getFeeForType(type: string): bigint {
@@ -1190,7 +1190,7 @@ class Client {
 
   /**
    * Builds a transaction based on the provided parameters.
-   * @param arg
+   * @param{BuildTransactionParams} arg
    */
   async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
     const {
@@ -2480,6 +2480,71 @@ class Client {
       method: 'signTransaction',
       params: { txData: tx },
     });
+  }
+
+  /**
+   * Returns a preview of UTXO changes (spent/created) for a built transaction.
+   *
+   * ⚠️ WARNING: This is *only* a local simulation based on the unsigned transaction.
+   * If the transaction is not successfully broadcast to the network, these changes are NOT real.
+   *
+   * Use this method very carefully.
+   *
+   * @param tx - The transaction to preview.
+   * @return { spent: UtxoEntry[], created: UtxoEntry[] } An object containing arrays of spent and created UTXOs.
+   */
+  previewUtxoChange(tx: Transaction): { spent: UtxoEntry[], created: UtxoEntry[] } {
+    const spent: UtxoEntry[] = [];
+    const created: UtxoEntry[] = [];
+
+
+    tx.JSONRepresentation.inputs.forEach((input) => {
+      if (input.input.input_type === 'UTXO' && (input as UtxoInput).utxo) {
+        spent.push({
+          outpoint: {
+            index: input.input.index,
+            source_type: input.input.source_type,
+            source_id: input.input.source_id,
+          },
+          utxo: (input as UtxoInput).utxo,
+        });
+      }
+    });
+
+    tx.JSONRepresentation.outputs.forEach((output, index) => {
+      if (output.type === 'Transfer' || output.type === 'LockThenTransfer') {
+        created.push({
+          outpoint: {
+            index,
+            source_type: SourceId.Transaction,
+            source_id: tx.transaction_id,
+          },
+          utxo: {
+            type: output.type,
+            value: output.value,
+            destination: output.destination,
+          },
+        });
+      }
+      if (output.type === 'IssueNft') {
+        created.push({
+          outpoint: {
+            index,
+            source_type: SourceId.Transaction,
+            source_id: tx.transaction_id,
+          },
+          // @ts-ignore
+          utxo: { // TODO: check nft utxo structure
+            type: output.type,
+            destination: output.destination,
+            token_id: output.token_id,
+            data: output.data,
+          },
+        });
+      }
+    });
+
+    return { spent, created };
   }
 
   async getXPub(): Promise<string> {
