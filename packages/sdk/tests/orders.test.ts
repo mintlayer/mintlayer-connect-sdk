@@ -161,6 +161,7 @@ test('create order - snapshot', async () => {
   expect(result).toMatchSnapshot();
 });
 
+// replay similar tx: https://lovelace.explorer.mintlayer.org/tx/0b9844f148f6ce71f0ec3741b9ed40ba1a709f1bdf2dc3144ff31d7b49c9be07
 test('fill order', async () => {
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 
@@ -235,7 +236,7 @@ test('fill order', async () => {
   })
 });
 
-
+// replay similar tx: https://lovelace.explorer.mintlayer.org/tx/a3a822f5e9099075e07234f435a2cda80cb6e88836331238b882da785973d7ac
 test('conclude order - snapshot', async () => {
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 
