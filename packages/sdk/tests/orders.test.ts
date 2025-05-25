@@ -6,6 +6,7 @@ import { addresses, utxos } from './__mocks__/accounts/account_01'
 beforeEach(() => {
   fetchMock.resetMocks();
   fetchMock.enableMocks();
+  // TODO: fix mock to orders requests, something is not right
 
   // эмуляция window.mojito
   (window as any).mojito = {
