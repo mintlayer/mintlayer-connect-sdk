@@ -5,6 +5,7 @@ import { addresses, utxos } from './__mocks__/accounts/account_01'
 
 beforeEach(() => {
   fetchMock.resetMocks();
+  fetchMock.enableMocks();
 
   // эмуляция window.mojito
   (window as any).mojito = {
@@ -120,6 +121,40 @@ beforeEach(() => {
     };
   });
 
+  // API /order/tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu_filled
+  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/order/tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu_filled', async () => {
+    return {
+      body: JSON.stringify({
+        "ask_balance": {
+          "atoms": "100000000000",
+          "decimal": "1"
+        },
+        "ask_currency": {
+          "type": "Coin"
+        },
+        "conclude_destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
+        "give_balance": {
+          "atoms": "1000000000000",
+          "decimal": "10"
+        },
+        "give_currency": {
+          "token_id": "tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l",
+          "type": "Token"
+        },
+        "initially_asked": {
+          "atoms": "1000000000000",
+          "decimal": "10"
+        },
+        "initially_given": {
+          "atoms": "10000000000000",
+          "decimal": "100"
+        },
+        "nonce": 1,
+        "order_id": "tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu_filled"
+      }),
+    };
+  });
+
   // API /account
   fetchMock.mockIf('https://api.mintini.app/account', async () => {
     return {
@@ -225,5 +260,93 @@ test('fill order - snapshot', async () => {
       }
     ]
   })
+});
 
+
+test('conclude order - snapshot', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.concludeOrder({
+    order_id: 'tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu',
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+
+  expect(result.JSONRepresentation).toStrictEqual({
+    "inputs": [
+      {
+        "input": {
+          "input_type": "AccountCommand",
+          "command": "ConcludeOrder",
+          "destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
+          "order_id": "tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu",
+          "nonce": 1
+        },
+        "utxo": null
+      },
+      {
+        "input": {
+          "index": 1,
+          "source_id": "af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab",
+          "source_type": "Transaction",
+          "input_type": "UTXO"
+        },
+        "utxo": {
+          "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+          "type": "Transfer",
+          "value": {
+            "amount": {
+              "atoms": "1703205604300000",
+              "decimal": "17032.056043"
+            },
+            "type": "Coin"
+          }
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "type": "Transfer",
+        "destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
+        "value": {
+          "type": "Coin",
+          "amount": {
+            "decimal": "9",
+            "atoms": "900000000000"
+          }
+        }
+      },
+      {
+        "type": "Transfer",
+        "destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
+        "value": {
+          "type": "TokenV1",
+          "token_id": "tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l",
+          "amount": {
+            "decimal": "10",
+            "atoms": "1000000000000"
+          }
+        }
+      },
+      {
+        "type": "Transfer",
+        "value": {
+          "type": "Coin",
+          "amount": {
+            "atoms": "1703005604300000",
+            "decimal": "17030.056043"
+          }
+        },
+        "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6"
+      }
+    ]
+  })
+
+  // expect(result).toMatchSnapshot();
 });

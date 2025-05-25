@@ -1563,7 +1563,7 @@ class Client {
     }
 
     if (type === 'ConcludeOrder') {
-      const { order_id, nonce, conclude_destination, ask_currency, give_currency, ask_balance, give_balance } = params.order;
+      const { order_id, nonce, conclude_destination, ask_currency, give_currency, ask_balance, give_balance, initially_asked, initially_given } = params.order;
       inputs.push({
         input: {
           input_type: "AccountCommand",
@@ -1586,8 +1586,8 @@ class Client {
                 token_id: ask_currency.token_id,
               }),
           amount: {
-            decimal: ask_balance.decimal,
-            atoms: ask_balance.atoms,
+            decimal: (parseInt(initially_asked.decimal) - parseInt(ask_balance.decimal)).toString(),
+            atoms: (parseInt(initially_asked.atoms) - parseInt(ask_balance.atoms)).toString(),
           },
         },
       });
