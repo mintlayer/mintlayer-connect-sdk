@@ -15,20 +15,25 @@ beforeEach(() => {
     request: jest.fn().mockResolvedValue('signed-transaction'),
   };
 
-  // API /chain/tip
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/chain/tip', async () => {
-    return {
-      body: JSON.stringify({ height: 200000 }),
-    };
-  });
+  fetchMock.doMock();
 
-  // API /account
-  fetchMock.mockIf('https://api.mintini.app/account', async () => {
-    return {
-      body: JSON.stringify({
-        utxos: utxos,
-      }),
-    };
+  fetchMock.mockResponse(async req => {
+    const url = req.url;
+
+    if (url.endsWith('/chain/tip')) {
+      return JSON.stringify({ height: 200000 });
+    }
+
+    if(url.endsWith('/account')) {
+      return {
+        body: JSON.stringify({
+          utxos: utxos,
+        }),
+      };
+    }
+
+    console.warn('No mock for:', url);
+    return JSON.stringify({ error: 'No mock defined' });
   });
 });
 
