@@ -491,6 +491,8 @@ type BuildTransactionParams =
     give_amount: number;
     give_token: string;
     conclude_destination: string;
+    ask_token_details?: TokenDetails;
+    give_token_details?: TokenDetails;
   };
 }
   | {
@@ -1530,35 +1532,39 @@ class Client {
     }
 
     if (type === 'CreateOrder') {
-      const { ask_amount, ask_token, give_amount, give_token, conclude_destination } = params;
-      const give_token_details = { number_of_decimals: 11 }; // TODO
-      const ask_token_details = { number_of_decimals: 11 }; // TODO
+      const { ask_amount, ask_token, give_amount, give_token, conclude_destination, ask_token_details, give_token_details } = params;
 
       if (give_token === 'Coin') {
         input_amount_coin_req += BigInt(give_amount! * Math.pow(10, 11));
-      } else {
+      } else if(give_token_details) {
         input_amount_token_req += BigInt(give_amount! * Math.pow(10, give_token_details.number_of_decimals));
+        send_token = {
+          token_id: give_token,
+          number_of_decimals: give_token_details.number_of_decimals,
+        }
+      } else {
+        throw new Error('Invalid give token');
       }
 
       outputs.push({
         type: 'CreateOrder',
+        conclude_destination,
+        ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'TokenV1' },
         ask_balance: {
-          atoms: (ask_amount! * Math.pow(10, 11)).toString(),
+          atoms: ask_token_details ? (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString() : (ask_amount! * Math.pow(10, 11)).toString(),
           decimal: ask_amount!.toString(),
         },
-        ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'TokenV1' },
-        conclude_destination,
-        give_balance: {
-          atoms: (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString(),
-          decimal: give_amount!.toString(),
+        initially_asked: {
+          atoms: ask_token_details ? (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString() : (ask_amount! * Math.pow(10, 11)).toString(),
+          decimal: ask_amount!.toString(),
         },
         give_currency: give_token === 'Coin' ? { type: 'Coin' } : { token_id: give_token, type: 'TokenV1' },
-        initially_asked: {
-          atoms: (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
-          decimal: ask_amount!.toString(),
+        give_balance: {
+          atoms: give_token_details ? (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString() : (give_amount! * Math.pow(10, 11)).toString(),
+          decimal: give_amount!.toString(),
         },
         initially_given: {
-          atoms: (give_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString(),
+          atoms: give_token_details ? (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString() : (give_amount! * Math.pow(10, 11)).toString(),
           decimal: give_amount!.toString(),
         },
       });
@@ -2199,9 +2205,29 @@ class Client {
     give_amount: number;
   }): Promise<SignedTransaction> {
     this.ensureInitialized();
+
+    let ask_token_details = null;
+    let give_token_details = null;
+
+    if(ask_token !== 'Coin') {
+      const request = await fetch(`${this.getApiServer()}/token/${ask_token}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch ask token');
+      }
+      ask_token_details = await request.json();
+    }
+
+    if(give_token !== 'Coin') {
+      const request = await fetch(`${this.getApiServer()}/token/${give_token}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch give token');
+      }
+      give_token_details = await request.json();
+    }
+
     const tx = await this.buildTransaction({
       type: 'CreateOrder',
-      params: { conclude_destination, ask_token, ask_amount, give_token, give_amount },
+      params: { conclude_destination, ask_token, ask_amount, give_token, give_amount, ask_token_details, give_token_details },
     });
     return this.signTransaction(tx);
   }
