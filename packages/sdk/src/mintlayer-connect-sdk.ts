@@ -498,15 +498,7 @@ type BuildTransactionParams =
   | {
   type: 'ConcludeOrder';
   params: {
-    order: {
-      order_id: string;
-      nonce: number;
-      conclude_destination: string;
-      ask_balance: AmountFields;
-      ask_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
-      give_balance: AmountFields;
-      give_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
-    };
+    order: OrderData;
   };
 }
   | {
@@ -515,9 +507,9 @@ type BuildTransactionParams =
     order_id: string;
     amount: number;
     destination: string;
-    order_details: {
-      nonce: number;
-    };
+    order_details: OrderData;
+    ask_token_details: TokenDetails;
+    give_token_details: TokenDetails;
   };
 };
 
@@ -528,9 +520,9 @@ interface OrderData {
   conclude_destination: string;
   initially_asked: AmountFields;
   initially_given: AmountFields;
-  ask_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
+  ask_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
   give_balance: AmountFields;
-  give_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
+  give_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
 }
 
 interface ClientOptions {
@@ -1619,21 +1611,60 @@ class Client {
     }
 
     if (type === 'FillOrder') {
-      const { order_id, amount, destination, order_details } = params;
+      const { order_id, amount, destination, order_details, ask_token_details, give_token_details } = params;
 
-      const amount_atoms = amount! * Math.pow(10, 11);
+      const give_amount = amount; // Amount to fill in the order. Give _to_ order as counterpart of ask
+      const give_amount_atoms = order_details.ask_currency.type === 'Token'
+        ? give_amount! * Math.pow(10, ask_token_details!.number_of_decimals)
+        : give_amount! * Math.pow(10, 11) // Coin decimal
+        ;
+
+      if(order_details.ask_currency.type === 'Coin') {
+        input_amount_coin_req += BigInt(give_amount_atoms);
+      } else if (ask_token_details) {
+        input_amount_token_req += BigInt(give_amount_atoms * Math.pow(10, ask_token_details.number_of_decimals));
+        send_token = {
+          token_id: order_details.ask_currency.token_id,
+          number_of_decimals: ask_token_details.number_of_decimals,
+        }
+      }
+
+      const rate = parseInt(order_details.initially_asked.atoms) / parseInt(order_details.initially_given.atoms);
+
+      const ask_amount = give_amount / rate;
+      const ask_amount_atoms = order_details.give_currency.type === 'Token'
+        ? ask_amount! * Math.pow(10, give_token_details!.number_of_decimals)
+        : ask_amount! * Math.pow(10, 11) // Coin decimal
+        ;
 
       inputs.push({
         input: {
           input_type: 'AccountCommand',
           command: 'FillOrder',
           order_id: order_id,
-          fill_atoms: amount_atoms.toString(),
+          fill_atoms: give_amount_atoms.toString(),
           destination: destination,
           nonce: order_details.nonce.toString(),
         },
         utxo: null,
       });
+
+      outputs.push({
+        type: 'Transfer',
+        destination: destination,
+        value: {
+          ...(order_details.give_currency.type === 'Coin'
+            ? { type: 'Coin' }
+            : {
+                type: 'TokenV1',
+                token_id: order_details.give_currency.token_id,
+              }),
+          amount: {
+            atoms: ask_amount_atoms.toString(),
+            decimal: ask_amount!.toString(),
+          },
+        },
+      })
     }
 
     fee += BigInt(2 * Math.pow(10, 11));
@@ -2247,10 +2278,32 @@ class Client {
       throw new Error('Failed to fetch order');
     }
     const data = await response.json();
-    const order_details = data;
+    const order_details: OrderData = data;
+
+    const { ask_currency, give_currency } = order_details;
+
+    let ask_token_details = null;
+    let give_token_details = null;
+
+    if(ask_currency.type !== 'Coin') {
+      const request = await fetch(`${this.getApiServer()}/token/${ask_currency.token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch ask token');
+      }
+      ask_token_details = await request.json();
+    }
+
+    if(give_currency.type !== 'Coin') {
+      const request = await fetch(`${this.getApiServer()}/token/${give_currency.token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch give token');
+      }
+      give_token_details = await request.json();
+    }
+
     const tx = await this.buildTransaction({
       type: 'FillOrder',
-      params: { order_id, amount, order_details, destination },
+      params: { order_id, amount, destination, order_details, ask_token_details, give_token_details },
     });
     return this.signTransaction(tx);
   }
