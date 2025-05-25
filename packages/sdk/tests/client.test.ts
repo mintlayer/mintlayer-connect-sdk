@@ -1,5 +1,6 @@
 import { Client } from '../src/mintlayer-connect-sdk'
 import fetchMock from 'jest-fetch-mock';
+import { addresses } from './__mocks__/accounts/account_01';
 
 beforeEach(() => {
   fetchMock.resetMocks();
@@ -23,18 +24,29 @@ beforeEach(() => {
     disconnect: jest.fn().mockResolvedValue(undefined),
     request: jest.fn().mockResolvedValue('signed-transaction'),
   };
+
+  fetchMock.doMock();
+
+  fetchMock.mockResponse(async req => {
+    const url = req.url;
+
+    if (url.endsWith('/chain/tip')) {
+      return JSON.stringify({ height: 200000 });
+    }
+
+    if (url.includes('/address/')) {
+      return JSON.stringify({
+        coin_balance: { atoms: '1000000000000', decimal: '10' },
+        tokens: [],
+      });
+    }
+
+    console.warn('No mock for:', url);
+    return JSON.stringify({ error: 'No mock defined' });
+  });
 });
 
 test('Client.getBalance() returns coin balance', async () => {
-  fetchMock.mockIf(/^https:\/\/api-server-lovelace\.mintlayer\.org\/api\/v2\/address\/.*/, async () => {
-    return {
-      body: JSON.stringify({
-        coin_balance: { atoms: '1000000000000', decimal: '10' },
-        tokens: [],
-      }),
-    };
-  });
-
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 
   await client.connect();

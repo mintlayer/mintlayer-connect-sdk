@@ -16,20 +16,142 @@ beforeEach(() => {
     request: jest.fn().mockResolvedValue('signed-transaction'),
   };
 
-  // API /chain/tip
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/chain/tip', async () => {
-    return {
-      body: JSON.stringify({ height: 200000 }),
-    };
-  });
+  fetchMock.doMock();
 
-  // API /account
-  fetchMock.mockIf('https://api.mintini.app/account', async () => {
-    return {
-      body: JSON.stringify({
-        utxos: utxos,
-      }),
-    };
+  fetchMock.mockResponse(async req => {
+    const url = req.url;
+
+    if (url.endsWith('/chain/tip')) {
+      return JSON.stringify({ height: 200000 });
+    }
+
+    if (url.includes('/pool/')) {
+      const poolId = url.split('/pool/')[1].split('/delegations')[0];
+      if(poolId === 'tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxkc') {
+        return JSON.stringify([
+          {
+            "balance": {
+              "atoms": "0",
+              "decimal": "0"
+            },
+            "creation_block_height": 195930,
+            "delegation_id": "tdelg1d57nmkp24k0rh0fgsjnjy78wxql8wvgr420ncdsesvssvdgfcg6sx6262w",
+            "next_nonce": 0,
+            "spend_destination": "tmt1q86huq7e03hmk6wj8sf7hezqgnshhtwy6s8gz3ur"
+          }
+        ]);
+      }
+      if(poolId === 'tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxka') {
+        return JSON.stringify([
+          {
+            "balance": {
+              "atoms": "0",
+              "decimal": "0"
+            },
+            "creation_block_height": 195930,
+            "delegation_id": "tdelg1d57nmkp24k0rh0fgsjnjy78wxql8wvgr420ncdsesvssvdgfcg6sx6262w",
+            "next_nonce": 0,
+            "spend_destination": "tmt1q86huq7e03hmk6wj8sf7hezqgnshhtwy6s8gz3ut" // not belonging to the user
+          }
+        ]);
+      }
+      if(poolId === 'wrong_pool_id') {
+        return {
+          body: JSON.stringify(JSON.stringify({"error":"Invalid pool Id"})),
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        };
+      }
+    }
+
+    if (url.includes('/token/')) {
+      const tokenId = url.split('/token/').pop();
+      if (tokenId === 'tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq') {
+        return JSON.stringify({
+          "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
+          "circulating_supply": {
+            "atoms": "209000000000",
+            "decimal": "2090"
+          },
+          "frozen": false,
+          "is_locked": false,
+          "is_token_freezable": true,
+          "is_token_unfreezable": null,
+          "metadata_uri": {
+            "hex": "697066733a2f2f516d4578616d706c6548617368313233",
+            "string": "ipfs://QmExampleHash123"
+          },
+          "next_nonce": 7,
+          "number_of_decimals": 8,
+          "token_ticker": {
+            "hex": "58595a32",
+            "string": "XYZ2"
+          },
+          "total_supply": {
+            "Fixed": {
+              "atoms": "100000000000000"
+            }
+          }
+        });
+      }
+      if (tokenId === 'tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l') {
+        return JSON.stringify({
+          "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
+          "circulating_supply": {
+            "atoms": "209000000000",
+            "decimal": "2090"
+          },
+          "frozen": false,
+          "is_locked": false,
+          "is_token_freezable": true,
+          "is_token_unfreezable": null,
+          "metadata_uri": {
+            "hex": "697066733a2f2f516d4578616d706c6548617368313233",
+            "string": "ipfs://QmExampleHash123"
+          },
+          "next_nonce": 7,
+          "number_of_decimals": 11,
+          "token_ticker": {
+            "hex": "58595a32",
+            "string": "XYZ2"
+          },
+          "total_supply": {
+            "Fixed": {
+              "atoms": "100000000000000"
+            }
+          }
+        });
+      }
+    }
+
+    if (url.includes('/delegation/')) {
+      const delegationId = url.split('/delegation/').pop();
+      if(delegationId === 'tdelg1d57nmkp24k0rh0fgsjnjy78wxql8wvgr420ncdsesvssvdgfcg6sx6262w') {
+        return JSON.stringify({
+          "balance": {
+            "atoms": "0",
+            "decimal": "0"
+          },
+          "creation_block_height": 195930,
+          "next_nonce": 0,
+          "pool_id": "tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxkc",
+          "spend_destination": "tmt1q86huq7e03hmk6wj8sf7hezqgnshhtwy6s8gz3ur"
+        })
+      }
+    }
+
+    if(url.endsWith('/account')) {
+      return {
+        body: JSON.stringify({
+          utxos: utxos,
+        }),
+      };
+    }
+
+    console.warn('No mock for:', url);
+    return JSON.stringify({ error: 'No mock defined' });
   });
 });
 
@@ -70,12 +192,6 @@ test('delegate staking - snaphsot', async () => {
 })
 
 test('delegate staking providing only pool_id - snapshot', async () => {
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/pool/tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxkc/delegations', async () => {
-    return {
-      body: JSON.stringify(pool_01),
-    };
-  });
-
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 
   const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
@@ -94,16 +210,6 @@ test('delegate staking providing only pool_id - snapshot', async () => {
 })
 
 test('delegate staking providing only wrong pool_id', async () => {
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/pool/wrong_pool_id/delegations', async () => {
-    return {
-      body: JSON.stringify({"error":"Invalid pool Id"}),
-      status: 400,
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    };
-  });
-
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 
   await client.connect();
@@ -115,23 +221,6 @@ test('delegate staking providing only wrong pool_id', async () => {
 })
 
 test('delegate staking providing only pool_id user not delegated to', async () => {
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/pool/tpool1tl784md209n53kuuwqxu68zav5lu5pdg8ca7kuhs6jg5lw24827q6qgxka/delegations', async () => {
-    return {
-      body: JSON.stringify([
-        {
-          "balance": {
-            "atoms": "0",
-            "decimal": "0"
-          },
-          "creation_block_height": 195930,
-          "delegation_id": "tdelg1d57nmkp24k0rh0fgsjnjy78wxql8wvgr420ncdsesvssvdgfcg6sx6262w",
-          "next_nonce": 0,
-          "spend_destination": "tmt1q86huq7e03hmk6wj8sf7hezqgnshhtwy6s8gz3ut" // not belonging to the user
-        }
-      ]),
-    };
-  });
-
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 
   await client.connect();

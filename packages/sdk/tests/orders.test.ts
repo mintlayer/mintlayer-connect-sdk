@@ -3,10 +3,12 @@ import fetchMock from 'jest-fetch-mock';
 
 import { addresses, utxos } from './__mocks__/accounts/account_01'
 
+let spy: jest.SpyInstance;
+
 beforeEach(() => {
   fetchMock.resetMocks();
-  fetchMock.enableMocks();
-  // TODO: fix mock to orders requests, something is not right
+
+  spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
 
   // эмуляция window.mojito
   (window as any).mojito = {
@@ -17,159 +19,132 @@ beforeEach(() => {
     request: jest.fn().mockResolvedValue('signed-transaction'),
   };
 
-  // API /chain/tip
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/chain/tip', async () => {
-    return {
-      body: JSON.stringify({ height: 200000 }),
-    };
-  });
+  fetchMock.doMock();
 
-  // API /token/tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/token/tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq', async () => {
-    return {
-      body: JSON.stringify({
-        "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
-        "circulating_supply": {
-          "atoms": "209000000000",
-          "decimal": "2090"
-        },
-        "frozen": false,
-        "is_locked": false,
-        "is_token_freezable": true,
-        "is_token_unfreezable": null,
-        "metadata_uri": {
-          "hex": "697066733a2f2f516d4578616d706c6548617368313233",
-          "string": "ipfs://QmExampleHash123"
-        },
-        "next_nonce": 7,
-        "number_of_decimals": 8,
-        "token_ticker": {
-          "hex": "58595a32",
-          "string": "XYZ2"
-        },
-        "total_supply": {
-          "Fixed": {
-            "atoms": "100000000000000"
+  fetchMock.mockResponse(async req => {
+    const url = req.url;
+
+    if (url.endsWith('/chain/tip')) {
+      return JSON.stringify({ height: 200000 });
+    }
+
+    if (url.includes('/token/')) {
+      const tokenId = url.split('/token/').pop();
+      if (tokenId === 'tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq') {
+        return JSON.stringify({
+          "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
+          "circulating_supply": {
+            "atoms": "209000000000",
+            "decimal": "2090"
+          },
+          "frozen": false,
+          "is_locked": false,
+          "is_token_freezable": true,
+          "is_token_unfreezable": null,
+          "metadata_uri": {
+            "hex": "697066733a2f2f516d4578616d706c6548617368313233",
+            "string": "ipfs://QmExampleHash123"
+          },
+          "next_nonce": 7,
+          "number_of_decimals": 8,
+          "token_ticker": {
+            "hex": "58595a32",
+            "string": "XYZ2"
+          },
+          "total_supply": {
+            "Fixed": {
+              "atoms": "100000000000000"
+            }
           }
-        }
-      }),
-    };
-  });
-
-  // API /token/tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/token/tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l', async () => {
-    return {
-      body: JSON.stringify({
-        "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
-        "circulating_supply": {
-          "atoms": "209000000000",
-          "decimal": "2090"
-        },
-        "frozen": false,
-        "is_locked": false,
-        "is_token_freezable": true,
-        "is_token_unfreezable": null,
-        "metadata_uri": {
-          "hex": "697066733a2f2f516d4578616d706c6548617368313233",
-          "string": "ipfs://QmExampleHash123"
-        },
-        "next_nonce": 7,
-        "number_of_decimals": 11,
-        "token_ticker": {
-          "hex": "58595a32",
-          "string": "XYZ2"
-        },
-        "total_supply": {
-          "Fixed": {
-            "atoms": "100000000000000"
+        });
+      }
+      if (tokenId === 'tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l') {
+        return JSON.stringify({
+          "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
+          "circulating_supply": {
+            "atoms": "209000000000",
+            "decimal": "2090"
+          },
+          "frozen": false,
+          "is_locked": false,
+          "is_token_freezable": true,
+          "is_token_unfreezable": null,
+          "metadata_uri": {
+            "hex": "697066733a2f2f516d4578616d706c6548617368313233",
+            "string": "ipfs://QmExampleHash123"
+          },
+          "next_nonce": 7,
+          "number_of_decimals": 11,
+          "token_ticker": {
+            "hex": "58595a32",
+            "string": "XYZ2"
+          },
+          "total_supply": {
+            "Fixed": {
+              "atoms": "100000000000000"
+            }
           }
-        }
-      }),
-    };
-  });
+        });
+      }
+      return JSON.stringify({ a: 'b' });
+    }
 
-  // API /order/tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/order/tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu', async () => {
-    return {
-      body: JSON.stringify({
-        "ask_balance": {
-          "atoms": "1000000000000",
-          "decimal": "10"
-        },
-        "ask_currency": {
-          "type": "Coin"
-        },
-        "conclude_destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
-        "give_balance": {
-          "atoms": "10000000000000",
-          "decimal": "100"
-        },
-        "give_currency": {
-          "token_id": "tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l",
-          "type": "Token"
-        },
-        "initially_asked": {
-          "atoms": "1000000000000",
-          "decimal": "10"
-        },
-        "initially_given": {
-          "atoms": "10000000000000",
-          "decimal": "100"
-        },
-        "nonce": 0,
-        "order_id": "tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu"
-      }),
-    };
-  });
+    if(url.includes('/order/')) {
+      const orderId = req.url.split('/order/').pop();
 
-  // API /order/tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu_filled
-  fetchMock.mockIf('https://api-server-lovelace.mintlayer.org/api/v2/order/tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu_filled', async () => {
-    return {
-      body: JSON.stringify({
-        "ask_balance": {
-          "atoms": "100000000000",
-          "decimal": "1"
-        },
-        "ask_currency": {
-          "type": "Coin"
-        },
-        "conclude_destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
-        "give_balance": {
-          "atoms": "1000000000000",
-          "decimal": "10"
-        },
-        "give_currency": {
-          "token_id": "tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l",
-          "type": "Token"
-        },
-        "initially_asked": {
-          "atoms": "1000000000000",
-          "decimal": "10"
-        },
-        "initially_given": {
-          "atoms": "10000000000000",
-          "decimal": "100"
-        },
-        "nonce": 1,
-        "order_id": "tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu_filled"
-      }),
-    };
-  });
+      if (orderId === 'tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu') {
+        return {
+          body: JSON.stringify({
+            "ask_balance": {
+              "atoms": "1000000000000",
+              "decimal": "10"
+            },
+            "ask_currency": {
+              "type": "Coin"
+            },
+            "conclude_destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
+            "give_balance": {
+              "atoms": "10000000000000",
+              "decimal": "100"
+            },
+            "give_currency": {
+              "token_id": "tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l",
+              "type": "Token"
+            },
+            "initially_asked": {
+              "atoms": "1000000000000",
+              "decimal": "10"
+            },
+            "initially_given": {
+              "atoms": "10000000000000",
+              "decimal": "100"
+            },
+            "nonce": 0,
+            "order_id": "tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu"
+          }),
+        };
+      }
+    }
 
-  // API /account
-  fetchMock.mockIf('https://api.mintini.app/account', async () => {
-    return {
-      body: JSON.stringify({
-        utxos: utxos,
-      }),
-    };
+    if(url.endsWith('/account')) {
+      return {
+        body: JSON.stringify({
+          utxos: utxos,
+        }),
+      };
+    }
+
+    console.warn('No mock for:', url);
+    return JSON.stringify({ error: 'No mock defined' });
   });
+});
+
+afterEach(() => {
+  spy?.mockRestore();
 });
 
 test('create order - snapshot', async () => {
   const client = await Client.create({ network: 'testnet', autoRestore: false });
-
-  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
 
   await client.connect();
 
@@ -186,11 +161,8 @@ test('create order - snapshot', async () => {
   expect(result).toMatchSnapshot();
 });
 
-
-test('fill order - snapshot', async () => {
+test('fill order', async () => {
   const client = await Client.create({ network: 'testnet', autoRestore: false });
-
-  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
 
   await client.connect();
 
@@ -267,7 +239,49 @@ test('fill order - snapshot', async () => {
 test('conclude order - snapshot', async () => {
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 
-  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+  fetchMock.mockResponseOnce(async req => {
+    const url = req.url;
+
+    if(url.includes('/order/')) {
+      const orderId = req.url.split('/order/').pop();
+
+      if (orderId === 'tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu') {
+        return {
+          body: JSON.stringify({
+            "ask_balance": {
+              "atoms": "100000000000",
+              "decimal": "1"
+            },
+            "ask_currency": {
+              "type": "Coin"
+            },
+            "conclude_destination": "tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py",
+            "give_balance": {
+              "atoms": "1000000000000",
+              "decimal": "10"
+            },
+            "give_currency": {
+              "token_id": "tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l",
+              "type": "Token"
+            },
+            "initially_asked": {
+              "atoms": "1000000000000",
+              "decimal": "10"
+            },
+            "initially_given": {
+              "atoms": "10000000000000",
+              "decimal": "100"
+            },
+            "nonce": 1,
+            "order_id": "tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu"
+          }),
+        };
+      }
+    }
+
+    console.warn('No mock for:', url);
+    return JSON.stringify({ error: 'No mock defined' });
+  });
 
   await client.connect();
 
