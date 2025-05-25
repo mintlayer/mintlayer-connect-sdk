@@ -291,8 +291,6 @@ test('conclude order - snapshot', async () => {
 
   const result = await spy.mock.results[0]?.value;
 
-  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
-
   expect(result.JSONRepresentation).toStrictEqual({
     "inputs": [
       {
