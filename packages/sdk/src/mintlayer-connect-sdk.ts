@@ -45,8 +45,8 @@ import initWasm, {
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
-function mergeUint8Arrays(arrays: any) {
-  const totalLength = arrays.reduce((sum: any, arr: any) => sum + arr.length, 0);
+function mergeUint8Arrays(arrays: Uint8Array[]) {
+  const totalLength = arrays.reduce((sum: number, arr: Uint8Array) => sum + arr.length, 0);
 
   const result = new Uint8Array(totalLength);
 
@@ -81,6 +81,8 @@ type Token = {
 
 type Value = Coin | Token;
 
+type SignedTransaction = string;
+
 interface Outpoint {
   id: string;
   index: number;
@@ -102,7 +104,7 @@ type Utxo = {
   value: Value;
   destination: string;
   token_id?: string;
-  data?: any;
+  data?: any; // split NFT utxo
 };
 
 type UtxoInput = {
@@ -522,6 +524,8 @@ interface OrderData {
   ask_balance: AmountFields;
   nonce: number;
   conclude_destination: string;
+  initially_asked: AmountFields;
+  initially_given: AmountFields;
   ask_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
   give_balance: AmountFields;
   give_currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string };
@@ -762,71 +766,6 @@ class Client {
   }
 
   /**
-   * Encodes the outputs for the transaction.
-   * @param amount
-   * @param address
-   * @param type
-   * @param lock
-   * @param chainTip
-   * @param tokenId
-   * @param utxo
-   * @private
-   */
-  private getOutputs({ amount, address, type = 'Transfer', lock, chainTip, tokenId, utxo }: any) {
-    if (type === 'LockThenTransfer' && !lock) {
-      throw new Error('LockThenTransfer requires a lock');
-    }
-
-    const amountInstace = Amount.from_atoms(amount);
-
-    const networkIndex = this.getMLNetwork();
-    if (type === 'Transfer') {
-      if (tokenId) {
-        return encode_output_token_transfer(amountInstace, address, tokenId, networkIndex);
-      } else {
-        return encode_output_transfer(amountInstace, address, networkIndex);
-      }
-    }
-    if (type === 'LockThenTransfer') {
-      let lockEncoded: Uint8Array = new Uint8Array();
-      if (lock.type === 'UntilTime') {
-        lockEncoded = encode_lock_until_time(BigInt(lock.content.timestamp));
-      }
-      if (lock.type === 'ForBlockCount') {
-        lockEncoded = encode_lock_for_block_count(BigInt(lock.content));
-      }
-      if (tokenId) {
-        return encode_output_token_lock_then_transfer(amountInstace, address, tokenId, lockEncoded, networkIndex);
-      } else {
-        return encode_output_lock_then_transfer(amountInstace, address, lockEncoded, networkIndex);
-      }
-    }
-    if (type === 'spendFromDelegation') {
-      // const stakingMaturity = getStakingMaturity(chainTip, networkType); // TODO: Get the staking maturity
-      const stakingMaturity = 0n; // TODO: Get the staking maturity
-      const encodedLockForBlock = encode_lock_for_block_count(stakingMaturity);
-      return encode_output_lock_then_transfer(amountInstace, address, encodedLockForBlock, networkIndex);
-    }
-
-    if (type === 'IssueNft') {
-      return encode_output_issue_nft(
-        utxo.utxo.token_id,
-        utxo.utxo.destination,
-        utxo.utxo.data.name.string,
-        utxo.utxo.data.ticker.string,
-        utxo.utxo.data.description.string,
-        stringToUint8Array(utxo.utxo.data.description.string),
-        utxo.utxo.data.creator,
-        utxo.utxo.data.media_uri.string,
-        utxo.utxo.data.icon_uri.string,
-        utxo.utxo.data.additional_metadata_uri.string,
-        BigInt(Number(chainTip)),
-        networkIndex,
-      );
-    }
-  }
-
-  /**
    * Returns the transaction ID.
    */
   readonly isMintlayer: boolean = true;
@@ -1046,7 +985,7 @@ class Client {
   /**
    * Returns the delegations for the connected addresses.
    */
-  async getDelegations(): Promise<any[]> {
+  async getDelegations(): Promise<DelegationDetails[]> {
     this.ensureInitialized();
     if (this.connectedAddresses[this.network].receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
@@ -1068,9 +1007,9 @@ class Client {
         const data = await response.json();
         return data;
       });
-      const delegations = await Promise.all(delegationPromises);
-      const totalDelegations = delegations.reduce((acc: any[], del: any) => {
-        return acc.concat(del);
+      const delegations: DelegationDetails[] = await Promise.all(delegationPromises);
+      const totalDelegations = delegations.reduce((acc: DelegationDetails[], item: DelegationDetails) => {
+        return acc.concat(item);
       }, []);
 
       return totalDelegations;
@@ -1082,7 +1021,7 @@ class Client {
   /**
    * Returns the tokens owned by the connected addresses.
    */
-  async getTokensOwned(): Promise<any[]> {
+  async getTokensOwned(): Promise<string[]> {
     this.ensureInitialized();
     if (this.connectedAddresses[this.network].receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
@@ -1105,8 +1044,8 @@ class Client {
         return data;
       });
       const authority = await Promise.all(authorityPromises);
-      const totalAuthority = authority.reduce((acc: any[], del: any) => {
-        return acc.concat(del);
+      const totalAuthority = authority.reduce((acc: string[], item: string) => {
+        return acc.concat(item);
       }, []);
 
       return totalAuthority;
@@ -1121,7 +1060,7 @@ class Client {
   async getDelegationsTotal(): Promise<number> {
     this.ensureInitialized();
     const delegations = await this.getDelegations();
-    const totalDelegation = delegations.reduce((acc: number, del: any) => {
+    const totalDelegation = delegations.reduce((acc: number, del: DelegationDetails) => {
       return acc + parseFloat(del.balance.decimal);
     }, 0);
     return totalDelegation;
@@ -1804,7 +1743,11 @@ class Client {
    * @param transactionJSONrepresentation
    * @param _network
    */
-  getTransactionBINrepresentation(transactionJSONrepresentation: TransactionJSONRepresentation, _network: Network) {
+  getTransactionBINrepresentation(transactionJSONrepresentation: TransactionJSONRepresentation, _network: Network): {
+    inputs: Uint8Array[];
+    outputs: Uint8Array[];
+    transactionsize: number;
+  } {
     const network = _network;
     // Binarisation
     // calculate fee and prepare as much transaction as possible
@@ -1888,26 +1831,32 @@ class Client {
         }
       });
 
-    const inputsArray = [...inputCommands, ...inputsIds];
+    const inputsArray = [...inputCommands, ...inputsIds].filter(
+      (x): x is NonNullable<typeof x> => x !== undefined
+    );
 
     const outputsArrayItems = transactionJSONrepresentation.outputs.map((output) => {
       if (output.type === 'Transfer') {
-        return this.getOutputs({
-          amount: BigInt(output.value.amount.atoms).toString(),
-          address: output.destination,
-          networkType: this.network,
-          ...(output.value.type === 'Coin' ? {} : { tokenId: output.value.token_id }),
-        });
+        if (output.value.type === 'TokenV1') {
+          return encode_output_token_transfer(Amount.from_atoms(output.value.amount.atoms), output.destination, output.value.token_id, network);
+        } else {
+          return encode_output_transfer(Amount.from_atoms(output.value.amount.atoms), output.destination, network);
+        }
       }
       if (output.type === 'LockThenTransfer') {
-        return this.getOutputs({
-          type: 'LockThenTransfer',
-          lock: output.lock,
-          amount: BigInt(output.value.amount.atoms).toString(),
-          address: output.destination,
-          networkType: this.network,
-          ...(output.value.type === 'Coin' ? {} : { tokenId: output.value.token_id }),
-        });
+        let lockEncoded: Uint8Array = new Uint8Array();
+        if (output.lock.type === 'UntilTime') {
+          // @ts-ignore
+          lockEncoded = encode_lock_until_time(BigInt(output.lock.content.timestamp)); // TODO: check if timestamp is correct
+        }
+        if (output.lock.type === 'ForBlockCount') {
+          lockEncoded = encode_lock_for_block_count(BigInt(output.lock.content));
+        }
+        if (output.value.type === 'TokenV1') {
+          return encode_output_token_lock_then_transfer(Amount.from_atoms(output.value.amount.atoms), output.destination, output.value.token_id, lockEncoded, network);
+        } else {
+          return encode_output_lock_then_transfer(Amount.from_atoms(output.value.amount.atoms), output.destination, lockEncoded, network);
+        }
       }
       if (output.type === 'CreateOrder') {
         return encode_create_order_output(
@@ -2000,7 +1949,9 @@ class Client {
         return encode_output_delegate_staking(Amount.from_atoms(output.amount.atoms), output.delegation_id, network);
       }
     });
-    const outputsArray = outputsArrayItems;
+    const outputsArray = outputsArrayItems.filter(
+      (x): x is NonNullable<typeof x> => x !== undefined
+    );
 
     const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
       .filter(({ input }) => input.input_type === 'UTXO')
@@ -2026,7 +1977,7 @@ class Client {
    * @param amount
    * @param token_id
    */
-  async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<any> {
+  async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     if (token_id) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
@@ -2048,7 +1999,7 @@ class Client {
    * @param to
    * @param token_id
    */
-  async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<any> {
+  async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
 
     if(!token_id) {
@@ -2067,13 +2018,13 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async delegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<any> {
+  async delegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
     return this.signTransaction(tx);
   }
 
-  async issueNft(tokenData: any): Promise<any> {
+  async issueNft(tokenData: any): Promise<SignedTransaction> {
     this.ensureInitialized();
     const description = tokenData.description;
 
@@ -2108,7 +2059,7 @@ class Client {
     token_ticker: string;
     supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
     supply_amount?: number;
-  }): Promise<any> {
+  }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({
       type: 'IssueFungibleToken',
@@ -2125,7 +2076,7 @@ class Client {
     destination: string;
     amount: number;
     token_id: string;
-  }): Promise<any> {
+  }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2141,7 +2092,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async unmintToken({ amount, token_id }: { amount: number; token_id: string }): Promise<any> {
+  async unmintToken({ amount, token_id }: { amount: number; token_id: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2154,7 +2105,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async lockTokenSupply({ token_id }: { token_id: string }): Promise<any> {
+  async lockTokenSupply({ token_id }: { token_id: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2167,7 +2118,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async changeTokenAuthority({ token_id, new_authority }: { token_id: string; new_authority: string }): Promise<any> {
+  async changeTokenAuthority({ token_id, new_authority }: { token_id: string; new_authority: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2189,7 +2140,7 @@ class Client {
   }: {
     token_id: string;
     new_metadata_uri: string;
-  }): Promise<any> {
+  }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2205,7 +2156,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async freezeToken({ token_id, is_unfreezable }: { token_id: string; is_unfreezable: boolean }): Promise<any> {
+  async freezeToken({ token_id, is_unfreezable }: { token_id: string; is_unfreezable: boolean }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2221,7 +2172,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async unfreezeToken({ token_id }: { token_id: string }): Promise<any> {
+  async unfreezeToken({ token_id }: { token_id: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2246,7 +2197,7 @@ class Client {
     ask_amount: number;
     give_token: string;
     give_amount: number;
-  }): Promise<any> {
+  }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({
       type: 'CreateOrder',
@@ -2263,7 +2214,7 @@ class Client {
     order_id: string;
     amount: number;
     destination: string;
-  }): Promise<any> {
+  }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
     if (!response.ok) {
@@ -2278,19 +2229,19 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async getAccountOrders(): Promise<any[]> {
+  async getAccountOrders(): Promise<OrderData[]> {
     this.ensureInitialized();
     const allOrders = await this.getAvailableOrders();
     const address = this.connectedAddresses;
     const currentAddress = address[this.network];
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
-    const orders = allOrders.filter((order: any) => {
+    const orders = allOrders.filter((order: OrderData) => {
       return addressList.includes(order.conclude_destination);
     });
     return orders;
   }
 
-  async concludeOrder({ order_id }: { order_id: string }): Promise<any> {
+  async concludeOrder({ order_id }: { order_id: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
     if (!response.ok) {
@@ -2312,7 +2263,7 @@ class Client {
     amount: number;
     token_id: string;
     intent: string;
-  }): Promise<any> {
+  }): Promise<SignedTransaction> {
     this.ensureInitialized();
 
     if(!token_id) {
@@ -2332,7 +2283,7 @@ class Client {
     return this.signTransaction({ ...tx, intent });
   }
 
-  async burn({ token_id, amount }: { token_id: string; amount: number }): Promise<any> {
+  async burn({ token_id, amount }: { token_id: string; amount: number }): Promise<SignedTransaction> {
     this.ensureInitialized();
     let token_details: TokenDetails | undefined = undefined;
 
@@ -2348,13 +2299,13 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async dataDeposit({ data }: { data: string }): Promise<any> {
+  async dataDeposit({ data }: { data: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'DataDeposit', params: { data } });
     return this.signTransaction(tx);
   }
 
-  async delegationCreate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<any> {
+  async delegationCreate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
     return this.signTransaction(tx);
@@ -2364,7 +2315,7 @@ class Client {
     params:
       | { pool_id: string; amount: number; delegation_id?: undefined }
       | { delegation_id: string; amount: number; pool_id?: undefined }
-  ): Promise<any> {
+  ): Promise<SignedTransaction> {
     this.ensureInitialized();
 
     const amount = params.amount;
@@ -2378,9 +2329,7 @@ class Client {
     if(delegation_id) {
       const tx = await this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id, amount } });
       return this.signTransaction(tx);
-    }
-
-    if(pool_id) {
+    } else if(pool_id) {
       const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
       const data: DelegationDetails[] = await response.json();
 
@@ -2410,6 +2359,8 @@ class Client {
 
       const tx = await this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id: first_delegation_id, amount } });
       return this.signTransaction(tx);
+    } else {
+      throw new Error('Delegation id or pool id is required');
     }
   }
 
@@ -2417,7 +2368,7 @@ class Client {
     params:
       | { pool_id: string; amount: number; delegation_id?: undefined }
       | { delegation_id: string; amount: number; pool_id?: undefined }
-  ): Promise<any> {
+  ): Promise<SignedTransaction> {
     this.ensureInitialized();
     const amount = params.amount;
     const delegation_id = params.delegation_id;
@@ -2437,9 +2388,7 @@ class Client {
 
       const tx = await this.buildTransaction({ type: 'DelegationWithdraw', params: { delegation_id, amount, delegation_details } });
       return this.signTransaction(tx);
-    }
-
-    if(pool_id) {
+    } else if(pool_id) {
       const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
       const data = await response.json();
 
@@ -2447,7 +2396,7 @@ class Client {
         throw new Error('Failed to fetch delegation id');
       }
 
-      const delegationIdMap: { [key: string] : DelegationDetails }[] = data.reduce((acc: { [key: string]: DelegationDetails }, item: DelegationDetails) => {
+      const delegationIdMap: Record<string, DelegationDetails> = data.reduce((acc: { [key: string]: DelegationDetails }, item: DelegationDetails) => {
         acc[item.spend_destination] = item;
         return acc;
       }, {});
@@ -2456,14 +2405,10 @@ class Client {
       const allAddresses = [...addresses.receiving, ...addresses.change];
 
       // find the first delegation id for the given pool id
-      const first_delegation: any = allAddresses.reduce((acc: string | null, address: string) => {
-        // @ts-ignore
-        if (delegationIdMap[address]) {
-          // @ts-ignore
-          return delegationIdMap[address];
-        }
-        return acc;
-      }, null);
+      const matchedAddress = allAddresses.find(address => delegationIdMap[address]);
+      const first_delegation = matchedAddress
+        ? delegationIdMap[matchedAddress]
+        : null;
 
       if(!first_delegation) {
         throw new Error('No delegation id found for the given pool id');
@@ -2471,10 +2416,12 @@ class Client {
 
       const tx = await this.buildTransaction({ type: 'DelegationWithdraw', params: { delegation_id: first_delegation.delegation_id, amount, delegation_details: first_delegation } });
       return this.signTransaction(tx);
+    } else {
+      throw new Error('Delegation id or pool id is required');
     }
   }
 
-  async signTransaction(tx: Transaction): Promise<any> {
+  async signTransaction(tx: Transaction): Promise<SignedTransaction> {
     this.ensureInitialized();
     return this.request({
       method: 'signTransaction',
@@ -2583,7 +2530,7 @@ class Client {
     });
   }
 
-  async getAvailableOrders(): Promise<any[]> {
+  async getAvailableOrders(): Promise<OrderData[]> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order`);
     if (!response.ok) {
