@@ -63,6 +63,56 @@ function stringToUint8Array(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
+type Address = {
+  [key: string]: {
+    receiving: string[];
+    change: string[];
+  };
+}; // TODO expand
+
+type MojitoRequest = any; // TODO expand
+
+export interface AccountProvider {
+  connect(): Promise<Address>;
+  restore(): Promise<Address>;
+  disconnect(): Promise<void>;
+  request(method: any, params: any): Promise<any>;
+}
+
+export class MojitoAccountProvider implements AccountProvider {
+  async connect() {
+    if (typeof window !== 'undefined' && window.mojito?.connect) {
+      return window.mojito.connect();
+    } else {
+      throw new Error('Mojito extension not available');
+    }
+  }
+
+  async restore() {
+    if (typeof window !== 'undefined' && window.mojito?.restore) {
+      return window.mojito.restore();
+    } else {
+      throw new Error('Mojito extension not available');
+    }
+  }
+
+  async disconnect() {
+    if (typeof window !== 'undefined' && window.mojito?.disconnect) {
+      return window.mojito.disconnect();
+    } else {
+      throw new Error('Mojito extension not available');
+    }
+  }
+
+  async request(method: any, params: any) {
+    if (typeof window !== 'undefined' && window.mojito?.request) {
+      return window.mojito.request(params.method, params.params);
+    } else {
+      throw new Error('Mojito extension not available');
+    }
+  }
+}
+
 type AmountFields= {
   atoms: string;
   decimal: string;
@@ -526,8 +576,9 @@ interface OrderData {
 }
 
 interface ClientOptions {
-  network?: 'mainnet' | 'testnet';
+  network?: 'testnet' | 'mainnet';
   autoRestore?: boolean;
+  accountProvider?: AccountProvider;
 }
 
 class Client {
@@ -539,6 +590,7 @@ class Client {
     };
   };
   private isInitialized: boolean;
+  private accountProvider: AccountProvider;
 
   /**
    * Creates a new Client instance.
@@ -548,6 +600,7 @@ class Client {
     this.network = options.network || 'mainnet';
     this.connectedAddresses = {};
     this.isInitialized = false;
+    this.accountProvider = options.accountProvider || new MojitoAccountProvider();
   }
 
   /**
@@ -560,12 +613,50 @@ class Client {
 
   /**
    * Creates a new Client instance and initializes it.
+   *
+   * example custom accountProvider:
+   *
+   * ```typescript
+   * export class InMemoryAccountProvider implements AccountProvider {
+   *   constructor(private addresses: Address[]) {}
+   *
+   *   async connect() {
+   *     return this.addresses;
+   *   }
+   *
+   *   async restore() {
+   *     return this.addresses;
+   *   }
+   *
+   *   async disconnect() {
+   *     return;
+   *   }
+   *
+   *   async request(params: MojitoRequest) {
+   *     throw new Error('Signing not supported in InMemoryAccountProvider');
+   *   }
+   * }
+   * ```
+   *
+   * to use:
+   * ```typescript
+   * const client = await Client.create({
+   *   network: 'testnet',
+   *   autoRestore: true,
+   *   accountProvider: new InMemoryAccountProvider({
+   *     receiving: ['tmt1receiving'], change: ['tmt1change'],
+   *   })
+   * });
+   * ```
+   *
    * @param options
    */
   static async create(options: ClientOptions = { autoRestore: true }): Promise<Client> {
     console.log('Create client');
     const client = new Client(options);
     await client.init();
+
+    client.accountProvider = options.accountProvider ?? new MojitoAccountProvider();
 
     if (options.autoRestore !== false) {
       const restored = await client.restore();
@@ -796,15 +887,11 @@ class Client {
   /**
    * Connects to the wallet and retrieves the connected addresses.
    */
-  async connect(): Promise<string[]> {
+  async connect(): Promise<Address> {
     this.ensureInitialized();
-    if (typeof window !== 'undefined' && window.mojito?.connect) {
-      const addresses = await window.mojito.connect();
-      this.connectedAddresses = addresses;
-      return addresses;
-    } else {
-      throw new Error('Mojito extension not available');
-    }
+    const addresses = await this.accountProvider.connect();
+    this.connectedAddresses = addresses;
+    return addresses;
   }
 
   /**
@@ -812,12 +899,7 @@ class Client {
    */
   async disconnect(): Promise<void> {
     this.ensureInitialized();
-    if (typeof window !== 'undefined' && window.mojito?.disconnect) {
-      await window.mojito.disconnect();
-      this.connectedAddresses = {};
-    } else {
-      throw new Error('Mojito extension not available');
-    }
+    await this.accountProvider.disconnect();
   }
 
   /**
@@ -826,15 +908,11 @@ class Client {
   async restore(): Promise<boolean> {
     this.ensureInitialized();
 
-    if (typeof window === 'undefined' || !window.mojito || typeof window.mojito.restore !== 'function') {
-      console.warn('[Mintlayer SDK] No injected wallet found. Cannot restore session.');
-      return false;
-    }
-
     try {
-      const addressData = await window.mojito.restore();
+      const addressData = await this.accountProvider.restore();
 
       if (addressData?.[this.network]?.receiving?.length) {
+        // @ts-ignore
         this.connectedAddresses = addressData[this.network].receiving;
         console.log('[Mintlayer SDK] Session restored');
         return true;
