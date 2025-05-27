@@ -671,21 +671,21 @@ class Client {
    */
   private selectUTXOs(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
     const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
-    const filteredUtxos: UtxoEntry[] = utxos
+    const filteredUtxos: any[] = utxos // type fix for NFT considering that NFT don't have amount
       .map((utxo) => {
         if (utxo.utxo.type === 'IssueNft') {
           return {
             ...utxo,
             utxo: {
               ...utxo.utxo,
-              // value: {
-              //   amount: {
-              //     atoms: 1,
-              //     decimal: 1,
-              //   },
-              //   type: 'TokenV1',
-              //   token_id: utxo.utxo.token_id,
-              // },
+              value: {
+                amount: {
+                  atoms: 1,
+                  decimal: 1,
+                },
+                type: 'TokenV1',
+                token_id: utxo.utxo.token_id,
+              },
             },
           };
         } else {

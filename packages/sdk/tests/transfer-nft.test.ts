@@ -185,9 +185,8 @@ test('buildTransaction for transfer NFT using normal utxo - snapshot', async () 
 
   const result = await spy.mock.results[0]?.value;
 
-  console.log(JSON.stringify(result, null, 2));
-
-  // expect(result).toMatchSnapshot();
+  expect(result).toMatchSnapshot();
+  spy.mockRestore();
 });
 
 test('buildTransaction for transfer NFT using initial issue utxo - snapshot', async () => {
@@ -204,7 +203,6 @@ test('buildTransaction for transfer NFT using initial issue utxo - snapshot', as
 
   const result = await spy.mock.results[0]?.value;
 
-  console.log(JSON.stringify(result, null, 2));
-
-  // expect(result).toMatchSnapshot();
+  expect(result).toMatchSnapshot();
+  spy.mockRestore();
 });
