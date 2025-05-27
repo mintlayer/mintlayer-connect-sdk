@@ -2964,6 +2964,30 @@ class Client {
   }
 }
 
+export class TransactionSigner {
+  private key: Uint8Array[];
+
+  constructor(privateKey: Uint8Array[]) {
+    this.key = privateKey;
+  }
+
+  // TODO implement signatures
+  private createSignature() {
+    const signature = new Uint8Array(this.key.length * 64);
+    return signature;
+  }
+
+  private encodeSignedTransaction(tx: Transaction, signature: Uint8Array): string {
+    const transaction_signed =  new Uint8Array(this.key.length * 64).toString(); // TODO implement
+    return transaction_signed;
+  }
+
+  sign(tx: Transaction): string {
+    const signature = this.createSignature(tx);
+    return this.encodeSignedTransaction(tx, signature);
+  }
+}
+
 export { Client };
 
 console.log('[Mintlayer Connect SDK] Loaded');
