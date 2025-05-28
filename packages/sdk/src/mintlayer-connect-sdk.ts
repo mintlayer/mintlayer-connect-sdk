@@ -1975,9 +1975,15 @@ class Client {
     const JSONRepresentation = {
       inputs,
       outputs,
+      fee: {
+        atoms: fee.toString(),
+        decimal: (Number(fee) / 1e11).toString(),
+      }
     };
 
     const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
+
+
 
     const transaction = encode_transaction(
       mergeUint8Arrays(BINRepresentation.inputs),
