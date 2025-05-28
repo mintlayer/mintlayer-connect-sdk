@@ -41,6 +41,9 @@ import initWasm, {
   encode_output_data_deposit,
   encode_output_create_delegation,
   encode_output_delegate_staking,
+  encode_signed_transaction,
+  encode_witness,
+  SignatureHashType,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -2971,14 +2974,79 @@ export class TransactionSigner {
     this.key = privateKey;
   }
 
-  // TODO implement signatures
-  private createSignature() {
-    const signature = new Uint8Array(this.key.length * 64);
+  private createSignature(tx: Transaction) {
+    const network = Network.Testnet; // TODO: make network configurable
+    const optUtxos_ = tx.JSONRepresentation.inputs.map((input) => {
+      if (input.input.input_type !== 'UTXO') {
+        return 0
+      }
+      const { utxo }: UtxoInput = input as UtxoInput;
+      if (input.input.input_type === 'UTXO') {
+        if (utxo.type === 'Transfer') {
+          if (utxo.value.type === 'TokenV1') {
+            return encode_output_token_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, utxo.value.token_id, network);
+          } else {
+            return encode_output_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, network);
+          }
+        }
+        if (utxo.type === 'LockThenTransfer') {
+          let lockEncoded: Uint8Array = new Uint8Array();
+          if (utxo.lock.type === 'UntilTime') {
+            // @ts-ignore
+            lockEncoded = encode_lock_until_time(BigInt(utxo.lock.content.timestamp)); // TODO: check if timestamp is correct
+          }
+          if (utxo.lock.type === 'ForBlockCount') {
+            lockEncoded = encode_lock_for_block_count(BigInt(utxo.lock.content));
+          }
+          if (utxo.value.type === 'TokenV1') {
+            return encode_output_token_lock_then_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, utxo.value.token_id, lockEncoded, network);
+          } else {
+            return encode_output_lock_then_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, lockEncoded, network);
+          }
+        }
+        return null
+      }
+    })
+
+    const optUtxos: any[] = []
+    for (let i = 0; i < optUtxos_.length; i++) {
+      if (tx.JSONRepresentation.inputs[i].input.input_type !== 'UTXO') {
+        optUtxos.push(0)
+        continue
+      } else {
+        optUtxos.push(1)
+        optUtxos.push(...optUtxos_[i])
+        continue
+      }
+    }
+
+    const encodedWitnesses = tx.JSONRepresentation.inputs.map(
+      (input, index) => {
+        const address =
+          input?.utxo?.destination ||
+          input?.input?.authority ||
+          input?.input?.destination
+        const addressPrivateKey = addressesPrivateKeys[address]
+
+        const witness = encode_witness(
+          SignatureHashType.ALL,
+          addressPrivateKey,
+          address,
+          transaction,
+          optUtxos,
+          index,
+          network,
+        )
+        return witness
+      },
+    )
+
+    const signature = mergeUint8Arrays(encodedWitnesses);
     return signature;
   }
 
   private encodeSignedTransaction(tx: Transaction, signature: Uint8Array): string {
-    const transaction_signed =  new Uint8Array(this.key.length * 64).toString(); // TODO implement
+    const transaction_signed = encode_signed_transaction(tx.HEXRepresentation_unsigned, signature);
     return transaction_signed;
   }
 
