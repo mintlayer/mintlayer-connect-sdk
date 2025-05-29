@@ -6,4 +6,4 @@ This monorepo contains core packages used for integrating with the Mintlayer blo
 
 - [`sdk`](./packages/sdk) – SDK for building Mintlayer transactions
 - [`wasm-lib`](./packages/wasm-lib) – WASM wrappers and bindings
-- [`demo`](./demo) – Example app using the SDK
+- [`examples`](./examples) – Example apps using the SDK
