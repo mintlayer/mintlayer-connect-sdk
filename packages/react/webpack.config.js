@@ -31,4 +31,8 @@ export default {
     outputModule: true,
     asyncWebAssembly: true,
   },
+  externals: {
+    react: 'react',
+    'react-dom': 'react-dom',
+  }
 };

@@ -11,9 +11,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@mintlayer/sdk": "workspace:*",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "@mintlayer/sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

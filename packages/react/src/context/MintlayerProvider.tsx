@@ -5,6 +5,9 @@ interface MintlayerContextValue {
   client: Client | null;
   loading: boolean;
   error: Error | null;
+  connected: boolean;
+  connect: () => Promise<void>;
+  disconnect: () => void;
   setNetwork: (network: 'mainnet' | 'testnet') => void;
 }
 
@@ -21,28 +24,39 @@ export const MintlayerProvider: React.FC<MintlayerProviderProps> = ({ children, 
   const [error, setError] = useState<Error | null>(null);
   const [currentNetwork, setCurrentNetwork] = useState<'mainnet' | 'testnet'>(network);
 
-  useEffect(() => {
-    async function initializeClient() {
-      try {
-        setLoading(true);
-        const newClient = await Client.create({ network: currentNetwork });
-        setClient(newClient);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Failed to initialize Mintlayer client'));
-      } finally {
-        setLoading(false);
-      }
-    }
+  const [connected, setConnected] = useState(false);
 
-    initializeClient();
-  }, [currentNetwork]);
+  const connect = async () => {
+    try {
+      setLoading(true);
+      const newClient = await Client.create({ network: currentNetwork });
+      setClient(newClient);
+      setConnected(true);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to connect'));
+      setConnected(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const disconnect = () => {
+    setClient(null);
+    setConnected(false);
+  };
+
+  // useEffect(() => {
+  //   connect();
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [currentNetwork]);
 
   const setNetwork = (newNetwork: 'mainnet' | 'testnet') => {
     setCurrentNetwork(newNetwork);
   };
 
   return (
-    <MintlayerContext.Provider value={{ client, loading, error, setNetwork }}>
+    <MintlayerContext.Provider value={{ client, loading, error, setNetwork, connect, disconnect, connected }}>
       {children}
     </MintlayerContext.Provider>
   );
