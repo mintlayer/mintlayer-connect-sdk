@@ -581,6 +581,123 @@ interface ClientOptions {
   accountProvider?: AccountProvider;
 }
 
+/**
+ * Arguments for the `transfer()` method.
+ *
+ * If `token_id` is provided, the corresponding token will be sent.
+ */
+export type TransferArgs =
+  | { to: string; amount: number; token_id: string }
+  | { to: string; amount: number; token_id?: undefined };
+
+export type TransferNftArgs = {
+  to: string;
+  token_id: string;
+}
+
+export type BurnArgs = {
+  token_id: string;
+  amount: number;
+};
+
+export type IssueNftArgs = {
+  destination: string;
+  creator?: string;
+  additional_metadata_uri: string;
+  description: string;
+  icon_uri: string;
+  media_hash: string;
+  media_uri: string;
+  name: string;
+  ticker: string;
+};
+
+export type IssueTokenArgs = {
+  authority: string;
+  is_freezable: boolean;
+  metadata_uri: string;
+  number_of_decimals: number;
+  token_ticker: string;
+  supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
+  supply_amount?: number;
+};
+
+export type MintTokenArgs = {
+  destination: string;
+  amount: number;
+  token_id: string;
+};
+
+export type UnmintTokenArgs = {
+  amount: number;
+  token_id: string;
+};
+
+export type LockTokenSupplyArgs = {
+  token_id: string;
+};
+
+export type ChangeTokenAuthorityArgs = {
+  token_id: string;
+  new_authority: string;
+};
+
+export type ChangeMetadataUriArgs = {
+  token_id: string;
+  new_metadata_uri: string;
+};
+
+export type FreezeTokenArgs = {
+  token_id: string;
+  is_unfreezable: boolean;
+};
+
+export type UnfreezeTokenArgs = {
+  token_id: string;
+};
+
+export type DataDepositArgs = {
+  data: string;
+};
+
+export type DelegationCreateArgs = {
+  pool_id: string;
+  destination: string;
+};
+
+export type DelegationWithdrawArgs =
+  | { pool_id: string; amount: number; delegation_id?: undefined }
+  | { delegation_id: string; amount: number; pool_id?: undefined };
+
+export type DelegationStakeArgs =
+  | { pool_id: string; amount: number; delegation_id?: undefined }
+  | { delegation_id: string; amount: number; pool_id?: undefined }
+
+export type CreateOrderArgs = {
+  conclude_destination: string;
+  ask_token: string;
+  ask_amount: number;
+  give_token: string;
+  give_amount: number;
+};
+
+export type FillOrderArgs = {
+  order_id: string;
+  amount: number;
+  destination: string;
+};
+
+export type ConcludeOrderArgs = {
+  order_id: string;
+};
+
+export type BridgeRequestArgs = {
+  destination: string;
+  amount: number;
+  token_id: string;
+  intent: string;
+};
+
 class Client {
   private network: 'mainnet' | 'testnet';
   private connectedAddresses: {
@@ -2087,12 +2204,13 @@ class Client {
   }
 
   /**
-   * Transfers coin or token to a given address.
-   * @param to
-   * @param amount
-   * @param token_id
+   * Transfers coins or tokens to a specified address.
+   * If a token_id is provided, token will be transferred instead of base coin.
+   *
+   * @param {TransferArgs} args Transfer arguments
+   * @returns A signed transaction
    */
-  async transfer({ to, amount, token_id }: { to: string; amount: number; token_id?: string }): Promise<SignedTransaction> {
+  async transfer({ to, amount, token_id }: TransferArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     if (token_id) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
@@ -2114,7 +2232,7 @@ class Client {
    * @param to
    * @param token_id
    */
-  async transferNft({ to, token_id }: { to: string; token_id: string }): Promise<SignedTransaction> {
+  async transferNft({ to, token_id }: TransferNftArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
 
     if(!token_id) {
@@ -2133,13 +2251,14 @@ class Client {
     return this.signTransaction(tx);
   }
 
+  ////////
   async delegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
     return this.signTransaction(tx);
   }
 
-  async issueNft(tokenData: any): Promise<SignedTransaction> {
+  async issueNft(tokenData: IssueNftArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const description = tokenData.description;
 
@@ -2166,15 +2285,7 @@ class Client {
     token_ticker,
     supply_type,
     supply_amount,
-  }: {
-    authority: string;
-    is_freezable: boolean;
-    metadata_uri: string;
-    number_of_decimals: number;
-    token_ticker: string;
-    supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
-    supply_amount?: number;
-  }): Promise<SignedTransaction> {
+  }: IssueTokenArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({
       type: 'IssueFungibleToken',
@@ -2187,11 +2298,7 @@ class Client {
     destination,
     amount,
     token_id,
-  }: {
-    destination: string;
-    amount: number;
-    token_id: string;
-  }): Promise<SignedTransaction> {
+  }: MintTokenArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2207,7 +2314,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async unmintToken({ amount, token_id }: { amount: number; token_id: string }): Promise<SignedTransaction> {
+  async unmintToken({ amount, token_id }: UnmintTokenArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2220,7 +2327,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async lockTokenSupply({ token_id }: { token_id: string }): Promise<SignedTransaction> {
+  async lockTokenSupply({ token_id }: LockTokenSupplyArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2233,7 +2340,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async changeTokenAuthority({ token_id, new_authority }: { token_id: string; new_authority: string }): Promise<SignedTransaction> {
+  async changeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2252,10 +2359,7 @@ class Client {
   async changeMetadataUri({
     token_id,
     new_metadata_uri,
-  }: {
-    token_id: string;
-    new_metadata_uri: string;
-  }): Promise<SignedTransaction> {
+  }: ChangeMetadataUriArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2271,7 +2375,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async freezeToken({ token_id, is_unfreezable }: { token_id: string; is_unfreezable: boolean }): Promise<SignedTransaction> {
+  async freezeToken({ token_id, is_unfreezable }: FreezeTokenArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2287,7 +2391,7 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async unfreezeToken({ token_id }: { token_id: string }): Promise<SignedTransaction> {
+  async unfreezeToken({ token_id }: UnfreezeTokenArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2306,13 +2410,7 @@ class Client {
     ask_amount,
     give_token,
     give_amount,
-  }: {
-    conclude_destination: string;
-    ask_token: string;
-    ask_amount: number;
-    give_token: string;
-    give_amount: number;
-  }): Promise<SignedTransaction> {
+  }: CreateOrderArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
 
     let ask_token_details = null;
@@ -2345,11 +2443,7 @@ class Client {
     order_id,
     amount,
     destination,
-  }: {
-    order_id: string;
-    amount: number;
-    destination: string;
-  }): Promise<SignedTransaction> {
+  }: FillOrderArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
     if (!response.ok) {
@@ -2398,7 +2492,7 @@ class Client {
     return orders;
   }
 
-  async concludeOrder({ order_id }: { order_id: string }): Promise<SignedTransaction> {
+  async concludeOrder({ order_id }: ConcludeOrderArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
     if (!response.ok) {
@@ -2415,12 +2509,7 @@ class Client {
     amount,
     token_id,
     intent,
-  }: {
-    destination: string;
-    amount: number;
-    token_id: string;
-    intent: string;
-  }): Promise<SignedTransaction> {
+  }: BridgeRequestArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
 
     if(!token_id) {
@@ -2440,7 +2529,7 @@ class Client {
     return this.signTransaction({ ...tx, intent });
   }
 
-  async burn({ token_id, amount }: { token_id: string; amount: number }): Promise<SignedTransaction> {
+  async burn({ token_id, amount }: BurnArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     let token_details: TokenDetails | undefined = undefined;
 
@@ -2456,23 +2545,20 @@ class Client {
     return this.signTransaction(tx);
   }
 
-  async dataDeposit({ data }: { data: string }): Promise<SignedTransaction> {
+  async dataDeposit({ data }: DataDepositArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'DataDeposit', params: { data } });
     return this.signTransaction(tx);
   }
 
-  async delegationCreate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<SignedTransaction> {
+  async delegationCreate({ pool_id, destination }: DelegationCreateArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
     return this.signTransaction(tx);
   }
 
   async delegationStake(
-    params:
-      | { pool_id: string; amount: number; delegation_id?: undefined }
-      | { delegation_id: string; amount: number; pool_id?: undefined }
-  ): Promise<SignedTransaction> {
+    params: DelegationStakeArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
 
     const amount = params.amount;
@@ -2521,11 +2607,7 @@ class Client {
     }
   }
 
-  async delegationWithdraw(
-    params:
-      | { pool_id: string; amount: number; delegation_id?: undefined }
-      | { delegation_id: string; amount: number; pool_id?: undefined }
-  ): Promise<SignedTransaction> {
+  async delegationWithdraw(params: DelegationWithdrawArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
     const amount = params.amount;
     const delegation_id = params.delegation_id;
