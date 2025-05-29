@@ -173,13 +173,42 @@ interface UtxoEntry {
   utxo: Utxo;
 }
 
-type Utxo = {
-  type: 'Transfer' | 'LockThenTransfer' | 'IssueNft';
+type BaseUtxo = {
   value: Value;
   destination: string;
   token_id?: string;
-  data?: any; // split NFT utxo
 };
+
+type TransferUtxo = BaseUtxo & {
+  type: 'Transfer';
+};
+
+type LockThenTransferUtxo = BaseUtxo & {
+  type: 'LockThenTransfer';
+  lock: {
+    type: 'ForBlockCount' | 'UntilTime';
+    content: string;
+  };
+};
+
+type IssueNftUtxo = {
+  type: 'IssueNft';
+  value: Value;
+  destination: string;
+  token_id?: string;
+  data: {
+    name: { hex: string; string: string };
+    ticker: { hex: string; string: string };
+    description: { hex: string; string: string };
+    media_hash: { hex: string; string: string };
+    media_uri: { hex: string; string: string };
+    icon_uri: { hex: string; string: string };
+    additional_metadata_uri: { hex: string; string: string };
+    creator: string | null;
+  };
+};
+
+type Utxo = TransferUtxo | LockThenTransferUtxo | IssueNftUtxo;
 
 type UtxoInput = {
   input: {
@@ -2838,7 +2867,7 @@ class Client {
     });
 
     tx.JSONRepresentation.outputs.forEach((output, index) => {
-      if (output.type === 'Transfer' || output.type === 'LockThenTransfer') {
+      if (output.type === 'Transfer') {
         created.push({
           outpoint: {
             index,
@@ -2849,6 +2878,21 @@ class Client {
             type: output.type,
             value: output.value,
             destination: output.destination,
+          },
+        });
+      }
+      if (output.type === 'LockThenTransfer') {
+        created.push({
+          outpoint: {
+            index,
+            source_type: SourceId.Transaction,
+            source_id: tx.transaction_id,
+          },
+          utxo: {
+            type: output.type,
+            value: output.value,
+            destination: output.destination,
+            lock: output.lock,
           },
         });
       }
@@ -2968,10 +3012,14 @@ class Client {
 }
 
 export class TransactionSigner {
-  private key: Uint8Array[];
+  private keys: Record<string, Uint8Array>;
 
-  constructor(privateKey: Uint8Array[]) {
-    this.key = privateKey;
+  constructor(privateKeys: Record<string, Uint8Array>) {
+    this.keys = privateKeys;
+  }
+
+  private getPrivateKey(address: string): Uint8Array | undefined {
+    return this.keys[address];
   }
 
   private createSignature(tx: Transaction) {
@@ -3008,25 +3056,52 @@ export class TransactionSigner {
       }
     })
 
-    const optUtxos: any[] = []
+    const optUtxosArray: number[] = [];
+
     for (let i = 0; i < optUtxos_.length; i++) {
+      const utxoBytes = optUtxos_[i];
       if (tx.JSONRepresentation.inputs[i].input.input_type !== 'UTXO') {
-        optUtxos.push(0)
-        continue
+        optUtxosArray.push(0);
       } else {
-        optUtxos.push(1)
-        optUtxos.push(...optUtxos_[i])
-        continue
+        if (!(utxoBytes instanceof Uint8Array)) {
+          throw new Error(`optUtxos_[${i}] is not a valid Uint8Array`);
+        }
+        optUtxosArray.push(1);
+        optUtxosArray.push(...utxoBytes);
       }
     }
 
+    const optUtxos = new Uint8Array(optUtxosArray);
+
     const encodedWitnesses = tx.JSONRepresentation.inputs.map(
       (input, index) => {
-        const address =
-          input?.utxo?.destination ||
-          input?.input?.authority ||
-          input?.input?.destination
-        const addressPrivateKey = addressesPrivateKeys[address]
+        let address: string | undefined = undefined;
+
+        if(input.input.input_type === 'UTXO') {
+          const utxoInput = input as UtxoInput;
+          address = utxoInput.utxo.destination;
+        }
+
+        if (input.input.input_type === 'AccountCommand') {
+          // @ts-ignore
+          address = input.input.authority;
+        }
+
+        if (input.input.input_type === 'AccountCommand' && input.input.command === 'FillOrder') {
+          address = input.input.destination;
+        }
+
+        if (address === undefined) {
+          throw new Error(`Address not found for input at index ${index}`);
+        }
+
+        const addressPrivateKey = this.getPrivateKey(address)
+
+        if (!addressPrivateKey) {
+          throw new Error(`Private key not found for address: ${address}`);
+        }
+
+        const transaction = this.hexToUint8Array(tx.HEXRepresentation_unsigned);
 
         const witness = encode_witness(
           SignatureHashType.ALL,
@@ -3045,9 +3120,25 @@ export class TransactionSigner {
     return signature;
   }
 
+  private hexToUint8Array(hex: string): Uint8Array {
+    if (hex.length % 2 !== 0) {
+      throw new Error("Hex string must have an even length");
+    }
+
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+    }
+    return bytes;
+  }
+
   private encodeSignedTransaction(tx: Transaction, signature: Uint8Array): string {
-    const transaction_signed = encode_signed_transaction(tx.HEXRepresentation_unsigned, signature);
-    return transaction_signed;
+    const transaction_signed = encode_signed_transaction(
+      this.hexToUint8Array(tx.HEXRepresentation_unsigned),
+      signature
+    );
+    const transaction_signed_hex = transaction_signed.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '');
+    return transaction_signed_hex;
   }
 
   sign(tx: Transaction): string {
