@@ -63,6 +63,34 @@ function stringToUint8Array(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
+function atomsToDecimal(atoms: string | number, decimals: number): string {
+  const atomsStr = atoms.toString();
+  const atomsLength = atomsStr.length;
+
+  if (decimals === 0) {
+    return atomsStr;
+  }
+
+  if (atomsLength <= decimals) {
+    // Pad with leading zeros
+    const padded = atomsStr.padStart(decimals, '0');
+    return '0.' + padded;
+  }
+
+  // Insert decimal point
+  const integerPart = atomsStr.slice(0, atomsLength - decimals);
+  const fractionalPart = atomsStr.slice(atomsLength - decimals);
+
+  // Remove trailing zeros from fractional part
+  const trimmedFractional = fractionalPart.replace(/0+$/, '');
+
+  if (trimmedFractional === '') {
+    return integerPart;
+  }
+
+  return integerPart + '.' + trimmedFractional;
+}
+
 type Address = {
   [key: string]: {
     receiving: string[];
@@ -314,12 +342,12 @@ type DataDepositOutput = {
 
 type TotalSupplyValue =
   | {
-  type: 'Unlimited' | 'Lockable';
+      type: 'Unlimited' | 'Lockable';
     }
   | {
-  type: 'Fixed';
-  amount: AmountFields;
-};
+      type: 'Fixed';
+      amount: AmountFields;
+    };
 
 type IssueFungibleTokenOutput = {
   type: 'IssueFungibleToken';
@@ -399,170 +427,170 @@ interface DelegationDetails {
 
 type TransferParams =
   | {
-  amount: number;
-  to: string;
-  token_id: string;
-  token_details: TokenDetails;
-}
+      amount: number;
+      to: string;
+      token_id: string;
+      token_details: TokenDetails;
+    }
   | {
-  amount: number;
-  to: string;
-  token_id?: undefined;
-  token_details?: undefined;
-};
+      amount: number;
+      to: string;
+      token_id?: undefined;
+      token_details?: undefined;
+    };
 
 type BuildTransactionParams =
   | {
-  type: 'Transfer';
-  params: TransferParams;
-}
+      type: 'Transfer';
+      params: TransferParams;
+    }
   | {
-  type: 'BurnToken';
-  params: {
-    amount: number;
-    token_id: string;
-    token_details?: TokenDetails;
-  };
-}
+      type: 'BurnToken';
+      params: {
+        amount: number;
+        token_id: string;
+        token_details?: TokenDetails;
+      };
+    }
   | {
-  type: 'IssueFungibleToken';
-  params: {
-    authority: string;
-    is_freezable: boolean;
-    metadata_uri: string;
-    number_of_decimals: number;
-    token_ticker: string;
-    supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
-    supply_amount?: number;
-  };
-}
+      type: 'IssueFungibleToken';
+      params: {
+        authority: string;
+        is_freezable: boolean;
+        metadata_uri: string;
+        number_of_decimals: number;
+        token_ticker: string;
+        supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
+        supply_amount?: number;
+      };
+    }
   | {
-  type: 'IssueNft';
-  params: {
-    destination: string;
-    creator?: string;
-    additional_metadata_uri: string;
-    description: string;
-    icon_uri: string;
-    media_hash: string;
-    media_uri: string;
-    name: string;
-    ticker: string;
-  };
-}
+      type: 'IssueNft';
+      params: {
+        destination: string;
+        creator?: string;
+        additional_metadata_uri: string;
+        description: string;
+        icon_uri: string;
+        media_hash: string;
+        media_uri: string;
+        name: string;
+        ticker: string;
+      };
+    }
   | {
-  type: 'MintToken';
-  params: {
-    amount: number;
-    destination: string;
-    token_id: string;
-    token_details: TokenDetails;
-  };
-}
+      type: 'MintToken';
+      params: {
+        amount: number;
+        destination: string;
+        token_id: string;
+        token_details: TokenDetails;
+      };
+    }
   | {
-  type: 'UnmintToken';
-  params: {
-    amount: number;
-    token_id: string;
-    token_details: TokenDetails;
-  };
-}
+      type: 'UnmintToken';
+      params: {
+        amount: number;
+        token_id: string;
+        token_details: TokenDetails;
+      };
+    }
   | {
-  type: 'FreezeToken';
-  params: {
-    token_id: string;
-    token_details: TokenDetails;
-    is_unfreezable: boolean;
-  };
-}
+      type: 'FreezeToken';
+      params: {
+        token_id: string;
+        token_details: TokenDetails;
+        is_unfreezable: boolean;
+      };
+    }
   | {
-  type: 'LockTokenSupply';
-  params: {
-    token_id: string;
-    token_details: TokenDetails;
-    is_unfreezable?: boolean;
-  };
-}
+      type: 'LockTokenSupply';
+      params: {
+        token_id: string;
+        token_details: TokenDetails;
+        is_unfreezable?: boolean;
+      };
+    }
   | {
-  type: 'UnfreezeToken';
-  params: {
-    token_id: string;
-    token_details: TokenDetails;
-  };
-}
+      type: 'UnfreezeToken';
+      params: {
+        token_id: string;
+        token_details: TokenDetails;
+      };
+    }
   | {
-  type: 'ChangeMetadataUri';
-  params: {
-    token_id: string;
-    token_details: TokenDetails;
-    new_metadata_uri: string;
-  };
-}
+      type: 'ChangeMetadataUri';
+      params: {
+        token_id: string;
+        token_details: TokenDetails;
+        new_metadata_uri: string;
+      };
+    }
   | {
-  type: 'ChangeTokenAuthority';
-  params: {
-    token_id: string;
-    token_details: TokenDetails;
-    new_authority: string;
-  };
-}
+      type: 'ChangeTokenAuthority';
+      params: {
+        token_id: string;
+        token_details: TokenDetails;
+        new_authority: string;
+      };
+    }
   | {
-  type: 'DataDeposit';
-  params: {
-    data: string;
-  };
-}
+      type: 'DataDeposit';
+      params: {
+        data: string;
+      };
+    }
   | {
-  type: 'CreateDelegationId';
-  params: {
-    destination: string;
-    pool_id: string;
-  };
-}
+      type: 'CreateDelegationId';
+      params: {
+        destination: string;
+        pool_id: string;
+      };
+    }
   | {
-  type: 'DelegateStaking';
-  params: {
-    delegation_id: string;
-    amount: number;
-  };
-}
+      type: 'DelegateStaking';
+      params: {
+        delegation_id: string;
+        amount: number;
+      };
+    }
   | {
-  type: 'DelegationWithdraw';
-  params: {
-    delegation_id: string;
-    amount: number;
-    delegation_details: DelegationDetails;
-  };
-}
+      type: 'DelegationWithdraw';
+      params: {
+        delegation_id: string;
+        amount: number;
+        delegation_details: DelegationDetails;
+      };
+    }
   | {
-  type: 'CreateOrder';
-  params: {
-    ask_amount: number;
-    ask_token: string;
-    give_amount: number;
-    give_token: string;
-    conclude_destination: string;
-    ask_token_details?: TokenDetails;
-    give_token_details?: TokenDetails;
-  };
-}
+      type: 'CreateOrder';
+      params: {
+        ask_amount: number;
+        ask_token: string;
+        give_amount: number;
+        give_token: string;
+        conclude_destination: string;
+        ask_token_details?: TokenDetails;
+        give_token_details?: TokenDetails;
+      };
+    }
   | {
-  type: 'ConcludeOrder';
-  params: {
-    order: OrderData;
-  };
-}
+      type: 'ConcludeOrder';
+      params: {
+        order: OrderData;
+      };
+    }
   | {
-  type: 'FillOrder';
-  params: {
-    order_id: string;
-    amount: number;
-    destination: string;
-    order_details: OrderData;
-    ask_token_details: TokenDetails;
-    give_token_details: TokenDetails;
-  };
-};
+      type: 'FillOrder';
+      params: {
+        order_id: string;
+        amount: number;
+        destination: string;
+        order_details: OrderData;
+        ask_token_details: TokenDetails;
+        give_token_details: TokenDetails;
+      };
+    };
 
 interface OrderData {
   order_id: string;
@@ -1383,17 +1411,17 @@ class Client {
               }),
           ...(token_details
             ? {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
-              },
-            }
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+                },
+              }
             : {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, 11)).toString(),
-              },
-            }),
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                },
+              }),
         },
       });
     }
@@ -1827,12 +1855,12 @@ class Client {
       const give_amount = amount; // Amount to fill in the order. Give _to_ order as counterpart of ask
       const give_amount_atoms =
         order_details.ask_currency.type === 'Token'
-        ? give_amount! * Math.pow(10, ask_token_details!.number_of_decimals)
+          ? give_amount! * Math.pow(10, ask_token_details!.number_of_decimals)
           : give_amount! * Math.pow(10, 11); // Coin decimal
       if (order_details.ask_currency.type === 'Coin') {
         input_amount_coin_req += BigInt(give_amount_atoms);
       } else if (ask_token_details) {
-        input_amount_token_req += BigInt(give_amount_atoms * Math.pow(10, ask_token_details.number_of_decimals));
+        input_amount_token_req += BigInt(give_amount_atoms);
         send_token = {
           token_id: order_details.ask_currency.token_id,
           number_of_decimals: ask_token_details.number_of_decimals,
@@ -1841,11 +1869,11 @@ class Client {
 
       const rate = parseInt(order_details.initially_asked.atoms) / parseInt(order_details.initially_given.atoms);
 
-      const ask_amount = give_amount / rate;
-      const ask_amount_atoms = order_details.give_currency.type === 'Token'
-        ? ask_amount! * Math.pow(10, give_token_details!.number_of_decimals)
-        : ask_amount! * Math.pow(10, 11) // Coin decimal
-        ;
+      const ask_amount_atoms = Math.floor(give_amount_atoms / rate);
+      const ask_amount =
+        order_details.give_currency.type === 'Token'
+          ? atomsToDecimal(ask_amount_atoms, give_token_details!.number_of_decimals)
+          : atomsToDecimal(ask_amount_atoms, 11); // Coin decimal
 
       inputs.push({
         input: {
@@ -2664,8 +2692,8 @@ class Client {
 
       const delegationIdMap: Record<string, DelegationDetails> = data.reduce(
         (acc: { [key: string]: DelegationDetails }, item: DelegationDetails) => {
-        acc[item.spend_destination] = item;
-        return acc;
+          acc[item.spend_destination] = item;
+          return acc;
         },
         {},
       );
