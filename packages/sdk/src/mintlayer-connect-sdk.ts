@@ -1873,8 +1873,14 @@ class Client {
     const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
     const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
 
+    if (type !== 'DelegationWithdraw') {
+      if (totalInputValueCoin < input_amount_coin_req) {
+        throw new Error('Not enough coin UTXOs');
+      }
+    }
+
     if (totalInputValueToken < input_amount_token_req) {
-      console.log('Not enough token UTXOs');
+      throw new Error('Not enough token UTXOs');
     }
 
     const changeAmountCoin = totalInputValueCoin - input_amount_coin_req;

@@ -114,3 +114,52 @@ test('buildTransaction for transfer - snapshot', async () => {
 
   expect(result).toMatchSnapshot();
 });
+
+
+test('transfer returns signed tx', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  const result = await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 10,
+  });
+
+  expect(result).toBe('signed-transaction');
+});
+
+test('buildTransaction called with correct params', async () => {
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 5,
+  });
+
+  expect(spy).toHaveBeenCalledWith({
+    type: 'Transfer',
+    params: expect.objectContaining({
+      to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+      amount: 5,
+    }),
+  });
+});
+
+test('fails transfer if not enough utxo', async () => {
+  fetchMock.mockIf('https://api.mintini.app/account', async () => {
+    return {
+      body: JSON.stringify({ utxos: [] }), // no utxos
+    };
+  });
+
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  await expect(client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 999999999,
+  })).rejects.toThrow('Not enough coin UTXOs');
+});
