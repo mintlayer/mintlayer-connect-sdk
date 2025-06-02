@@ -56,14 +56,14 @@ test('preview utxo after transfer', async () => {
   expect(spent[0].outpoint.source_id).toBe('af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab');
   expect(spent[0].outpoint.index).toBe(1);
   expect(created.length).toBe(2);
-  expect(created[0].outpoint.source_id).toBe('05d9ec811338b736816f64965f17844cdbf45711f0892534f3f7408344052bcc');
+  expect(created[0].outpoint.source_id).toBe('95d91b8b3c9cd5973e85a397a86a803ab2b8ba8b8ad1b875c85b5c8ae7e4fc7d');
   expect(created[0].outpoint.index).toBe(0);
   expect(created[0].utxo.destination).toBe('tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc');
   expect(created[0].utxo.value.amount.decimal).toBe('10');
   expect(created[1].utxo.destination).toBe('tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6');
-  expect(created[1].outpoint.source_id).toBe('05d9ec811338b736816f64965f17844cdbf45711f0892534f3f7408344052bcc');
+  expect(created[1].outpoint.source_id).toBe('95d91b8b3c9cd5973e85a397a86a803ab2b8ba8b8ad1b875c85b5c8ae7e4fc7d');
   expect(created[1].outpoint.index).toBe(1);
   expect(created[1].utxo.type).toBe('Transfer');
   expect(created[1].utxo.value.type).toBe('Coin');
-  expect(created[1].utxo.value.amount.atoms).toBe('1701805604300000');
+  expect(created[1].utxo.value.amount.atoms).toBe('1702185004300000');
 });

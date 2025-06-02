@@ -152,11 +152,11 @@ exports[`buildTransaction for transfer token - snapshot 1`] = `
         0,
         15,
         224,
-        116,
-        42,
-        83,
-        177,
-        12,
+        30,
+        87,
+        66,
+        4,
+        13,
         6,
         1,
         134,
@@ -246,13 +246,13 @@ exports[`buildTransaction for transfer token - snapshot 1`] = `
     ],
     "transactionsize": 438,
   },
-  "HEXRepresentation_unsigned": "0100080000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab010000000000cdcee4a44823978cc50245eff518a562c4461e74fee2ce2f46cade822f657e0d000000000c00029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c202286bee01769479bae7d535d097defdff0f4e7101669d4a1900000fe0742a53b10c060186ec450457d09ad9807393d89cec9c71d620602100029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c207001edc0c170186ec450457d09ad9807393d89cec9c71d6206021",
+  "HEXRepresentation_unsigned": "0100080000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab010000000000cdcee4a44823978cc50245eff518a562c4461e74fee2ce2f46cade822f657e0d000000000c00029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c202286bee01769479bae7d535d097defdff0f4e7101669d4a1900000fe01e5742040d060186ec450457d09ad9807393d89cec9c71d620602100029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c207001edc0c170186ec450457d09ad9807393d89cec9c71d6206021",
   "JSONRepresentation": {
     "fee": {
-      "atoms": "400000000000",
-      "decimal": "4",
+      "atoms": "43800000000",
+      "decimal": "0.438",
     },
-    "id": "b9c3a1306fc61d4c0a0af8b7a74bf98affec47d7b8f0f9e06a2f70e3a3d63437",
+    "id": "8c52b8ae56b485d12b034ecf6b5a0ae40c53df5baa32e8f19b28e9316d46a724",
     "inputs": [
       {
         "input": {
@@ -312,8 +312,8 @@ exports[`buildTransaction for transfer token - snapshot 1`] = `
         "type": "Transfer",
         "value": {
           "amount": {
-            "atoms": "1702805604300000",
-            "decimal": "17028.056043",
+            "atoms": "1703161804300000",
+            "decimal": "17031.618043",
           },
           "type": "Coin",
         },
@@ -332,6 +332,6 @@ exports[`buildTransaction for transfer token - snapshot 1`] = `
       },
     ],
   },
-  "transaction_id": "b9c3a1306fc61d4c0a0af8b7a74bf98affec47d7b8f0f9e06a2f70e3a3d63437",
+  "transaction_id": "8c52b8ae56b485d12b034ecf6b5a0ae40c53df5baa32e8f19b28e9316d46a724",
 }
 `;
