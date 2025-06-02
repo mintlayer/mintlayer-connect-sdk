@@ -2270,6 +2270,12 @@ class Client {
       .filter(({ input }) => input.input_type === 'UTXO')
       .map((input) => input.utxo.destination);
 
+    // @ts-ignore
+    if (transactionJSONrepresentation.inputs[0].input.account_type === 'DelegationBalance') {
+      // @ts-ignore
+      inputAddresses.push(transactionJSONrepresentation.outputs[0].destination);
+    }
+
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
       inputAddresses,

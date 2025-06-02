@@ -597,10 +597,10 @@ exports[`staking withdraw - snapshot 1`] = `
         0,
         7,
         0,
-        130,
-        186,
-        3,
-        231,
+        251,
+        204,
+        157,
+        228,
         1,
         245,
         126,
@@ -627,15 +627,15 @@ exports[`staking withdraw - snapshot 1`] = `
         112,
       ],
     ],
-    "transactionsize": 78,
+    "transactionsize": 181,
   },
-  "HEXRepresentation_unsigned": "0100040100006d3d3dd82aad9e3bbd2884a72278ee303e773103aa9f3c36198321063509c235070010a5d4e8040100070082ba03e701f57e03d97c6fbb69d23c13ebe44044e17badc4d4028170",
+  "HEXRepresentation_unsigned": "0100040100006d3d3dd82aad9e3bbd2884a72278ee303e773103aa9f3c36198321063509c235070010a5d4e80401000700fbcc9de401f57e03d97c6fbb69d23c13ebe44044e17badc4d4028170",
   "JSONRepresentation": {
     "fee": {
-      "atoms": "7800000000",
-      "decimal": "0.078",
+      "atoms": "18100000000",
+      "decimal": "0.181",
     },
-    "id": "0d63777593b1fa2517b1efa3887629f138f987a01fd880eef96b38f5ea184859",
+    "id": "83827ec9d06d27308148ad1c33fc80d5f17f1d2c67a8ee138956d933be8ee967",
     "inputs": [
       {
         "input": {
@@ -660,14 +660,14 @@ exports[`staking withdraw - snapshot 1`] = `
         "type": "LockThenTransfer",
         "value": {
           "amount": {
-            "atoms": "992200000000",
-            "decimal": "9.922",
+            "atoms": "981900000000",
+            "decimal": "9.819",
           },
           "type": "Coin",
         },
       },
     ],
   },
-  "transaction_id": "0d63777593b1fa2517b1efa3887629f138f987a01fd880eef96b38f5ea184859",
+  "transaction_id": "83827ec9d06d27308148ad1c33fc80d5f17f1d2c67a8ee138956d933be8ee967",
 }
 `;
