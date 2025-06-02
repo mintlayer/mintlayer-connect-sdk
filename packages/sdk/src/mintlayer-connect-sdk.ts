@@ -74,21 +74,14 @@ function atomsToDecimal(atoms: string | number, decimals: number): string {
   if (atomsLength <= decimals) {
     // Pad with leading zeros
     const padded = atomsStr.padStart(decimals, '0');
-    return '0.' + padded;
+    return '0.' + padded.replace(/0+$/, '') || '0';
   }
 
   // Insert decimal point
   const integerPart = atomsStr.slice(0, atomsLength - decimals);
-  const fractionalPart = atomsStr.slice(atomsLength - decimals);
+  const fractionalPart = atomsStr.slice(atomsLength - decimals).replace(/0+$/, '');
 
-  // Remove trailing zeros from fractional part
-  const trimmedFractional = fractionalPart.replace(/0+$/, '');
-
-  if (trimmedFractional === '') {
-    return integerPart;
-  }
-
-  return integerPart + '.' + trimmedFractional;
+  return fractionalPart === '' ? integerPart : `${integerPart}.${fractionalPart}`;
 }
 
 type Address = {
@@ -1297,7 +1290,7 @@ class Client {
     let fee = Amount.from_atoms('0');
     switch (type) {
       case 'Transfer':
-        return BigInt(2 * Math.pow(10, 11));
+        return 0n;
       case 'BurnToken':
         return 0n;
       case 'IssueNft':
@@ -1907,138 +1900,142 @@ class Client {
     const data = await response.json();
     const utxos: UtxoEntry[] = data.utxos;
 
-    let fee = 0n;
-
-    fee += this.getFeeForType(type);
-
-    const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } = this.getRequiredInputsOutputs({type, params} as BuildTransactionParams);
-
-    fee += BigInt(2 * Math.pow(10, 11));
-    const input_amount_coin_req_w_fee = input_amount_coin_req + fee;
-
-    const inputObjCoin = type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null) : [];
-    const inputObjToken = send_token?.token_id
-      ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
-      : [];
-
-    const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
-    const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
-
-    if (type !== 'DelegationWithdraw') {
-      if (totalInputValueCoin < input_amount_coin_req_w_fee) {
-        throw new Error('Not enough coin UTXOs');
-      }
-    }
-
-    if (totalInputValueToken < input_amount_token_req) {
-      throw new Error('Not enough token UTXOs');
-    }
-
-    const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
-    const changeAmountToken = totalInputValueToken - input_amount_token_req;
-
-    if (type === 'DelegationWithdraw') {
-      (outputs[0] as LockThenTransferOutput).value.amount = {
-        atoms: (BigInt((outputs[0] as LockThenTransferOutput).value.amount.atoms) - BigInt(fee.toString())).toString(),
-        decimal: (
-          Number(BigInt((outputs[0] as LockThenTransferOutput).value.amount.atoms) - BigInt(fee.toString())) / 1e11
-        ).toString(),
-      };
-    }
-
-    if (changeAmountCoin > 0) {
-      outputs.push({
-        type: 'Transfer',
-        value: {
-          type: 'Coin',
-          amount: {
-            atoms: changeAmountCoin.toString(),
-            decimal: (Number(changeAmountCoin) / 1e11).toString(),
-          },
-        },
-        destination: currentAddress.change[0],
-      });
-    }
-
-    if (changeAmountToken > 0 && send_token) {
-      const decimals = send_token.number_of_decimals;
-
-      outputs.push({
-        type: 'Transfer',
-        value: {
-          type: 'TokenV1',
-          token_id: send_token.token_id,
-          amount: {
-            atoms: changeAmountToken.toString(),
-            decimal: (Number(changeAmountToken) / Math.pow(10, decimals!)).toString(),
-          },
-        },
-        destination: currentAddress.change[0],
-      });
-    }
-
-    inputs.push(...inputObjCoin);
-    inputs.push(...inputObjToken);
-
-    const JSONRepresentation: TransactionJSONRepresentation = {
+    const {
       inputs,
       outputs,
-      fee: {
-        atoms: fee.toString(),
-        decimal: atomsToDecimal(fee.toString(), 11).toString(),
+      input_amount_coin_req,
+      input_amount_token_req,
+      send_token
+    } = this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
+
+    let preciseFee = BigInt(0);
+    let previousFee = BigInt(-1);
+    const MAX_ATTEMPTS = 10;
+    let attempts = 0;
+
+    while (attempts < MAX_ATTEMPTS) {
+      attempts++;
+
+      const totalFee = this.getFeeForType(type) + preciseFee;
+      const input_amount_coin_req_w_fee = input_amount_coin_req + totalFee;
+
+      const inputObjCoin = type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null) : [];
+      const inputObjToken = send_token?.token_id
+        ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
+        : [];
+
+      const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
+      const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
+
+      if (type !== 'DelegationWithdraw' && totalInputValueCoin < input_amount_coin_req_w_fee) {
+        throw new Error('Not enough coin UTXOs');
       }
-    };
-
-    const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
-
-    const transaction_size = BigInt(Math.ceil(BINRepresentation.transactionsize));
-    const feerate = BigInt('100000000000');
-
-    const preciseFee = BigInt(transaction_size * feerate / 1000n);
-    console.log('preciseFee', preciseFee);
-
-    const transaction = encode_transaction(
-      mergeUint8Arrays(BINRepresentation.inputs),
-      mergeUint8Arrays(BINRepresentation.outputs),
-      BigInt(0),
-    );
-
-    const transaction_id = get_transaction_id(transaction, true);
-
-    JSONRepresentation.id = transaction_id;
-
-    // some operations need to be recoded with given data
-    // if outputs include issueNft type
-    if (outputs.some((output) => output.type === 'IssueNft')) {
-      // need to modify the transaction outout exact that object
-      try {
-        get_token_id(
-          mergeUint8Arrays(BINRepresentation.inputs),
-          this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
-        );
-      } catch (error) {
-        throw new Error('Error while getting token id');
+      if (totalInputValueToken < input_amount_token_req) {
+        throw new Error('Not enough token UTXOs');
       }
-      const token_id = get_token_id(
-        mergeUint8Arrays(BINRepresentation.inputs),
-        this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
-      );
-      const index = outputs.findIndex((output) => output.type === 'IssueNft');
-      const output = outputs[index] as IssueNftOutput;
-      outputs[index] = {
-        ...output,
-        token_id: token_id,
+
+      const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
+      const changeAmountToken = totalInputValueToken - input_amount_token_req;
+
+      const finalOutputs = [...outputs];
+
+      if (type === 'DelegationWithdraw') {
+        const out = finalOutputs[0] as LockThenTransferOutput;
+        out.value.amount = {
+          atoms: (BigInt(out.value.amount.atoms) - totalFee).toString(),
+          decimal: (Number(BigInt(out.value.amount.atoms) - totalFee) / 1e11).toString(),
+        };
+      }
+
+      if (changeAmountCoin > 0n) {
+        finalOutputs.push({
+          type: 'Transfer',
+          value: {
+            type: 'Coin',
+            amount: {
+              atoms: changeAmountCoin.toString(),
+              decimal: (Number(changeAmountCoin) / 1e11).toString(),
+            },
+          },
+          destination: currentAddress.change[0],
+        });
+      }
+
+      if (changeAmountToken > 0n && send_token) {
+        const decimals = send_token.number_of_decimals;
+        finalOutputs.push({
+          type: 'Transfer',
+          value: {
+            type: 'TokenV1',
+            token_id: send_token.token_id,
+            amount: {
+              atoms: changeAmountToken.toString(),
+              decimal: (Number(changeAmountToken) / Math.pow(10, decimals)).toString(),
+            },
+          },
+          destination: currentAddress.change[0],
+        });
+      }
+
+      const finalInputs = [...inputs, ...inputObjCoin, ...inputObjToken];
+
+      const JSONRepresentation: TransactionJSONRepresentation = {
+        inputs: finalInputs,
+        outputs: finalOutputs,
+        fee: {
+          atoms: totalFee.toString(),
+          decimal: atomsToDecimal(totalFee.toString(), 11).toString(),
+        },
       };
+
+      const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
+
+      const transaction_size = BigInt(Math.ceil(BINRepresentation.transactionsize));
+      const feerate = BigInt('100000000000'); // TODO: Get the current feerate from the network
+      const nextPreciseFee = (transaction_size * feerate) / 1000n;
+
+      if (nextPreciseFee === preciseFee || nextPreciseFee === previousFee) {
+        const transaction = encode_transaction(
+          mergeUint8Arrays(BINRepresentation.inputs),
+          mergeUint8Arrays(BINRepresentation.outputs),
+          BigInt(0),
+        );
+
+        const transaction_id = get_transaction_id(transaction, true);
+
+        if (finalOutputs.some((output) => output.type === 'IssueNft')) {
+          const token_id = get_token_id(
+            mergeUint8Arrays(BINRepresentation.inputs),
+            this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
+          );
+          const index = finalOutputs.findIndex((output) => output.type === 'IssueNft');
+          const output = finalOutputs[index] as IssueNftOutput;
+          finalOutputs[index] = {
+            ...output,
+            token_id,
+          };
+        }
+
+        const HEXRepresentation_unsigned = transaction.reduce(
+          (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
+          '',
+        );
+
+        return {
+          JSONRepresentation: {
+            ...JSONRepresentation,
+            id: transaction_id,
+          },
+          BINRepresentation,
+          HEXRepresentation_unsigned,
+          transaction_id,
+        };
+      }
+      previousFee = preciseFee;
+      preciseFee = nextPreciseFee;
     }
 
-    const HEXRepresentation_unsigned = transaction.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '');
-
-    return {
-      JSONRepresentation,
-      BINRepresentation,
-      HEXRepresentation_unsigned,
-      transaction_id,
-    };
+    throw new Error('Failed to build transaction after maximum attempts');
   }
 
   /**
