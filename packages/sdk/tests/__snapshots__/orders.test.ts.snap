@@ -161,11 +161,11 @@ exports[`create order - snapshot 1`] = `
         0,
         15,
         224,
-        68,
-        24,
-        228,
-        223,
+        53,
+        178,
         12,
+        4,
+        13,
         6,
         1,
         134,
@@ -255,8 +255,13 @@ exports[`create order - snapshot 1`] = `
     ],
     "transactionsize": 447,
   },
-  "HEXRepresentation_unsigned": "0100080000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab010000000000cdcee4a44823978cc50245eff518a562c4461e74fee2ce2f46cade822f657e0d000000000c0b014feab906d667b56c49e3c86b8bf9e1ea10bdff2d00070010a5d4e8029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c20700e40b540200000fe04418e4df0c060186ec450457d09ad9807393d89cec9c71d620602100029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c20700046bf4140186ec450457d09ad9807393d89cec9c71d6206021",
+  "HEXRepresentation_unsigned": "0100080000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab010000000000cdcee4a44823978cc50245eff518a562c4461e74fee2ce2f46cade822f657e0d000000000c0b014feab906d667b56c49e3c86b8bf9e1ea10bdff2d00070010a5d4e8029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c20700e40b540200000fe035b20c040d060186ec450457d09ad9807393d89cec9c71d620602100029091c094fadde262ce8f5560cdd5cbe25400d1996fd04a6a2a776ef0c92975c20700046bf4140186ec450457d09ad9807393d89cec9c71d6206021",
   "JSONRepresentation": {
+    "fee": {
+      "atoms": "44700000000",
+      "decimal": "0.447",
+    },
+    "id": "0642961250425a6dcc12f8e38307031b906d12a72fc911e32c5728316b47c471",
     "inputs": [
       {
         "input": {
@@ -331,8 +336,8 @@ exports[`create order - snapshot 1`] = `
         "type": "Transfer",
         "value": {
           "amount": {
-            "atoms": "1703005604300000",
-            "decimal": "17030.056043",
+            "atoms": "1703160904300000",
+            "decimal": "17031.609043",
           },
           "type": "Coin",
         },
@@ -351,6 +356,6 @@ exports[`create order - snapshot 1`] = `
       },
     ],
   },
-  "transaction_id": "e1b6ae17eb61672986728072d283baeb629ae6a19203609f3a9cace9c3ca4682",
+  "transaction_id": "0642961250425a6dcc12f8e38307031b906d12a72fc911e32c5728316b47c471",
 }
 `;

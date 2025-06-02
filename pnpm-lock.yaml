@@ -21,11 +21,11 @@ importers:
         specifier: ^5.0.0
         version: 5.1.4(webpack@5.99.7)
 
-  demo:
+  examples/demo:
     dependencies:
       '@mintlayer/sdk':
         specifier: workspace:*
-        version: link:../packages/sdk
+        version: link:../../packages/sdk
     devDependencies:
       html-webpack-plugin:
         specifier: ^5.0.0

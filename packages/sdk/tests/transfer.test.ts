@@ -163,3 +163,25 @@ test('fails transfer if not enough utxo', async () => {
     amount: 999999999,
   })).rejects.toThrow('Not enough coin UTXOs');
 });
+
+test('transfer transfer fee precise', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 10,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  const { fee } = result.JSONRepresentation;
+
+  expect(fee).toEqual({
+    atoms: "20600000000",
+    decimal: "0.206"
+  });
+});

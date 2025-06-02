@@ -82,11 +82,11 @@ exports[`buildTransaction for transfer - snapshot 1`] = `
         0,
         15,
         224,
-        100,
+        246,
         133,
-        126,
-        200,
-        11,
+        212,
+        32,
+        12,
         6,
         1,
         134,
@@ -113,8 +113,13 @@ exports[`buildTransaction for transfer - snapshot 1`] = `
     ],
     "transactionsize": 206,
   },
-  "HEXRepresentation_unsigned": "0100040000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab01000000080000070010a5d4e801769479bae7d535d097defdff0f4e7101669d4a1900000fe064857ec80b060186ec450457d09ad9807393d89cec9c71d6206021",
+  "HEXRepresentation_unsigned": "0100040000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab01000000080000070010a5d4e801769479bae7d535d097defdff0f4e7101669d4a1900000fe0f685d4200c060186ec450457d09ad9807393d89cec9c71d6206021",
   "JSONRepresentation": {
+    "fee": {
+      "atoms": "20600000000",
+      "decimal": "0.206",
+    },
+    "id": "95d91b8b3c9cd5973e85a397a86a803ab2b8ba8b8ad1b875c85b5c8ae7e4fc7d",
     "inputs": [
       {
         "input": {
@@ -153,14 +158,14 @@ exports[`buildTransaction for transfer - snapshot 1`] = `
         "type": "Transfer",
         "value": {
           "amount": {
-            "atoms": "1701805604300000",
-            "decimal": "17018.056043",
+            "atoms": "1702185004300000",
+            "decimal": "17021.850043",
           },
           "type": "Coin",
         },
       },
     ],
   },
-  "transaction_id": "05d9ec811338b736816f64965f17844cdbf45711f0892534f3f7408344052bcc",
+  "transaction_id": "95d91b8b3c9cd5973e85a397a86a803ab2b8ba8b8ad1b875c85b5c8ae7e4fc7d",
 }
 `;

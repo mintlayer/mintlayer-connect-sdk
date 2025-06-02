@@ -74,21 +74,14 @@ function atomsToDecimal(atoms: string | number, decimals: number): string {
   if (atomsLength <= decimals) {
     // Pad with leading zeros
     const padded = atomsStr.padStart(decimals, '0');
-    return '0.' + padded;
+    return '0.' + padded.replace(/0+$/, '') || '0';
   }
 
   // Insert decimal point
   const integerPart = atomsStr.slice(0, atomsLength - decimals);
-  const fractionalPart = atomsStr.slice(atomsLength - decimals);
+  const fractionalPart = atomsStr.slice(atomsLength - decimals).replace(/0+$/, '');
 
-  // Remove trailing zeros from fractional part
-  const trimmedFractional = fractionalPart.replace(/0+$/, '');
-
-  if (trimmedFractional === '') {
-    return integerPart;
-  }
-
-  return integerPart + '.' + trimmedFractional;
+  return fractionalPart === '' ? integerPart : `${integerPart}.${fractionalPart}`;
 }
 
 type Address = {
@@ -400,6 +393,8 @@ type Output =
 export interface TransactionJSONRepresentation {
   inputs: Input[];
   outputs: Output[];
+  fee?: AmountFields;
+  id?: string;
 }
 
 interface Transaction {
@@ -1295,7 +1290,7 @@ class Client {
     let fee = Amount.from_atoms('0');
     switch (type) {
       case 'Transfer':
-        return BigInt(2 * Math.pow(10, 11));
+        return 0n;
       case 'BurnToken':
         return 0n;
       case 'IssueNft':
@@ -1345,48 +1340,15 @@ class Client {
     }
   }
 
-  /**
-   * Builds a transaction based on the provided parameters.
-   * @param{BuildTransactionParams} arg
-   */
-  async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
-    const { type, params } = arg;
-
-    this.ensureInitialized();
-    if (!params) throw new Error('Missing params');
-
-    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
-
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
-    const addressList = [...currentAddress.receiving, ...currentAddress.change];
-
-    const response = await fetch('https://api.mintini.app' + '/account', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ addresses: addressList, network: this.network === 'mainnet' ? 0 : 1 }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch utxos');
-    }
-
-    const data = await response.json();
-    const utxos: UtxoEntry[] = data.utxos;
-
-    let fee = 0n;
-    const inputs: Input[] = [];
-    const outputs: Output[] = [];
+  private getRequiredInputsOutputs(args: BuildTransactionParams) {
+    const { type, params } = args;
+    let send_token: { token_id: string; number_of_decimals: number } | undefined;
 
     let input_amount_coin_req = 0n;
     let input_amount_token_req = 0n;
 
-    let send_token: { token_id: string; number_of_decimals: number } | undefined;
-
-    fee += this.getFeeForType(type);
-
+    const inputs: Input[] = [];
+    const outputs: Output[] = [];
     if (type === 'Transfer') {
       const { token_id, token_details } = params;
 
@@ -1407,21 +1369,21 @@ class Client {
           ...(token_details
             ? { type: 'TokenV1', token_id }
             : {
-                type: 'Coin',
-              }),
+              type: 'Coin',
+            }),
           ...(token_details
             ? {
-                amount: {
-                  decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
-                },
-              }
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+              },
+            }
             : {
-                amount: {
-                  decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
-                },
-              }),
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, 11)).toString(),
+              },
+            }),
         },
       });
     }
@@ -1445,9 +1407,9 @@ class Client {
           ...(token_id === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id,
-              }),
+              type: 'TokenV1',
+              token_id,
+            }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
@@ -1821,9 +1783,9 @@ class Client {
           ...(ask_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id: ask_currency.token_id,
-              }),
+              type: 'TokenV1',
+              token_id: ask_currency.token_id,
+            }),
           amount: {
             decimal: (parseInt(initially_asked.decimal) - parseInt(ask_balance.decimal)).toString(),
             atoms: (parseInt(initially_asked.atoms) - parseInt(ask_balance.atoms)).toString(),
@@ -1838,9 +1800,9 @@ class Client {
           ...(give_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id: give_currency.token_id,
-              }),
+              type: 'TokenV1',
+              token_id: give_currency.token_id,
+            }),
           amount: {
             decimal: give_balance.decimal,
             atoms: give_balance.atoms,
@@ -1894,9 +1856,9 @@ class Client {
           ...(order_details.give_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id: order_details.give_currency.token_id,
-              }),
+              type: 'TokenV1',
+              token_id: order_details.give_currency.token_id,
+            }),
           amount: {
             atoms: ask_amount_atoms.toString(),
             decimal: ask_amount!.toString(),
@@ -1904,121 +1866,176 @@ class Client {
         },
       });
     }
+    return { inputs, outputs, send_token, input_amount_coin_req, input_amount_token_req };
+  }
 
-    fee += BigInt(2 * Math.pow(10, 11));
-    input_amount_coin_req += fee;
+  /**
+   * Builds a transaction based on the provided parameters.
+   * @param{BuildTransactionParams} arg
+   */
+  async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
+    const { type, params } = arg;
 
-    const inputObjCoin = type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req, null) : [];
-    const inputObjToken = send_token?.token_id
-      ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
-      : [];
+    this.ensureInitialized();
+    if (!params) throw new Error('Missing params');
 
-    const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
-    const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
+    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
 
-    if (type !== 'DelegationWithdraw') {
-      if (totalInputValueCoin < input_amount_coin_req) {
-        throw new Error('Not enough coin UTXOs');
-      }
+    const address = this.connectedAddresses;
+    const currentAddress = address[this.network];
+    const addressList = [...currentAddress.receiving, ...currentAddress.change];
+
+    const response = await fetch('https://api.mintini.app' + '/account', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ addresses: addressList, network: this.network === 'mainnet' ? 0 : 1 }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch utxos');
     }
 
-    if (totalInputValueToken < input_amount_token_req) {
-      throw new Error('Not enough token UTXOs');
-    }
+    const data = await response.json();
+    const utxos: UtxoEntry[] = data.utxos;
 
-    const changeAmountCoin = totalInputValueCoin - input_amount_coin_req;
-    const changeAmountToken = totalInputValueToken - input_amount_token_req;
-
-    if (type === 'DelegationWithdraw') {
-      (outputs[0] as LockThenTransferOutput).value.amount = {
-        atoms: (BigInt((outputs[0] as LockThenTransferOutput).value.amount.atoms) - BigInt(fee.toString())).toString(),
-        decimal: (
-          Number(BigInt((outputs[0] as LockThenTransferOutput).value.amount.atoms) - BigInt(fee.toString())) / 1e11
-        ).toString(),
-      };
-    }
-
-    if (changeAmountCoin > 0) {
-      outputs.push({
-        type: 'Transfer',
-        value: {
-          type: 'Coin',
-          amount: {
-            atoms: changeAmountCoin.toString(),
-            decimal: (Number(changeAmountCoin) / 1e11).toString(),
-          },
-        },
-        destination: currentAddress.change[0],
-      });
-    }
-
-    if (changeAmountToken > 0 && send_token) {
-      const decimals = send_token.number_of_decimals;
-
-      outputs.push({
-        type: 'Transfer',
-        value: {
-          type: 'TokenV1',
-          token_id: send_token.token_id,
-          amount: {
-            atoms: changeAmountToken.toString(),
-            decimal: (Number(changeAmountToken) / Math.pow(10, decimals!)).toString(),
-          },
-        },
-        destination: currentAddress.change[0],
-      });
-    }
-
-    inputs.push(...inputObjCoin);
-    inputs.push(...inputObjToken);
-
-    const JSONRepresentation = {
+    const {
       inputs,
       outputs,
-    };
+      input_amount_coin_req,
+      input_amount_token_req,
+      send_token
+    } = this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
 
-    const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
+    let preciseFee = BigInt(0);
+    let previousFee = BigInt(-1);
+    const MAX_ATTEMPTS = 10;
+    let attempts = 0;
 
-    const transaction = encode_transaction(
-      mergeUint8Arrays(BINRepresentation.inputs),
-      mergeUint8Arrays(BINRepresentation.outputs),
-      BigInt(0),
-    );
+    while (attempts < MAX_ATTEMPTS) {
+      attempts++;
 
-    const transaction_id = get_transaction_id(transaction, true);
+      const totalFee = this.getFeeForType(type) + preciseFee;
+      const input_amount_coin_req_w_fee = input_amount_coin_req + totalFee;
 
-    // some operations need to be recoded with given data
-    // if outputs include issueNft type
-    if (outputs.some((output) => output.type === 'IssueNft')) {
-      // need to modify the transaction outout exact that object
-      try {
-        get_token_id(
-          mergeUint8Arrays(BINRepresentation.inputs),
-          this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
-        );
-      } catch (error) {
-        throw new Error('Error while getting token id');
+      const inputObjCoin = type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null) : [];
+      const inputObjToken = send_token?.token_id
+        ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
+        : [];
+
+      const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
+      const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
+
+      if (type !== 'DelegationWithdraw' && totalInputValueCoin < input_amount_coin_req_w_fee) {
+        throw new Error('Not enough coin UTXOs');
       }
-      const token_id = get_token_id(
-        mergeUint8Arrays(BINRepresentation.inputs),
-        this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
-      );
-      const index = outputs.findIndex((output) => output.type === 'IssueNft');
-      const output = outputs[index] as IssueNftOutput;
-      outputs[index] = {
-        ...output,
-        token_id: token_id,
+      if (totalInputValueToken < input_amount_token_req) {
+        throw new Error('Not enough token UTXOs');
+      }
+
+      const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
+      const changeAmountToken = totalInputValueToken - input_amount_token_req;
+
+      const finalOutputs = [...outputs];
+
+      if (type === 'DelegationWithdraw') {
+        const out = finalOutputs[0] as LockThenTransferOutput;
+        out.value.amount = {
+          atoms: (BigInt(out.value.amount.atoms) - totalFee).toString(),
+          decimal: (Number(BigInt(out.value.amount.atoms) - totalFee) / 1e11).toString(),
+        };
+      }
+
+      if (changeAmountCoin > 0n) {
+        finalOutputs.push({
+          type: 'Transfer',
+          value: {
+            type: 'Coin',
+            amount: {
+              atoms: changeAmountCoin.toString(),
+              decimal: (Number(changeAmountCoin) / 1e11).toString(),
+            },
+          },
+          destination: currentAddress.change[0],
+        });
+      }
+
+      if (changeAmountToken > 0n && send_token) {
+        const decimals = send_token.number_of_decimals;
+        finalOutputs.push({
+          type: 'Transfer',
+          value: {
+            type: 'TokenV1',
+            token_id: send_token.token_id,
+            amount: {
+              atoms: changeAmountToken.toString(),
+              decimal: (Number(changeAmountToken) / Math.pow(10, decimals)).toString(),
+            },
+          },
+          destination: currentAddress.change[0],
+        });
+      }
+
+      const finalInputs = [...inputs, ...inputObjCoin, ...inputObjToken];
+
+      const JSONRepresentation: TransactionJSONRepresentation = {
+        inputs: finalInputs,
+        outputs: finalOutputs,
+        fee: {
+          atoms: totalFee.toString(),
+          decimal: atomsToDecimal(totalFee.toString(), 11).toString(),
+        },
       };
+
+      const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
+
+      const transaction_size = BigInt(Math.ceil(BINRepresentation.transactionsize));
+      const feerate = BigInt('100000000000'); // TODO: Get the current feerate from the network
+      const nextPreciseFee = (transaction_size * feerate) / 1000n;
+
+      if (nextPreciseFee === preciseFee || nextPreciseFee === previousFee) {
+        const transaction = encode_transaction(
+          mergeUint8Arrays(BINRepresentation.inputs),
+          mergeUint8Arrays(BINRepresentation.outputs),
+          BigInt(0),
+        );
+
+        const transaction_id = get_transaction_id(transaction, true);
+
+        if (finalOutputs.some((output) => output.type === 'IssueNft')) {
+          const token_id = get_token_id(
+            mergeUint8Arrays(BINRepresentation.inputs),
+            this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
+          );
+          const index = finalOutputs.findIndex((output) => output.type === 'IssueNft');
+          const output = finalOutputs[index] as IssueNftOutput;
+          finalOutputs[index] = {
+            ...output,
+            token_id,
+          };
+        }
+
+        const HEXRepresentation_unsigned = transaction.reduce(
+          (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
+          '',
+        );
+
+        return {
+          JSONRepresentation: {
+            ...JSONRepresentation,
+            id: transaction_id,
+          },
+          BINRepresentation,
+          HEXRepresentation_unsigned,
+          transaction_id,
+        };
+      }
+      previousFee = preciseFee;
+      preciseFee = nextPreciseFee;
     }
 
-    const HEXRepresentation_unsigned = transaction.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '');
-
-    return {
-      JSONRepresentation,
-      BINRepresentation,
-      HEXRepresentation_unsigned,
-      transaction_id,
-    };
+    throw new Error('Failed to build transaction after maximum attempts');
   }
 
   /**
@@ -2252,6 +2269,12 @@ class Client {
     const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
       .filter(({ input }) => input.input_type === 'UTXO')
       .map((input) => input.utxo.destination);
+
+    // @ts-ignore
+    if (transactionJSONrepresentation.inputs[0].input.account_type === 'DelegationBalance') {
+      // @ts-ignore
+      inputAddresses.push(transactionJSONrepresentation.outputs[0].destination);
+    }
 
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
