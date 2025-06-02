@@ -176,6 +176,11 @@ test('fill order', async () => {
   const result = await spy.mock.results[0]?.value;
 
   expect(result.JSONRepresentation).toStrictEqual({
+    "fee": {
+      "atoms": "200000000000",
+      "decimal": "2",
+    },
+    "id": "e56ccfc684746de3867f8c3985575e61ddcbba5a20eabb0db5afe885e4399efc",
     "inputs": [
       {
         "input": {
@@ -293,6 +298,11 @@ test('conclude order - snapshot', async () => {
   const result = await spy.mock.results[0]?.value;
 
   expect(result.JSONRepresentation).toStrictEqual({
+    "fee": {
+      "atoms": "200000000000",
+      "decimal": "2",
+    },
+    "id": "6fd6992d0a4006c543d9a93d6d0ce85d8c4a9831d969b93726b13102e909ff92",
     "inputs": [
       {
         "input": {

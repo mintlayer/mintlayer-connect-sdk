@@ -115,6 +115,11 @@ exports[`buildTransaction for transfer - snapshot 1`] = `
   },
   "HEXRepresentation_unsigned": "0100040000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab01000000080000070010a5d4e801769479bae7d535d097defdff0f4e7101669d4a1900000fe064857ec80b060186ec450457d09ad9807393d89cec9c71d6206021",
   "JSONRepresentation": {
+    "fee": {
+      "atoms": "400000000000",
+      "decimal": "4",
+    },
+    "id": "05d9ec811338b736816f64965f17844cdbf45711f0892534f3f7408344052bcc",
     "inputs": [
       {
         "input": {

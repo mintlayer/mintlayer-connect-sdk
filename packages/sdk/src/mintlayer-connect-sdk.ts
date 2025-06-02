@@ -400,6 +400,8 @@ type Output =
 export interface TransactionJSONRepresentation {
   inputs: Input[];
   outputs: Output[];
+  fee?: AmountFields;
+  id?: string;
 }
 
 interface Transaction {
@@ -1345,48 +1347,15 @@ class Client {
     }
   }
 
-  /**
-   * Builds a transaction based on the provided parameters.
-   * @param{BuildTransactionParams} arg
-   */
-  async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
-    const { type, params } = arg;
-
-    this.ensureInitialized();
-    if (!params) throw new Error('Missing params');
-
-    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
-
-    const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
-    const addressList = [...currentAddress.receiving, ...currentAddress.change];
-
-    const response = await fetch('https://api.mintini.app' + '/account', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ addresses: addressList, network: this.network === 'mainnet' ? 0 : 1 }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch utxos');
-    }
-
-    const data = await response.json();
-    const utxos: UtxoEntry[] = data.utxos;
-
-    let fee = 0n;
-    const inputs: Input[] = [];
-    const outputs: Output[] = [];
+  private getRequiredInputsOutputs(args: BuildTransactionParams) {
+    const { type, params } = args;
+    let send_token: { token_id: string; number_of_decimals: number } | undefined;
 
     let input_amount_coin_req = 0n;
     let input_amount_token_req = 0n;
 
-    let send_token: { token_id: string; number_of_decimals: number } | undefined;
-
-    fee += this.getFeeForType(type);
-
+    const inputs: Input[] = [];
+    const outputs: Output[] = [];
     if (type === 'Transfer') {
       const { token_id, token_details } = params;
 
@@ -1407,21 +1376,21 @@ class Client {
           ...(token_details
             ? { type: 'TokenV1', token_id }
             : {
-                type: 'Coin',
-              }),
+              type: 'Coin',
+            }),
           ...(token_details
             ? {
-                amount: {
-                  decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
-                },
-              }
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+              },
+            }
             : {
-                amount: {
-                  decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
-                },
-              }),
+              amount: {
+                decimal: params.amount!.toString(),
+                atoms: (params.amount! * Math.pow(10, 11)).toString(),
+              },
+            }),
         },
       });
     }
@@ -1445,9 +1414,9 @@ class Client {
           ...(token_id === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id,
-              }),
+              type: 'TokenV1',
+              token_id,
+            }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
@@ -1821,9 +1790,9 @@ class Client {
           ...(ask_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id: ask_currency.token_id,
-              }),
+              type: 'TokenV1',
+              token_id: ask_currency.token_id,
+            }),
           amount: {
             decimal: (parseInt(initially_asked.decimal) - parseInt(ask_balance.decimal)).toString(),
             atoms: (parseInt(initially_asked.atoms) - parseInt(ask_balance.atoms)).toString(),
@@ -1838,9 +1807,9 @@ class Client {
           ...(give_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id: give_currency.token_id,
-              }),
+              type: 'TokenV1',
+              token_id: give_currency.token_id,
+            }),
           amount: {
             decimal: give_balance.decimal,
             atoms: give_balance.atoms,
@@ -1894,9 +1863,9 @@ class Client {
           ...(order_details.give_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-                type: 'TokenV1',
-                token_id: order_details.give_currency.token_id,
-              }),
+              type: 'TokenV1',
+              token_id: order_details.give_currency.token_id,
+            }),
           amount: {
             atoms: ask_amount_atoms.toString(),
             decimal: ask_amount!.toString(),
@@ -1904,11 +1873,50 @@ class Client {
         },
       });
     }
+    return { inputs, outputs, send_token, input_amount_coin_req, input_amount_token_req };
+  }
+
+  /**
+   * Builds a transaction based on the provided parameters.
+   * @param{BuildTransactionParams} arg
+   */
+  async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
+    const { type, params } = arg;
+
+    this.ensureInitialized();
+    if (!params) throw new Error('Missing params');
+
+    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
+
+    const address = this.connectedAddresses;
+    const currentAddress = address[this.network];
+    const addressList = [...currentAddress.receiving, ...currentAddress.change];
+
+    const response = await fetch('https://api.mintini.app' + '/account', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ addresses: addressList, network: this.network === 'mainnet' ? 0 : 1 }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch utxos');
+    }
+
+    const data = await response.json();
+    const utxos: UtxoEntry[] = data.utxos;
+
+    let fee = 0n;
+
+    fee += this.getFeeForType(type);
+
+    const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } = this.getRequiredInputsOutputs({type, params} as BuildTransactionParams);
 
     fee += BigInt(2 * Math.pow(10, 11));
-    input_amount_coin_req += fee;
+    const input_amount_coin_req_w_fee = input_amount_coin_req + fee;
 
-    const inputObjCoin = type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req, null) : [];
+    const inputObjCoin = type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null) : [];
     const inputObjToken = send_token?.token_id
       ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
       : [];
@@ -1917,7 +1925,7 @@ class Client {
     const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
 
     if (type !== 'DelegationWithdraw') {
-      if (totalInputValueCoin < input_amount_coin_req) {
+      if (totalInputValueCoin < input_amount_coin_req_w_fee) {
         throw new Error('Not enough coin UTXOs');
       }
     }
@@ -1926,7 +1934,7 @@ class Client {
       throw new Error('Not enough token UTXOs');
     }
 
-    const changeAmountCoin = totalInputValueCoin - input_amount_coin_req;
+    const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
     const changeAmountToken = totalInputValueToken - input_amount_token_req;
 
     if (type === 'DelegationWithdraw') {
@@ -1972,7 +1980,7 @@ class Client {
     inputs.push(...inputObjCoin);
     inputs.push(...inputObjToken);
 
-    const JSONRepresentation = {
+    const JSONRepresentation: TransactionJSONRepresentation = {
       inputs,
       outputs,
       fee: {
@@ -1983,6 +1991,12 @@ class Client {
 
     const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
+    const transaction_size = BigInt(Math.ceil(BINRepresentation.transactionsize));
+    const feerate = BigInt('100000000000');
+
+    const preciseFee = BigInt(transaction_size * feerate / 1000n);
+    console.log('preciseFee', preciseFee);
+
     const transaction = encode_transaction(
       mergeUint8Arrays(BINRepresentation.inputs),
       mergeUint8Arrays(BINRepresentation.outputs),
@@ -1990,6 +2004,8 @@ class Client {
     );
 
     const transaction_id = get_transaction_id(transaction, true);
+
+    JSONRepresentation.id = transaction_id;
 
     // some operations need to be recoded with given data
     // if outputs include issueNft type

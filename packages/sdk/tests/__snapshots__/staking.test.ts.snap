@@ -140,6 +140,11 @@ exports[`create delegation - snapshot 1`] = `
   },
   "HEXRepresentation_unsigned": "0100040000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab010000000805010724b6998cc794f848eaab2c2ee94f6f271111c46b839f088fddfa89bbf1d11cba014f3199ca35db0dea2d00f0c3fb180c54b9e400000fe04418e4df0c060186ec450457d09ad9807393d89cec9c71d6206021",
   "JSONRepresentation": {
+    "fee": {
+      "atoms": "200000000000",
+      "decimal": "2",
+    },
+    "id": "9a2173442aec3f56e834675033e40e65e1b6ba9c09e6be8599d3db8bc8a69c5e",
     "inputs": [
       {
         "input": {
@@ -309,6 +314,11 @@ exports[`delegate staking - snaphsot 1`] = `
   },
   "HEXRepresentation_unsigned": "0100040000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab010000000806070010a5d4e86d3d3dd82aad9e3bbd2884a72278ee303e773103aa9f3c36198321063509c23500000fe034730ff70b060186ec450457d09ad9807393d89cec9c71d6206021",
   "JSONRepresentation": {
+    "fee": {
+      "atoms": "200000000000",
+      "decimal": "2",
+    },
+    "id": "7265e382aa4ab9f8db50cbf858a6f9b3e5fcca8d89ca2b104229cdeb0a38676e",
     "inputs": [
       {
         "input": {
@@ -481,6 +491,11 @@ exports[`delegate staking providing only pool_id - snapshot 1`] = `
   },
   "HEXRepresentation_unsigned": "0100040000af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab010000000806070010a5d4e86d3d3dd82aad9e3bbd2884a72278ee303e773103aa9f3c36198321063509c23500000fe034730ff70b060186ec450457d09ad9807393d89cec9c71d6206021",
   "JSONRepresentation": {
+    "fee": {
+      "atoms": "200000000000",
+      "decimal": "2",
+    },
+    "id": "7265e382aa4ab9f8db50cbf858a6f9b3e5fcca8d89ca2b104229cdeb0a38676e",
     "inputs": [
       {
         "input": {
@@ -616,6 +631,11 @@ exports[`staking withdraw - snapshot 1`] = `
   },
   "HEXRepresentation_unsigned": "0100040100006d3d3dd82aad9e3bbd2884a72278ee303e773103aa9f3c36198321063509c235070010a5d4e8040100070040b743ba01f57e03d97c6fbb69d23c13ebe44044e17badc4d4028170",
   "JSONRepresentation": {
+    "fee": {
+      "atoms": "200000000000",
+      "decimal": "2",
+    },
+    "id": "c240706a8e614912c950fe0ebb38f2fc6d96327229cebc9f2d759c4b20c26620",
     "inputs": [
       {
         "input": {
