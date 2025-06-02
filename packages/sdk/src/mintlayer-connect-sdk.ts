@@ -63,6 +63,34 @@ function stringToUint8Array(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
+function atomsToDecimal(atoms: string | number, decimals: number): string {
+  const atomsStr = atoms.toString();
+  const atomsLength = atomsStr.length;
+
+  if (decimals === 0) {
+    return atomsStr;
+  }
+
+  if (atomsLength <= decimals) {
+    // Pad with leading zeros
+    const padded = atomsStr.padStart(decimals, '0');
+    return '0.' + padded;
+  }
+
+  // Insert decimal point
+  const integerPart = atomsStr.slice(0, atomsLength - decimals);
+  const fractionalPart = atomsStr.slice(atomsLength - decimals);
+
+  // Remove trailing zeros from fractional part
+  const trimmedFractional = fractionalPart.replace(/0+$/, '');
+
+  if (trimmedFractional === '') {
+    return integerPart;
+  }
+
+  return integerPart + '.' + trimmedFractional;
+}
+
 type Address = {
   [key: string]: {
     receiving: string[];
@@ -1832,7 +1860,7 @@ class Client {
       if (order_details.ask_currency.type === 'Coin') {
         input_amount_coin_req += BigInt(give_amount_atoms);
       } else if (ask_token_details) {
-        input_amount_token_req += BigInt(give_amount_atoms * Math.pow(10, ask_token_details.number_of_decimals));
+        input_amount_token_req += BigInt(give_amount_atoms);
         send_token = {
           token_id: order_details.ask_currency.token_id,
           number_of_decimals: ask_token_details.number_of_decimals,
@@ -1841,11 +1869,12 @@ class Client {
 
       const rate = parseInt(order_details.initially_asked.atoms) / parseInt(order_details.initially_given.atoms);
 
-      const ask_amount = give_amount / rate;
-      const ask_amount_atoms =
+      const ask_amount_atoms = Math.floor(give_amount_atoms / rate);
+      const ask_amount =
         order_details.give_currency.type === 'Token'
-          ? ask_amount! * Math.pow(10, give_token_details!.number_of_decimals)
-          : ask_amount! * Math.pow(10, 11); // Coin decimal
+          ? atomsToDecimal(ask_amount_atoms, give_token_details!.number_of_decimals)
+          : atomsToDecimal(ask_amount_atoms, 11); // Coin decimal
+
       inputs.push({
         input: {
           input_type: 'AccountCommand',
