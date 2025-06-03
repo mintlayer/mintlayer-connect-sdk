@@ -1369,21 +1369,21 @@ class Client {
           ...(token_details
             ? { type: 'TokenV1', token_id }
             : {
-              type: 'Coin',
-            }),
+                type: 'Coin',
+              }),
           ...(token_details
             ? {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
-              },
-            }
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+                },
+              }
             : {
-              amount: {
-                decimal: params.amount!.toString(),
-                atoms: (params.amount! * Math.pow(10, 11)).toString(),
-              },
-            }),
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                },
+              }),
         },
       });
     }
@@ -1407,9 +1407,9 @@ class Client {
           ...(token_id === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id,
-            }),
+                type: 'TokenV1',
+                token_id,
+              }),
           amount: {
             decimal: params.amount!.toString(),
             atoms: (params.amount! * Math.pow(10, 11)).toString(),
@@ -1783,9 +1783,9 @@ class Client {
           ...(ask_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id: ask_currency.token_id,
-            }),
+                type: 'TokenV1',
+                token_id: ask_currency.token_id,
+              }),
           amount: {
             decimal: (parseInt(initially_asked.decimal) - parseInt(ask_balance.decimal)).toString(),
             atoms: (parseInt(initially_asked.atoms) - parseInt(ask_balance.atoms)).toString(),
@@ -1800,9 +1800,9 @@ class Client {
           ...(give_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id: give_currency.token_id,
-            }),
+                type: 'TokenV1',
+                token_id: give_currency.token_id,
+              }),
           amount: {
             decimal: give_balance.decimal,
             atoms: give_balance.atoms,
@@ -1856,9 +1856,9 @@ class Client {
           ...(order_details.give_currency.type === 'Coin'
             ? { type: 'Coin' }
             : {
-              type: 'TokenV1',
-              token_id: order_details.give_currency.token_id,
-            }),
+                type: 'TokenV1',
+                token_id: order_details.give_currency.token_id,
+              }),
           amount: {
             atoms: ask_amount_atoms.toString(),
             decimal: ask_amount!.toString(),
@@ -1900,13 +1900,8 @@ class Client {
     const data = await response.json();
     const utxos: UtxoEntry[] = data.utxos;
 
-    const {
-      inputs,
-      outputs,
-      input_amount_coin_req,
-      input_amount_token_req,
-      send_token
-    } = this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
+    const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
+      this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
 
     let preciseFee = BigInt(0);
     let previousFee = BigInt(-1);
@@ -1919,7 +1914,8 @@ class Client {
       const totalFee = this.getFeeForType(type) + preciseFee;
       const input_amount_coin_req_w_fee = input_amount_coin_req + totalFee;
 
-      const inputObjCoin = type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null) : [];
+      const inputObjCoin =
+        type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null) : [];
       const inputObjToken = send_token?.token_id
         ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
         : [];
