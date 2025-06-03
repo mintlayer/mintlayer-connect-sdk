@@ -2073,7 +2073,7 @@ class Client {
           return encode_input_for_fill_order(
             input.order_id,
             Amount.from_atoms(input.fill_atoms.toString()),
-            'tmt1q8vjp3lrvezlnkwhhv944f2vw2k9get4ty0fkyn3',
+            input.destination,
             BigInt(input.nonce.toString()),
             network,
           );
