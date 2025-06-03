@@ -1986,9 +1986,10 @@ class Client {
 
       const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
-      const transaction_size = BigInt(Math.ceil(BINRepresentation.transactionsize));
-      const feerate = BigInt('100000000000'); // TODO: Get the current feerate from the network
-      const nextPreciseFee = (transaction_size * feerate) / 1000n;
+      const transaction_size_in_bytes = BigInt(Math.ceil(BINRepresentation.transactionsize));
+      const fee_amount_per_kb = BigInt('100000000000'); // TODO: Get the current feerate from the network
+
+      const nextPreciseFee = ((fee_amount_per_kb * transaction_size_in_bytes) + BigInt(999)) / BigInt(1000)
 
       if (nextPreciseFee === preciseFee || nextPreciseFee === previousFee) {
         const transaction = encode_transaction(
@@ -2072,7 +2073,7 @@ class Client {
           return encode_input_for_fill_order(
             input.order_id,
             Amount.from_atoms(input.fill_atoms.toString()),
-            input.destination,
+            'tmt1q8vjp3lrvezlnkwhhv944f2vw2k9get4ty0fkyn3',
             BigInt(input.nonce.toString()),
             network,
           );
@@ -2270,6 +2271,14 @@ class Client {
     if (transactionJSONrepresentation.inputs[0].input.account_type === 'DelegationBalance') {
       // @ts-ignore
       inputAddresses.push(transactionJSONrepresentation.outputs[0].destination);
+    }
+    // @ts-ignore
+    if (transactionJSONrepresentation.inputs[0].input.input_type === 'AccountCommand') {
+      // @ts-ignore
+      if (transactionJSONrepresentation.inputs[0].input.destination) {
+        // @ts-ignore
+        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.destination);
+      }
     }
 
     const transactionsize = estimate_transaction_size(
