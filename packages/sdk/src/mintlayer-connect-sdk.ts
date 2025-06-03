@@ -44,6 +44,7 @@ import initWasm, {
   encode_signed_transaction,
   encode_witness,
   SignatureHashType,
+  encode_output_htlc,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -143,6 +144,8 @@ export class MojitoAccountProvider implements AccountProvider {
     }
   }
 }
+
+type CreateHtlcArgs = any;
 
 type AmountFields = {
   atoms: string;
@@ -623,6 +626,17 @@ type BuildTransactionParams =
         order_details: OrderData;
         ask_token_details: TokenDetails;
         give_token_details: TokenDetails;
+      };
+    }
+  | {
+      type: 'CreateHtlc';
+      params: {
+        amount: number,
+        token_id: string;
+        secret_hash: string;
+        spend_address: string;
+        refund_address: string;
+        refund_timelock: string;
       };
     };
 
@@ -1385,6 +1399,8 @@ class Client {
         return 0n;
       case 'ConcludeOrder':
         return 0n;
+      case 'CreateHtlc':
+        return 0n;
       default:
         throw new Error(`Unknown transaction type: ${type}`);
     }
@@ -1922,6 +1938,25 @@ class Client {
         },
       });
     }
+
+    if (type === 'CreateHtlc') {
+      // @ts-ignore
+      outputs.push({
+        // @ts-ignore
+        type: 'CreateHtlc',
+        // @ts-ignore
+        amount: {
+          atoms: (params.amount! * Math.pow(10, 11)).toString(),
+          decimal: params.amount!.toString(),
+        },
+        token_id: params.token_id,
+        secret_hash: params.secret_hash,
+        spend_address: params.spend_address,
+        refund_address: params.refund_address,
+        refund_timelock: params.refund_timelock,
+      })
+    }
+
     return { inputs, outputs, send_token, input_amount_coin_req, input_amount_token_req };
   }
 
@@ -2315,6 +2350,27 @@ class Client {
 
       if (output.type === 'DelegateStaking') {
         return encode_output_delegate_staking(Amount.from_atoms(output.amount.atoms), output.delegation_id, network);
+      }
+
+      // @ts-ignore
+      if (output.type === 'CreateHtlc') {
+        // @ts-ignore
+        const refund_timelock = encode_lock_until_time(BigInt(output.refund_timelock));
+        return encode_output_htlc(
+          // @ts-ignore
+          Amount.from_atoms(output.amount.atoms),
+          // @ts-ignore
+          output.token_id,
+          // @ts-ignore
+          output.secret_hash,
+          // @ts-ignore
+          output.spend_address,
+          // @ts-ignore
+          output.refund_address,
+          // @ts-ignore
+          refund_timelock,
+          network,
+        );
       }
     });
     const outputsArray = outputsArrayItems.filter((x): x is NonNullable<typeof x> => x !== undefined);
@@ -2825,6 +2881,22 @@ class Client {
     } else {
       throw new Error('Delegation id or pool id is required');
     }
+  }
+
+  async createHtlc(params: CreateHtlcArgs): Promise<SignedTransaction>{
+    this.ensureInitialized();
+    const tx = await this.buildTransaction({
+      type: 'CreateHtlc',
+      params: {
+        amount: params.amount,
+        token_id: params.token_id,
+        secret_hash: params.secret_hash,
+        spend_address: params.spend_address,
+        refund_address: params.refund_address,
+        refund_timelock: params.refund_timelock,
+      },
+    });
+    return this.signTransaction(tx);
   }
 
   async signTransaction(tx: Transaction): Promise<SignedTransaction> {
