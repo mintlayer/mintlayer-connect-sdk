@@ -2131,8 +2131,6 @@ class Client {
 
     const inputsArray = [...inputCommands, ...inputsIds].filter((x): x is NonNullable<typeof x> => x !== undefined);
 
-    console.log('inputsArray', inputsArray);
-
     const outputsArrayItems = transactionJSONrepresentation.outputs.map((output) => {
       if (output.type === 'Transfer') {
         if (output.value.type === 'TokenV1') {
@@ -2264,7 +2262,6 @@ class Client {
       }
     });
     const outputsArray = outputsArrayItems.filter((x): x is NonNullable<typeof x> => x !== undefined);
-    console.log('outputsArray', outputsArray);
 
     const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
       .filter(({ input }) => input.input_type === 'UTXO')
@@ -2290,8 +2287,6 @@ class Client {
       mergeUint8Arrays(outputsArray),
       network,
     );
-
-    console.log('transactionsize', transactionsize);
 
     return {
       inputs: inputsArray,
