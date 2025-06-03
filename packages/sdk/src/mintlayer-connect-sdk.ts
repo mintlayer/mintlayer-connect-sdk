@@ -2279,6 +2279,24 @@ class Client {
         // @ts-ignore
         inputAddresses.push(transactionJSONrepresentation.inputs[0].input.destination);
       }
+      // @ts-ignore
+      if (transactionJSONrepresentation.inputs[0].input.authority) {
+        // @ts-ignore
+        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.authority);
+      }
+    }
+    // @ts-ignore
+    if (transactionJSONrepresentation.inputs[0].input.input_type === 'Account') {
+      // @ts-ignore
+      if (transactionJSONrepresentation.inputs[0].input.destination) {
+        // @ts-ignore
+        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.destination);
+      }
+      // @ts-ignore
+      if (transactionJSONrepresentation.inputs[0].input.authority) {
+        // @ts-ignore
+        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.authority);
+      }
     }
 
     const transactionsize = estimate_transaction_size(
