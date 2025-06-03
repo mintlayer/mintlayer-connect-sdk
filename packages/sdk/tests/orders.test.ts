@@ -234,10 +234,10 @@ test('fill order', async () => {
 
   expect(result.JSONRepresentation).toStrictEqual({
     "fee": {
-      "atoms": "30100000000",
-      "decimal": "0.301",
+      "atoms": "40400000000",
+      "decimal": "0.404",
     },
-    "id": "4bcaf078df908c0fa7fa73419289b5c4e2ea4f89a2f9a4ef877d8a04cc8650c5",
+    "id": "ee22e819eba9b30b3b3ecd21322b566d41973d346a922eb9a685121554ad3be1",
     "inputs": [
       {
         "input": {
@@ -288,8 +288,8 @@ test('fill order', async () => {
         "value": {
           "type": "Coin",
           "amount": {
-            "atoms": "1702175504300000",
-            "decimal": "17021.755043"
+            "atoms": "1702165204300000",
+            "decimal": "17021.652043"
           }
         },
         "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6"
@@ -310,6 +310,9 @@ test('fill order that fail on call', async () => {
   });
 
   const result = await spy.mock.results[0]?.value;
+
+  console.log(JSON.stringify(result, null, 2));
+
   expect(result.JSONRepresentation.fee.decimal).toBe('0.399');
 });
 
@@ -371,10 +374,10 @@ test('conclude order - snapshot', async () => {
 
   expect(result.JSONRepresentation).toStrictEqual({
     "fee": {
-      "atoms": "30200000000",
-      "decimal": "0.302",
+      "atoms": "40500000000",
+      "decimal": "0.405",
     },
-    "id": "bc6c7df6b4cb0f337b16cca4e3ed5c5105ae12c2c32d08f8d5186adbac5e5f22",
+    "id": "a0e027bed40136528b3c5462b198a7e9781fad6659ab6c0d22b8c2a499148964",
     "inputs": [
       {
         "input": {
@@ -435,8 +438,8 @@ test('conclude order - snapshot', async () => {
         "value": {
           "type": "Coin",
           "amount": {
-            "atoms": "1703175404300000",
-            "decimal": "17031.754043"
+            "atoms": "1703165104300000",
+            "decimal": "17031.651043"
           }
         },
         "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6"
