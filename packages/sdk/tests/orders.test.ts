@@ -237,7 +237,7 @@ test('fill order', async () => {
       "atoms": "40400000000",
       "decimal": "0.404",
     },
-    "id": "ee22e819eba9b30b3b3ecd21322b566d41973d346a922eb9a685121554ad3be1",
+    "id": "7cf8eb89b786869160e47e27b25cbf577dc2112516cf5b147cd22bd341a18d66",
     "inputs": [
       {
         "input": {
@@ -449,3 +449,16 @@ test('conclude order - snapshot', async () => {
 
   // expect(result).toMatchSnapshot();
 });
+
+test('fill order subsequent', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  // first order fill
+  await client.fillOrder({
+    order_id: 'tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu',
+    amount: 10,
+    destination: 'tmt1q8kfn6vl835y4tj5yfsdvz7ay5cjnvhv952wftmt',
+  });
+
+})
