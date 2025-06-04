@@ -1989,7 +1989,7 @@ class Client {
       const transaction_size_in_bytes = BigInt(Math.ceil(BINRepresentation.transactionsize));
       const fee_amount_per_kb = BigInt('100000000000'); // TODO: Get the current feerate from the network
 
-      const nextPreciseFee = ((fee_amount_per_kb * transaction_size_in_bytes) + BigInt(999)) / BigInt(1000)
+      const nextPreciseFee = (fee_amount_per_kb * transaction_size_in_bytes + BigInt(999)) / BigInt(1000);
 
       if (nextPreciseFee === preciseFee || nextPreciseFee === previousFee) {
         const transaction = encode_transaction(
@@ -2859,22 +2859,22 @@ class Client {
     let txresult: Transaction | undefined = undefined;
     this.buildTransaction = new Proxy(this.buildTransaction, {
       apply: async (target, thisArg, args) => {
-        const result = await Reflect.apply(target, thisArg, args) as Transaction;
+        const result = (await Reflect.apply(target, thisArg, args)) as Transaction;
         txresult = result; // pull the result of the buildTransaction
         return result;
       },
-    })
+    });
 
     // Call this function in parallel is not allowed due to Proxy usage BUT also due to the fact that we need to
     // ensure that utxo results are getting one by one, parallel not makes sense here.
     if ((this as any).__decoratorLock__) {
-      throw new Error("decorateWithUtxoFetch already running — cannot run in parallel.");
+      throw new Error('decorateWithUtxoFetch already running — cannot run in parallel.');
     }
 
     (this as any).__decoratorLock__ = true;
 
     try {
-      const t = await func()
+      const t = await func();
 
       if (!txresult) {
         throw new Error('Failed to decorate with UtxoFetch');
