@@ -2850,6 +2850,7 @@ class Client {
    * Do not use in parallel for the same client instance.
    * Intended to get utxo changes for transactions one by one.
    * @param func The function to decorate.
+   * @return A promise that resolves to an object containing the result of the function **and** UTXO changes.
    */
   async decorateWithUtxoFetch<T>(func: () => Promise<T>): Promise<{ result: T; utxo: { created: any; spent: any } }> {
     this.ensureInitialized();
