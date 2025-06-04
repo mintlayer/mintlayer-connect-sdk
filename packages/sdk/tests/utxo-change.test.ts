@@ -72,6 +72,18 @@ test('decorate with utxo change', async () => {
   const client = await Client.create({ network: 'testnet', autoRestore: false });
   await client.connect();
 
+  const transaction = await client.buildTransaction({
+    type: 'Transfer',
+    params: {
+      to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+      amount: 10,
+    }
+  });
+
+  const { spent, created } = client.previewUtxoChange(transaction);
+
+
+  // now you can get utxo preview from the helper function
   const { result, utxo } = await client.decorateWithUtxoFetch(
     () => client.transfer({
       to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
@@ -79,7 +91,10 @@ test('decorate with utxo change', async () => {
     })
   );
 
-  console.log('result', result);
-  console.log('utxo', utxo);
+  const { spent: spentFromHelper, created: createdFromHelper } = utxo;
+
+  expect(spentFromHelper).toEqual(spent);
+  expect(createdFromHelper).toEqual(created);
+
   expect(result).toBe('signed-transaction');
 });
