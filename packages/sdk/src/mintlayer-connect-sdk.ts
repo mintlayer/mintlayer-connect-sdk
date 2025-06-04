@@ -2587,6 +2587,36 @@ class Client {
     return this.signTransaction(tx);
   }
 
+  async decorateWithUtxoFetch(func: any): Promise<any> {
+    this.ensureInitialized();
+
+    const originalBuildTransaction = this.buildTransaction;
+
+    let txresult: Transaction | undefined = undefined;
+    this.buildTransaction = new Proxy(this.buildTransaction, {
+      apply: async (target, thisArg, args) => {
+        // Call the original function
+        const result = Reflect.apply(target, thisArg, args);
+        console.log('result', result);
+        txresult = await result;
+        // Return the result of the function call
+        return result;
+      },
+    })
+
+    const t= await func()
+
+    if(!txresult){
+      throw new Error('Failed to decorate with UtxoFetch');
+    }
+
+    const { created, spent } = this.previewUtxoChange(txresult);
+
+    this.buildTransaction = originalBuildTransaction;
+
+    return { result: t, utxo: { created, spent } };
+  }
+
   async getAccountOrders(): Promise<OrderData[]> {
     this.ensureInitialized();
     const allOrders = await this.getAvailableOrders();

@@ -449,3 +449,16 @@ test('conclude order - snapshot', async () => {
 
   // expect(result).toMatchSnapshot();
 });
+
+test('fill order subsequent', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  // first order fill
+  await client.fillOrder({
+    order_id: 'tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu',
+    amount: 10,
+    destination: 'tmt1q8kfn6vl835y4tj5yfsdvz7ay5cjnvhv952wftmt',
+  });
+
+})

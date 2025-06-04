@@ -67,3 +67,19 @@ test('preview utxo after transfer', async () => {
   expect(created[1].utxo.value.type).toBe('Coin');
   expect(created[1].utxo.value.amount.atoms).toBe('1702185004300000');
 });
+
+test('decorate with utxo change', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  const { result, utxo } = await client.decorateWithUtxoFetch(
+    () => client.transfer({
+      to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+      amount: 10,
+    })
+  );
+
+  console.log('result', result);
+  console.log('utxo', utxo);
+  expect(result).toBe('signed-transaction');
+});
