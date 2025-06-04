@@ -2597,24 +2597,25 @@ class Client {
       apply: async (target, thisArg, args) => {
         // Call the original function
         const result = Reflect.apply(target, thisArg, args);
-        console.log('result', result);
         txresult = await result;
         // Return the result of the function call
         return result;
       },
     })
 
-    const t= await func()
+    try {
+      const t = await func()
 
-    if(!txresult){
-      throw new Error('Failed to decorate with UtxoFetch');
+      if (!txresult) {
+        throw new Error('Failed to decorate with UtxoFetch');
+      }
+
+      const { created, spent } = this.previewUtxoChange(txresult);
+
+      return { result: t, utxo: { created, spent } };
+    } finally {
+      this.buildTransaction = originalBuildTransaction;
     }
-
-    const { created, spent } = this.previewUtxoChange(txresult);
-
-    this.buildTransaction = originalBuildTransaction;
-
-    return { result: t, utxo: { created, spent } };
   }
 
   async getAccountOrders(): Promise<OrderData[]> {
