@@ -722,6 +722,17 @@ export type BridgeRequestArgs = {
   intent: string;
 };
 
+export type SignChallengeArgs = {
+  message: string;
+  address?: string;
+}
+
+export type SignChallengeResponse = {
+  message: string;
+  address: string;
+  signature: string;
+}
+
 class Client {
   private network: 'mainnet' | 'testnet';
   private connectedAddresses: {
@@ -2776,6 +2787,22 @@ class Client {
     return this.request({
       method: 'signTransaction',
       params: { txData: tx },
+    });
+  }
+
+  /**
+   * Signs a challenge message with the given address.
+   * Used to prove ownership of the address.
+   * @param args
+   */
+  async signChallenge(args: SignChallengeArgs): Promise<SignChallengeResponse> {
+    this.ensureInitialized();
+    return this.request({
+      method: 'signChallenge',
+      params: {
+        message: args.message,
+        address: args.address,
+      },
     });
   }
 

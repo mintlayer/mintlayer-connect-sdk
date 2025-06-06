@@ -69,6 +69,7 @@
                 <button onclick="toggleSection('createDelegation')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Create Delegation</button>
                 <button onclick="toggleSection('delegationStake')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Delegation Stake</button>
                 <button onclick="toggleSection('delegationWithdraw')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Delegation Withdraw</button>
+                <button onclick="toggleSection('signChallenge')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Sign Challenge</button>
             </div>
 
             <!-- Transfer Section -->
@@ -317,6 +318,16 @@
                     <button onclick="delegationWithdraw()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Withdraw</button>
                 </div>
             </div>
+
+            <!-- Sign Challenge Section -->
+            <div id="signChallenge" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Sign Challenge</h3>
+                <div class="space-y-4">
+                    <input type="text" id="sign_challenge_address" placeholder="Address (optional)" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="sign_challenge_message" placeholder="Message" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="signChallenge()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Sign Challenge</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -340,7 +351,7 @@
       'lockTokenSupply', 'changeTokenAuthority', 'changeTokenMetadata', 'createOrder',
       'fillOrder', 'concludeOrder', 'bridgeRequest', 'broadcastTx', 'freezeToken',
       'unfreezeToken', 'burn', 'dataDeposit', 'createDelegation', 'delegationStake',
-      'delegationWithdraw'
+      'delegationWithdraw', 'signChallenge'
     ];
     sections.forEach(id => {
       const el = document.getElementById(id);
@@ -888,6 +899,23 @@
     try {
       const withdrawResult = await window.mintlayer.delegationWithdraw({ pool_id, delegation_id, amount });
       displayOutput(`Delegation withdraw result: ${JSON.stringify(withdrawResult, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function signChallenge () {
+    const address = document.getElementById('sign_challenge_address').value;
+    const message = document.getElementById('sign_challenge_message').value;
+
+    if (!message) {
+      displayOutput('Please provide a message to sign.');
+      return;
+    }
+
+    try {
+      const { signature } = await window.mintlayer.signChallenge({ address, message });
+      displayOutput(`Signature: ${JSON.stringify(signature, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);
     }
