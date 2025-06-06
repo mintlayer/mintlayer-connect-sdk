@@ -1118,10 +1118,10 @@ class Client {
   async request({ method, params }: { method: string; params?: Record<string, any> }): Promise<any> {
     this.ensureInitialized();
 
-    if (typeof window !== 'undefined' && window.mojito?.request) {
-      return await window.mojito.request(method, params);
+    if (typeof this.accountProvider.request !== 'undefined') {
+      return await this.accountProvider.request(method, params);
     } else {
-      throw new Error('Mojito extension not available');
+      throw new Error('request method not implemented in the account provider');
     }
   }
 
