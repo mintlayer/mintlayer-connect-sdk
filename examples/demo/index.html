@@ -70,6 +70,7 @@
                 <button onclick="toggleSection('delegationStake')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Delegation Stake</button>
                 <button onclick="toggleSection('delegationWithdraw')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Delegation Withdraw</button>
                 <button onclick="toggleSection('signChallenge')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Sign Challenge</button>
+                <button onclick="toggleSection('createHtlc')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Create Htlc</button>
             </div>
 
             <!-- Transfer Section -->
@@ -328,6 +329,14 @@
                     <button onclick="signChallenge()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Sign Challenge</button>
                 </div>
             </div>
+
+            <!-- Create HTLC Section -->
+            <div id="createHtlc" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Create HTLC</h3>
+                <div class="space-y-4">
+                    <button onclick="createHTLC()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Create HTLC</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -351,7 +360,7 @@
       'lockTokenSupply', 'changeTokenAuthority', 'changeTokenMetadata', 'createOrder',
       'fillOrder', 'concludeOrder', 'bridgeRequest', 'broadcastTx', 'freezeToken',
       'unfreezeToken', 'burn', 'dataDeposit', 'createDelegation', 'delegationStake',
-      'delegationWithdraw', 'signChallenge'
+      'delegationWithdraw', 'signChallenge', 'createHtlc'
     ];
     sections.forEach(id => {
       const el = document.getElementById(id);
@@ -915,6 +924,27 @@
 
     try {
       const { signature } = await window.mintlayer.signChallenge({ address, message });
+      displayOutput(`Signature: ${JSON.stringify(signature, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function createHTLC () {
+    try {
+      const { signature } = await window.mintlayer.createHtlc({
+        amount: "10",
+        spend_address: "tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc",
+        refund_address: "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+        refund_timelock: {
+          type: "ForBlockCount",
+          content: "20"
+        },
+        token_id: null, // null for native token
+        // token_id: "tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq",
+        secret_hash: "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3",
+      });
+
       displayOutput(`Signature: ${JSON.stringify(signature, null, 2)}`);
     } catch (error) {
       displayOutput(`Error: ${error.message}`);

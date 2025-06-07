@@ -41,6 +41,7 @@ import initWasm, {
   encode_output_data_deposit,
   encode_output_create_delegation,
   encode_output_delegate_staking,
+  encode_output_htlc,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -133,6 +134,8 @@ export class MojitoAccountProvider implements AccountProvider {
     }
   }
 }
+
+type CreateHtlcArgs = any;
 
 type AmountFields = {
   atoms: string;
@@ -352,6 +355,37 @@ type IssueFungibleTokenOutput = {
   total_supply: TotalSupplyValue;
 };
 
+type Timelock =
+  | {
+  type: 'UntilTime';
+  content: {
+    timestamp: string;
+  };
+}
+  | {
+  type: 'ForBlockCount';
+  content: number;
+};
+
+type HtlcOutput = {
+  type: 'Htlc';
+  value: {
+    token_id?: string;
+    type: 'Coin' | 'TokenV1';
+    amount: AmountFields;
+  }
+  token_id?: string;
+  htlc: {
+    refund_key: string;
+    secret_hash: {
+      hex: string;
+      string: string | null;
+    },
+    spend_key: string;
+    refund_timelock: Timelock;
+  }
+}
+
 type IssueNftOutput = {
   type: 'IssueNft';
   destination: string;
@@ -388,7 +422,8 @@ type Output =
   | IssueNftOutput
   | CreateOrderOutput
   | CreateDelegationIdOutput
-  | DelegateStakingOutput;
+  | DelegateStakingOutput
+  | HtlcOutput;
 
 export interface TransactionJSONRepresentation {
   inputs: Input[];
@@ -585,6 +620,17 @@ type BuildTransactionParams =
         ask_token_details: TokenDetails;
         give_token_details: TokenDetails;
       };
+    }
+  | {
+      type: 'Htlc';
+      params: {
+        amount: number;
+        token_id: string;
+        secret_hash: string;
+        spend_address: string;
+        refund_address: string;
+        refund_timelock: string;
+      };
     };
 
 interface OrderData {
@@ -725,13 +771,13 @@ export type BridgeRequestArgs = {
 export type SignChallengeArgs = {
   message: string;
   address?: string;
-}
+};
 
 export type SignChallengeResponse = {
   message: string;
   address: string;
   signature: string;
-}
+};
 
 class Client {
   private network: 'mainnet' | 'testnet';
@@ -1346,6 +1392,8 @@ class Client {
         return 0n;
       case 'ConcludeOrder':
         return 0n;
+      case 'Htlc':
+        return BigInt(1 * Math.pow(10, 11)); // TODO: 0n
       default:
         throw new Error(`Unknown transaction type: ${type}`);
     }
@@ -1877,6 +1925,59 @@ class Client {
         },
       });
     }
+
+    if (type === 'Htlc') {
+      // @ts-ignore
+      const { token_id, token_details } = params;
+
+      if (token_details) {
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details.number_of_decimals));
+        send_token = {
+          token_id,
+          number_of_decimals: token_details.number_of_decimals,
+        };
+      } else {
+        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
+      }
+
+      outputs.push({
+        type: 'Htlc',
+        htlc: {
+          refund_key: params.refund_address,
+          refund_timelock: {
+            content: 20,
+            type: 'ForBlockCount',
+          },
+          secret_hash: {
+            hex: params.secret_hash,
+            string: null,
+          },
+          spend_key: params.spend_address,
+        },
+        value:
+          {
+            ...(token_details
+              ? {
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+                },
+              }
+              : {
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                },
+              }),
+            ...(token_details
+              ? { type: 'TokenV1', token_id }
+              : {
+                type: 'Coin',
+              }),
+          },
+      });
+    }
+
     return { inputs, outputs, send_token, input_amount_coin_req, input_amount_token_req };
   }
 
@@ -2270,6 +2371,27 @@ class Client {
 
       if (output.type === 'DelegateStaking') {
         return encode_output_delegate_staking(Amount.from_atoms(output.amount.atoms), output.delegation_id, network);
+      }
+
+      if (output.type === 'Htlc') {
+        let refund_timelock: Uint8Array = new Uint8Array();
+
+        if (output.htlc.refund_timelock.type === 'UntilTime') {
+          refund_timelock = encode_lock_until_time(BigInt(output.htlc.refund_timelock.content.timestamp)); // TODO: check if timestamp is correct
+        }
+        if (output.htlc.refund_timelock.type === 'ForBlockCount') {
+          refund_timelock = encode_lock_for_block_count(BigInt(output.htlc.refund_timelock.content));
+        }
+
+        return encode_output_htlc(
+          Amount.from_atoms(output.value.amount.atoms),
+          output.value.token_id,
+          output.htlc.secret_hash.hex,
+          output.htlc.spend_key,
+          output.htlc.refund_key,
+          refund_timelock,
+          network,
+        );
       }
     });
     const outputsArray = outputsArrayItems.filter((x): x is NonNullable<typeof x> => x !== undefined);
@@ -2780,6 +2902,22 @@ class Client {
     } else {
       throw new Error('Delegation id or pool id is required');
     }
+  }
+
+  async createHtlc(params: CreateHtlcArgs): Promise<SignedTransaction> {
+    this.ensureInitialized();
+    const tx = await this.buildTransaction({
+      type: 'Htlc',
+      params: {
+        amount: params.amount,
+        token_id: params.token_id,
+        secret_hash: params.secret_hash,
+        spend_address: params.spend_address,
+        refund_address: params.refund_address,
+        refund_timelock: params.refund_timelock,
+      },
+    });
+    return this.signTransaction(tx);
   }
 
   async signTransaction(tx: Transaction): Promise<SignedTransaction> {
