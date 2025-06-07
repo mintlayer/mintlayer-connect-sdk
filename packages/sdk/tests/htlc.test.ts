@@ -109,10 +109,43 @@ test('buildTransaction for transfer - snapshot', async () => {
     amount: "10",
     spend_address: "tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc",
     refund_address: "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
-    refund_timelock: "1749239730",
+    refund_timelock: {
+      type: "UntilTime",
+      content: {
+        timestamp: '1749239730'
+      }
+    },
     token_id: null, // null for native token
     // token_id: "tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq",
     secret_hash: "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3",
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  console.log('result', result);
+
+  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+});
+
+// example of TX: 513932890fb1fee9b21d3004d4292e7eace8753f43d601013d635b8b1195f207
+test('buildTransaction for transfer - snapshot 2', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.createHtlc({
+    amount: "10",
+    spend_address: "tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc",
+    refund_address: "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+    refund_timelock: {
+      type: "ForBlockCount",
+      content: "20"
+    },
+    token_id: null, // null for native token
+    // token_id: "tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq",
+    secret_hash: "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3", // "test"
   });
 
   const result = await spy.mock.results[0]?.value;
