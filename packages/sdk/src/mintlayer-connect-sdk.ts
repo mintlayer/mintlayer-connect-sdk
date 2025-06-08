@@ -468,7 +468,7 @@ export interface TransactionJSONRepresentation {
   inputs: Input[];
   outputs: Output[];
   fee?: AmountFields;
-  id?: string;
+  id: string;
 }
 
 interface Transaction {
@@ -512,6 +512,7 @@ type BuildTransactionParams =
   | {
       type: 'Transfer';
       params: TransferParams;
+      opts?: any; // TODO: define options type
     }
   | {
       type: 'BurnToken';
@@ -998,7 +999,7 @@ class Client {
    * @private
    */
   private selectUTXOs(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
-    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
+    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft', 'Htlc'];
     const filteredUtxos: any[] = utxos // type fix for NFT considering that NFT don't have amount
       .map((utxo) => {
         if (utxo.utxo.type === 'IssueNft') {
@@ -1038,9 +1039,10 @@ class Client {
     const utxosToSpend: UtxoEntry[] = [];
     let lastIndex = 0;
 
-    filteredUtxos.sort((a, b) => {
-      return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
-    });
+    // TODO: sort if good but need to consider force use UTXO, test fails due to this
+    // filteredUtxos.sort((a, b) => {
+    //   return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
+    // });
 
     for (let i = 0; i < filteredUtxos.length; i++) {
       lastIndex = i;
@@ -2055,7 +2057,11 @@ class Client {
     }
 
     const data = await response.json();
-    const utxos: UtxoEntry[] = data.utxos;
+
+    // @ts-ignore
+    const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo || [];
+
+    const utxos: UtxoEntry[] = [...forceSpendUtxo, ...data.utxos];
 
     const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
       this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
@@ -2076,6 +2082,8 @@ class Client {
       const inputObjToken = send_token?.token_id
         ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
         : [];
+
+      console.log('inputObjCoin', JSON.stringify(inputObjCoin));
 
       const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
       const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
@@ -2139,6 +2147,7 @@ class Client {
           atoms: totalFee.toString(),
           decimal: atomsToDecimal(totalFee.toString(), 11).toString(),
         },
+        id: 'to_be_filled_in'
       };
 
       const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
@@ -2442,8 +2451,17 @@ class Client {
     const outputsArray = outputsArrayItems.filter((x): x is NonNullable<typeof x> => x !== undefined);
 
     const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
-      .filter(({ input }) => input.input_type === 'UTXO')
-      .map((input) => input.utxo.destination);
+      .filter(({ input, utxo }) => input.input_type === 'UTXO')
+      .map((input) => {
+        if (input.utxo.destination){
+          return input.utxo.destination;
+        }
+        // @ts-ignore
+        if (input.utxo.htlc) {
+          // @ts-ignore
+          return input.utxo.htlc.refund_key; // TODO: need to handle spend too
+        }
+      });
 
     // @ts-ignore
     if (transactionJSONrepresentation.inputs[0].input.account_type === 'DelegationBalance') {
@@ -2476,6 +2494,10 @@ class Client {
         inputAddresses.push(transactionJSONrepresentation.inputs[0].input.authority);
       }
     }
+
+    console.log('inputsArray', inputsArray);
+    console.log('outputsArray', outputsArray);
+
 
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
@@ -2965,6 +2987,38 @@ class Client {
     return this.signTransaction(tx);
   }
 
+  async refundHtlc(params: any): Promise<any> {
+    this.ensureInitialized();
+
+    const { transaction_id, utxo } = params;
+
+    let useHtlcUtxo: any[] = [];
+
+    if (transaction_id) {
+      const response = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch transaction');
+      }
+      const transaction: TransactionJSONRepresentation = await response.json();
+      // @ts-ignore
+      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
+      // @ts-ignore
+      useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
+    }
+
+    const tx = await this.buildTransaction({
+      type: 'Transfer',
+      params: {
+        to: useHtlcUtxo[0].utxo.htlc.refund_key,
+        amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+      },
+      opts: {
+        forceSpendUtxo: useHtlcUtxo,
+      }
+    });
+    return this.signTransaction(tx);
+  }
+
   async signTransaction(tx: Transaction): Promise<SignedTransaction> {
     this.ensureInitialized();
     return this.request({
@@ -3023,7 +3077,7 @@ class Client {
           outpoint: {
             index,
             source_type: SourceId.Transaction,
-            source_id: tx.transaction_id,
+            source_id: tx.JSONRepresentation.id,
           },
           utxo: {
             type: output.type,
@@ -3052,7 +3106,7 @@ class Client {
           outpoint: {
             index,
             source_type: SourceId.Transaction,
-            source_id: tx.transaction_id,
+            source_id: tx.JSONRepresentation.id,
           },
           // @ts-ignore
           utxo: {
@@ -3061,6 +3115,24 @@ class Client {
             destination: output.destination,
             token_id: output.token_id,
             data: output.data,
+          },
+        });
+      }
+      if (output.type === 'Htlc') {
+        created.push({
+          outpoint: {
+            index,
+            source_type: SourceId.Transaction,
+            source_id: tx.JSONRepresentation.id,
+          },
+          // @ts-ignore
+          utxo: {
+            // @ts-ignore
+            type: output.type,
+            // @ts-ignore
+            value: output.value,
+            // @ts-ignore
+            htlc: output.htlc,
           },
         });
       }
