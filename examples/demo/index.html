@@ -948,11 +948,13 @@
         refund_address: "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
         refund_timelock: {
           type: "ForBlockCount",
-          content: "20"
+          content: "2"
         },
         token_id: null, // null for native token
         // token_id: "tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq",
-        secret_hash: "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3",
+        secret_hash: {
+          hex: 'd5777dbd9541baea8a562381387323773b18e0f6'
+        },
       });
 
       displayOutput(`Signature: ${JSON.stringify(signature, null, 2)}`);

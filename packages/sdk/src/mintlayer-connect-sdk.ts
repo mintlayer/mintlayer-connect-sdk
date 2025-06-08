@@ -1388,7 +1388,7 @@ class Client {
     let fee = Amount.from_atoms('0');
     switch (type) {
       case 'Transfer':
-        return 0n;
+        return BigInt(1 * Math.pow(10, 11)); // TODO: 0n
       case 'BurnToken':
         return 0n;
       case 'IssueNft':
@@ -1996,7 +1996,8 @@ class Client {
             type: 'ForBlockCount',
           },
           secret_hash: {
-            hex: params.secret_hash,
+            // @ts-ignore
+            hex: params.secret_hash.hex,
             string: null,
           },
           spend_key: params.spend_address,
@@ -2149,6 +2150,8 @@ class Client {
         },
         id: 'to_be_filled_in'
       };
+
+      console.log('JSONRepresentation', JSONRepresentation);
 
       const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
