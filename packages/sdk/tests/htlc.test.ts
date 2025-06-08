@@ -98,6 +98,96 @@ beforeEach(() => {
           "version_byte": 1
         });
       }
+      if(txId === '5a6752ae5d4da45c9f163d0f1b24aed13e3fda88b11742469b202b37f7b9e38f') {
+        return JSON.stringify({
+          "block_id": "abe6ebe0f1b51f9c404348d0e9fb2a3ef1dadfdb67ad7644ca940aebe392c7d4",
+          "confirmations": "12",
+          "fee": {
+            "atoms": "134500000000",
+            "decimal": "1.345"
+          },
+          "flags": 0,
+          "id": "5a6752ae5d4da45c9f163d0f1b24aed13e3fda88b11742469b202b37f7b9e38f",
+          "inputs": [
+            {
+              "input": {
+                "index": 0,
+                "input_type": "UTXO",
+                "source_id": "408a1e5a8c59ed10ffc6a55244f29e465b692223ef6e6ef05b03a3a4b6010507",
+                "source_type": "Transaction"
+              },
+              "utxo": {
+                "htlc": {
+                  "refund_key": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+                  "refund_timelock": {
+                    "content": 20,
+                    "type": "ForBlockCount"
+                  },
+                  "secret_hash": {
+                    "hex": "d5777dbd9541baea8a562381387323773b18e0f6",
+                    "string": null
+                  },
+                  "spend_key": "tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc"
+                },
+                "type": "Htlc",
+                "value": {
+                  "amount": {
+                    "atoms": "1000000000000",
+                    "decimal": "10"
+                  },
+                  "type": "Coin"
+                }
+              }
+            },
+            {
+              "input": {
+                "index": 0,
+                "input_type": "UTXO",
+                "source_id": "e4e82208a042b4c30be2d3f49ef880cd5393345d25a87de096cebf96b90751ae",
+                "source_type": "Transaction"
+              },
+              "utxo": {
+                "destination": "tmt1qyrjfd5e3nref7zga24jcthffahjwyg3csxu3xgc",
+                "type": "Transfer",
+                "value": {
+                  "amount": {
+                    "atoms": "1000000000000",
+                    "decimal": "10"
+                  },
+                  "type": "Coin"
+                }
+              }
+            }
+          ],
+          "is_replaceable": false,
+          "outputs": [
+            {
+              "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+              "type": "Transfer",
+              "value": {
+                "amount": {
+                  "atoms": "1000000000000",
+                  "decimal": "10"
+                },
+                "type": "Coin"
+              }
+            },
+            {
+              "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+              "type": "Transfer",
+              "value": {
+                "amount": {
+                  "atoms": "865500000000",
+                  "decimal": "8.655"
+                },
+                "type": "Coin"
+              }
+            }
+          ],
+          "timestamp": "1749419790",
+          "version_byte": 1
+        });
+      }
     }
 
     if (url.includes('/token/')) {
@@ -260,3 +350,18 @@ test('buildTransaction for htlc refund', async () => {
   console.log(JSON.stringify(result.JSONRepresentation, null, 2));
   expect(result).toMatchSnapshot();
 })
+
+test('extract Htlc from transaction', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  await client.connect();
+
+  const secret = await client.extractHtlcSecret({
+    transaction_id: "5a6752ae5d4da45c9f163d0f1b24aed13e3fda88b11742469b202b37f7b9e38f",
+    transaction_hex: "0100080000408a1e5a8c59ed10ffc6a55244f29e465b692223ef6e6ef05b03a3a4b6010507000000000000e4e82208a042b4c30be2d3f49ef880cd5393345d25a87de096cebf96b90751ae00000000080000070010a5d4e80186ec450457d09ad9807393d89cec9c71d620602100000700efd183c90186ec450457d09ad9807393d89cec9c71d62060210801011902002fec938c1a8735a46698ca0aa4539cbac7036ecc0a900af43fc5ec04591a48048d01000263e8a1cbb56634ef88997b93fed52b3420fcc7d169954b67def9dce82b549953007ff174e51f07617fe6a6d4eda904999a4468d464b9a82df43bf5fac01dd73241fc8f6ca2822050d61591d04aa4bdc3c484d222882ec5dca2b02738b87b5a3dbc01018d010003b8b4a52ce4957f998479c5e881133648b95fc4b0c54bd58c7d32d37c4d0f235a007765bf6b6b50d44dca4bba8e95c40d610d1130535c22a4f50f3cd9d9b432938d436348180153aaf905a6d8b330e428c8d0d92402bb3cfbd21da02eacd426ad9b",
+  });
+
+  const secret_original = new Uint8Array([47, 236, 147, 140, 26, 135, 53, 164, 102, 152, 202, 10, 164, 83, 156, 186, 199, 3, 110, 204, 10, 144, 10, 244, 63, 197, 236, 4, 89, 26, 72, 4]);
+
+  expect(Array.from(secret)).toEqual(Array.from(secret_original));
+});

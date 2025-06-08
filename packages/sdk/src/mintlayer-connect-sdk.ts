@@ -45,6 +45,7 @@ import initWasm, {
   encode_witness,
   SignatureHashType,
   encode_output_htlc,
+  extract_htlc_secret,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -65,6 +66,19 @@ function mergeUint8Arrays(arrays: Uint8Array[]) {
 
 function stringToUint8Array(str: string): Uint8Array {
   return new TextEncoder().encode(str);
+}
+
+function hexToUint8Array(hex: any) {
+  if (hex.length % 2 !== 0) {
+    throw new Error("Invalid hex string");
+  }
+
+  const array = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < array.length; i++) {
+    array[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+
+  return array;
 }
 
 export function atomsToDecimal(atoms: string | number, decimals: number): string {
@@ -3020,6 +3034,45 @@ class Client {
       }
     });
     return this.signTransaction(tx);
+  }
+
+  async extractHtlcSecret(arg: any): Promise<any> {
+    const {
+      transaction_id,
+      transaction_hex,
+    } = arg;
+
+    const res = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
+    if (!res.ok) {
+      throw new Error('Failed to fetch transaction');
+    }
+    const transaction: TransactionJSONRepresentation = await res.json();
+
+    const transaction_signed = hexToUint8Array(transaction_hex);
+
+    const inputs = transaction.inputs.filter(({utxo}: any) => utxo && utxo.type === 'Htlc');
+
+    const outpointedSourceIds: any[] = (inputs as any[])
+      .filter(({ input }) => input.input_type === 'UTXO')
+      .map(({ input }) => {
+        const bytes = Uint8Array.from(input.source_id.match(/.{1,2}/g)!.map((byte: any) => parseInt(byte, 16)));
+        return {
+          source_id: encode_outpoint_source_id(bytes, SourceId.Transaction),
+          index: input.index,
+        };
+      });
+
+    const htlc_outpoint_source_id: any = outpointedSourceIds[0].source_id;
+    const htlc_output_index: any = outpointedSourceIds[0].index;
+
+    const secret = extract_htlc_secret(
+      transaction_signed,
+      true,
+      htlc_outpoint_source_id,
+      htlc_output_index
+    );
+
+    return secret;
   }
 
   async signTransaction(tx: Transaction): Promise<SignedTransaction> {
