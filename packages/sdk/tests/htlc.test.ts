@@ -24,6 +24,81 @@ beforeEach(() => {
       return JSON.stringify({ height: 200000 });
     }
 
+    if (url.includes('/transaction/')) {
+      const txId = url.split('/transaction/').pop();
+      if(txId === '513932890fb1fee9b21d3004d4292e7eace8753f43d601013d635b8b1195f207') {
+        return JSON.stringify({
+          "block_id": "445e7c4520afd0f1296aebbe87d8547d9025dd99a86e594d178efaefd6db1f6d",
+          "confirmations": "913",
+          "fee": {
+            "atoms": "124900000000",
+            "decimal": "1.249"
+          },
+          "flags": 0,
+          "id": "513932890fb1fee9b21d3004d4292e7eace8753f43d601013d635b8b1195f207",
+          "inputs": [
+            {
+              "input": {
+                "index": 1,
+                "input_type": "UTXO",
+                "source_id": "92b08778d6d0345f1f943f83e7969fbcece9629938dddcec94f0b28382a58feb",
+                "source_type": "Transaction"
+              },
+              "utxo": {
+                "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+                "type": "Transfer",
+                "value": {
+                  "amount": {
+                    "atoms": "1689595604300000",
+                    "decimal": "16895.956043"
+                  },
+                  "type": "Coin"
+                }
+              }
+            }
+          ],
+          "is_replaceable": false,
+          "outputs": [
+            {
+              "htlc": {
+                "refund_key": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+                "refund_timelock": {
+                  "content": 20,
+                  "type": "ForBlockCount"
+                },
+                "secret_hash": {
+                  "hex": "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3",
+                  "string": null
+                },
+                "spend_key": "tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc"
+              },
+              "type": "Htlc",
+              "value": {
+                "amount": {
+                  "atoms": "1000000000000",
+                  "decimal": "10"
+                },
+                "type": "Coin"
+              }
+            },
+            {
+              "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6",
+              "type": "Transfer",
+              "value": {
+                "amount": {
+                  "atoms": "1688470704300000",
+                  "decimal": "16884.707043"
+                },
+                "type": "Coin"
+              }
+            }
+          ],
+          "timestamp": "1749276116",
+          "version_byte": 1
+        });
+      }
+    }
+
     if (url.includes('/token/')) {
       const tokenId = url.split('/token/').pop();
       if (tokenId === 'tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq') {
@@ -153,5 +228,23 @@ test('buildTransaction for transfer - snapshot 2', async () => {
   console.log('result', result);
 
   console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+  expect(result).toMatchSnapshot();
 });
 
+test('buildTransaction for htlc refund', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.refundHtlc({
+    transaction_id: "513932890fb1fee9b21d3004d4292e7eace8753f43d601013d635b8b1195f207",
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  console.log('result', result);
+  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+  expect(result).toMatchSnapshot();
+})
