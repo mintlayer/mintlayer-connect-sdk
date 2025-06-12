@@ -1053,10 +1053,9 @@ class Client {
     const utxosToSpend: UtxoEntry[] = [];
     let lastIndex = 0;
 
-    // TODO: sort if good but need to consider force use UTXO, test fails due to this
-    // filteredUtxos.sort((a, b) => {
-    //   return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
-    // });
+    filteredUtxos.sort((a, b) => {
+      return Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms));
+    });
 
     for (let i = 0; i < filteredUtxos.length; i++) {
       lastIndex = i;
@@ -2076,7 +2075,7 @@ class Client {
     // @ts-ignore
     const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo || [];
 
-    const utxos: UtxoEntry[] = [...forceSpendUtxo, ...data.utxos];
+    const utxos: UtxoEntry[] = data.utxos;
 
     const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
       this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
@@ -2098,7 +2097,20 @@ class Client {
         ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
         : [];
 
-      console.log('inputObjCoin', JSON.stringify(inputObjCoin));
+      if(forceSpendUtxo) {
+        const forceCoinUtxos = forceSpendUtxo.filter(utxo => utxo.utxo.value.type === 'Coin');
+        const forceTokenUtxos = forceSpendUtxo.filter(utxo => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === send_token?.token_id);
+
+        if (forceCoinUtxos.length > 0) {
+          // @ts-ignore
+          inputObjCoin.unshift(...forceCoinUtxos);
+        }
+        if (forceTokenUtxos.length > 0) {
+          // @ts-ignore
+          inputObjToken.unshift(...forceTokenUtxos);
+        }
+      }
+
 
       const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
       const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
@@ -2990,11 +3002,25 @@ class Client {
 
   async createHtlc(params: CreateHtlcArgs): Promise<SignedTransaction> {
     this.ensureInitialized();
+
+    let token_details: TokenDetails | undefined = undefined;
+
+    if(params.token_id){
+      const request = await fetch(`${this.getApiServer()}/token/${params.token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      token_details = token;
+    }
+
     const tx = await this.buildTransaction({
       type: 'Htlc',
       params: {
         amount: params.amount,
         token_id: params.token_id,
+        token_details: token_details || undefined,
+        // @ts-ignore
         secret_hash: params.secret_hash,
         spend_address: params.spend_address,
         refund_address: params.refund_address,
@@ -3096,6 +3122,14 @@ class Client {
         message: args.message,
         address: args.address,
       },
+    });
+  }
+
+  async requestSecretHash(args: any): Promise<any> {
+    this.ensureInitialized();
+    return this.request({
+      method: 'requestSecretHash',
+      params: {},
     });
   }
 
