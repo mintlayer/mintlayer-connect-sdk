@@ -41,6 +41,7 @@ import initWasm, {
   encode_output_data_deposit,
   encode_output_create_delegation,
   encode_output_delegate_staking,
+  encode_output_htlc, extract_htlc_secret,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -61,6 +62,19 @@ function mergeUint8Arrays(arrays: Uint8Array[]) {
 
 function stringToUint8Array(str: string): Uint8Array {
   return new TextEncoder().encode(str);
+}
+
+function hexToUint8Array(hex: any) {
+  if (hex.length % 2 !== 0) {
+    throw new Error("Invalid hex string");
+  }
+
+  const array = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < array.length; i++) {
+    array[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+
+  return array;
 }
 
 function atomsToDecimal(atoms: string | number, decimals: number): string {
@@ -133,6 +147,8 @@ export class MojitoAccountProvider implements AccountProvider {
     }
   }
 }
+
+type CreateHtlcArgs = any;
 
 type AmountFields = {
   atoms: string;
@@ -352,6 +368,37 @@ type IssueFungibleTokenOutput = {
   total_supply: TotalSupplyValue;
 };
 
+type Timelock =
+  | {
+  type: 'UntilTime';
+  content: {
+    timestamp: string;
+  };
+}
+  | {
+  type: 'ForBlockCount';
+  content: number;
+};
+
+type HtlcOutput = {
+  type: 'Htlc';
+  value: {
+    token_id?: string;
+    type: 'Coin' | 'TokenV1';
+    amount: AmountFields;
+  }
+  token_id?: string;
+  htlc: {
+    refund_key: string;
+    secret_hash: {
+      hex: string;
+      string: string | null;
+    },
+    spend_key: string;
+    refund_timelock: Timelock;
+  }
+}
+
 type IssueNftOutput = {
   type: 'IssueNft';
   destination: string;
@@ -388,13 +435,14 @@ type Output =
   | IssueNftOutput
   | CreateOrderOutput
   | CreateDelegationIdOutput
-  | DelegateStakingOutput;
+  | DelegateStakingOutput
+  | HtlcOutput;
 
 export interface TransactionJSONRepresentation {
   inputs: Input[];
   outputs: Output[];
   fee?: AmountFields;
-  id?: string;
+  id: string;
 }
 
 interface Transaction {
@@ -438,6 +486,7 @@ type BuildTransactionParams =
   | {
       type: 'Transfer';
       params: TransferParams;
+      opts?: any; // TODO: define options type
     }
   | {
       type: 'BurnToken';
@@ -585,6 +634,17 @@ type BuildTransactionParams =
         ask_token_details: TokenDetails;
         give_token_details: TokenDetails;
       };
+    }
+  | {
+      type: 'Htlc';
+      params: {
+        amount: number;
+        token_id: string;
+        secret_hash: string;
+        spend_address: string;
+        refund_address: string;
+        refund_timelock: string;
+      };
     };
 
 interface OrderData {
@@ -725,13 +785,13 @@ export type BridgeRequestArgs = {
 export type SignChallengeArgs = {
   message: string;
   address?: string;
-}
+};
 
 export type SignChallengeResponse = {
   message: string;
   address: string;
   signature: string;
-}
+};
 
 class Client {
   private network: 'mainnet' | 'testnet';
@@ -913,7 +973,7 @@ class Client {
    * @private
    */
   private selectUTXOs(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
-    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
+    const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft', 'Htlc'];
     const filteredUtxos: any[] = utxos // type fix for NFT considering that NFT don't have amount
       .map((utxo) => {
         if (utxo.utxo.type === 'IssueNft') {
@@ -1301,7 +1361,7 @@ class Client {
     let fee = Amount.from_atoms('0');
     switch (type) {
       case 'Transfer':
-        return 0n;
+        return BigInt(1 * Math.pow(10, 11)); // TODO: 0n
       case 'BurnToken':
         return 0n;
       case 'IssueNft':
@@ -1346,6 +1406,8 @@ class Client {
         return 0n;
       case 'ConcludeOrder':
         return 0n;
+      case 'Htlc':
+        return BigInt(1 * Math.pow(10, 11)); // TODO: 0n
       default:
         throw new Error(`Unknown transaction type: ${type}`);
     }
@@ -1877,6 +1939,60 @@ class Client {
         },
       });
     }
+
+    if (type === 'Htlc') {
+      // @ts-ignore
+      const { token_id, token_details } = params;
+
+      if (token_details) {
+        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details.number_of_decimals));
+        send_token = {
+          token_id,
+          number_of_decimals: token_details.number_of_decimals,
+        };
+      } else {
+        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
+      }
+
+      outputs.push({
+        type: 'Htlc',
+        htlc: {
+          refund_key: params.refund_address,
+          refund_timelock: {
+            content: 20,
+            type: 'ForBlockCount',
+          },
+          secret_hash: {
+            // @ts-ignore
+            hex: params.secret_hash.hex,
+            string: null,
+          },
+          spend_key: params.spend_address,
+        },
+        value:
+          {
+            ...(token_details
+              ? {
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+                },
+              }
+              : {
+                amount: {
+                  decimal: params.amount!.toString(),
+                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                },
+              }),
+            ...(token_details
+              ? { type: 'TokenV1', token_id }
+              : {
+                type: 'Coin',
+              }),
+          },
+      });
+    }
+
     return { inputs, outputs, send_token, input_amount_coin_req, input_amount_token_req };
   }
 
@@ -1909,6 +2025,10 @@ class Client {
     }
 
     const data = await response.json();
+
+    // @ts-ignore
+    const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo || [];
+
     const utxos: UtxoEntry[] = data.utxos;
 
     const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
@@ -1930,6 +2050,21 @@ class Client {
       const inputObjToken = send_token?.token_id
         ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
         : [];
+
+      if(forceSpendUtxo) {
+        const forceCoinUtxos = forceSpendUtxo.filter(utxo => utxo.utxo.value.type === 'Coin');
+        const forceTokenUtxos = forceSpendUtxo.filter(utxo => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === send_token?.token_id);
+
+        if (forceCoinUtxos.length > 0) {
+          // @ts-ignore
+          inputObjCoin.unshift(...forceCoinUtxos);
+        }
+        if (forceTokenUtxos.length > 0) {
+          // @ts-ignore
+          inputObjToken.unshift(...forceTokenUtxos);
+        }
+      }
+
 
       const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
       const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
@@ -1993,7 +2128,10 @@ class Client {
           atoms: totalFee.toString(),
           decimal: atomsToDecimal(totalFee.toString(), 11).toString(),
         },
+        id: 'to_be_filled_in'
       };
+
+      console.log('JSONRepresentation', JSONRepresentation);
 
       const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
@@ -2271,12 +2409,42 @@ class Client {
       if (output.type === 'DelegateStaking') {
         return encode_output_delegate_staking(Amount.from_atoms(output.amount.atoms), output.delegation_id, network);
       }
+
+      if (output.type === 'Htlc') {
+        let refund_timelock: Uint8Array = new Uint8Array();
+
+        if (output.htlc.refund_timelock.type === 'UntilTime') {
+          refund_timelock = encode_lock_until_time(BigInt(output.htlc.refund_timelock.content.timestamp)); // TODO: check if timestamp is correct
+        }
+        if (output.htlc.refund_timelock.type === 'ForBlockCount') {
+          refund_timelock = encode_lock_for_block_count(BigInt(output.htlc.refund_timelock.content));
+        }
+
+        return encode_output_htlc(
+          Amount.from_atoms(output.value.amount.atoms),
+          output.value.token_id,
+          output.htlc.secret_hash.hex,
+          output.htlc.spend_key,
+          output.htlc.refund_key,
+          refund_timelock,
+          network,
+        );
+      }
     });
     const outputsArray = outputsArrayItems.filter((x): x is NonNullable<typeof x> => x !== undefined);
 
     const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
-      .filter(({ input }) => input.input_type === 'UTXO')
-      .map((input) => input.utxo.destination);
+      .filter(({ input, utxo }) => input.input_type === 'UTXO')
+      .map((input) => {
+        if (input.utxo.destination){
+          return input.utxo.destination;
+        }
+        // @ts-ignore
+        if (input.utxo.htlc) {
+          // @ts-ignore
+          return input.utxo.htlc.refund_key; // TODO: need to handle spend too
+        }
+      });
 
     // @ts-ignore
     if (transactionJSONrepresentation.inputs[0].input.account_type === 'DelegationBalance') {
@@ -2309,6 +2477,10 @@ class Client {
         inputAddresses.push(transactionJSONrepresentation.inputs[0].input.authority);
       }
     }
+
+    console.log('inputsArray', inputsArray);
+    console.log('outputsArray', outputsArray);
+
 
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
@@ -2782,6 +2954,107 @@ class Client {
     }
   }
 
+  async createHtlc(params: CreateHtlcArgs): Promise<SignedTransaction> {
+    this.ensureInitialized();
+
+    let token_details: TokenDetails | undefined = undefined;
+
+    if(params.token_id){
+      const request = await fetch(`${this.getApiServer()}/token/${params.token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      const token = await request.json();
+      token_details = token;
+    }
+
+    const tx = await this.buildTransaction({
+      type: 'Htlc',
+      params: {
+        amount: params.amount,
+        token_id: params.token_id,
+        token_details: token_details || undefined,
+        // @ts-ignore
+        secret_hash: params.secret_hash,
+        spend_address: params.spend_address,
+        refund_address: params.refund_address,
+        refund_timelock: params.refund_timelock,
+      },
+    });
+    return this.signTransaction(tx);
+  }
+
+  async refundHtlc(params: any): Promise<any> {
+    this.ensureInitialized();
+
+    const { transaction_id, utxo } = params;
+
+    let useHtlcUtxo: any[] = [];
+
+    if (transaction_id) {
+      const response = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch transaction');
+      }
+      const transaction: TransactionJSONRepresentation = await response.json();
+      // @ts-ignore
+      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
+      // @ts-ignore
+      useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
+    }
+
+    const tx = await this.buildTransaction({
+      type: 'Transfer',
+      params: {
+        to: useHtlcUtxo[0].utxo.htlc.refund_key,
+        amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+      },
+      opts: {
+        forceSpendUtxo: useHtlcUtxo,
+      }
+    });
+    return this.signTransaction(tx);
+  }
+
+  async extractHtlcSecret(arg: any): Promise<any> {
+    const {
+      transaction_id,
+      transaction_hex,
+    } = arg;
+
+    const res = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
+    if (!res.ok) {
+      throw new Error('Failed to fetch transaction');
+    }
+    const transaction: TransactionJSONRepresentation = await res.json();
+
+    const transaction_signed = hexToUint8Array(transaction_hex);
+
+    const inputs = transaction.inputs.filter(({utxo}: any) => utxo && utxo.type === 'Htlc');
+
+    const outpointedSourceIds: any[] = (inputs as any[])
+      .filter(({ input }) => input.input_type === 'UTXO')
+      .map(({ input }) => {
+        const bytes = Uint8Array.from(input.source_id.match(/.{1,2}/g)!.map((byte: any) => parseInt(byte, 16)));
+        return {
+          source_id: encode_outpoint_source_id(bytes, SourceId.Transaction),
+          index: input.index,
+        };
+      });
+
+    const htlc_outpoint_source_id: any = outpointedSourceIds[0].source_id;
+    const htlc_output_index: any = outpointedSourceIds[0].index;
+
+    const secret = extract_htlc_secret(
+      transaction_signed,
+      true,
+      htlc_outpoint_source_id,
+      htlc_output_index
+    );
+
+    return secret;
+  }
+
   async signTransaction(tx: Transaction): Promise<SignedTransaction> {
     this.ensureInitialized();
     return this.request({
@@ -2803,6 +3076,14 @@ class Client {
         message: args.message,
         address: args.address,
       },
+    });
+  }
+
+  async requestSecretHash(args: any): Promise<any> {
+    this.ensureInitialized();
+    return this.request({
+      method: 'requestSecretHash',
+      params: {},
     });
   }
 
@@ -2840,7 +3121,7 @@ class Client {
           outpoint: {
             index,
             source_type: SourceId.Transaction,
-            source_id: tx.transaction_id,
+            source_id: tx.JSONRepresentation.id,
           },
           utxo: {
             type: output.type,
@@ -2854,7 +3135,7 @@ class Client {
           outpoint: {
             index,
             source_type: SourceId.Transaction,
-            source_id: tx.transaction_id,
+            source_id: tx.JSONRepresentation.id,
           },
           // @ts-ignore
           utxo: {
@@ -2863,6 +3144,24 @@ class Client {
             destination: output.destination,
             token_id: output.token_id,
             data: output.data,
+          },
+        });
+      }
+      if (output.type === 'Htlc') {
+        created.push({
+          outpoint: {
+            index,
+            source_type: SourceId.Transaction,
+            source_id: tx.JSONRepresentation.id,
+          },
+          // @ts-ignore
+          utxo: {
+            // @ts-ignore
+            type: output.type,
+            // @ts-ignore
+            value: output.value,
+            // @ts-ignore
+            htlc: output.htlc,
           },
         });
       }
