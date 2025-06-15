@@ -74,7 +74,68 @@ const tx = await client.buildTransaction({
 
 ### 4. Sign transaction
 
-TODO
+Since version 1.0.17 the SDK supports signing transactions using class Signer:
+
+```ts
+import { Signer } from '@mintlayer/sdk';
+ 
+const private_keys = {
+    'tmt1qxyz...': new Uint8Array([0,0,0,...]) // Replace with actual private key bytes
+};
+
+const signer = new Signer(private_keys);
+
+const transaction = await client.buildTransaction({
+  type: 'Transfer',
+  params: {
+    to: 'tmt1qxyz...', // recipient address
+    amount: 10,        // in human-readable units
+  },
+});
+
+const signed_transaction = await signer.signTransaction(transaction);
+```
+
+To use helper methods, you have to implement AccountProvider interface that will handle connection and signing requests. By default, SDK communicates to Mojito Account Provider. Here's an example implementation:
+
+```ts
+class MyAccountProvider implements AccountProvider {
+  async connect() {
+    return addresses; // Replace with actual addresses
+  }
+
+  async restore() {
+    return addresses;
+  }
+
+  async disconnect() {
+    return Promise.resolve()
+  }
+
+  async request(method, params) {
+    if( method === 'signTransaction') {
+      const signer = new Signer(private_keys);
+      const transaction_signed = signer.sign(params.txData);
+
+      return Promise.resolve(transaction_signed);
+    }
+    throw new Error(`Method ${method} not implemented`);
+  }
+}
+
+const client = await Client.create({
+  network: 'testnet',
+  autoRestore: false,
+  accountProvider: new MyAccountProvider()
+});
+
+await client.connect();
+
+const signed_transaction = await client.transfer({
+  to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+  amount: 10,
+});
+```
 
 ---
 
