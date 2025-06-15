@@ -1401,7 +1401,7 @@ class Client {
     let fee = Amount.from_atoms('0');
     switch (type) {
       case 'Transfer':
-        return BigInt(1 * Math.pow(10, 11)); // TODO: 0n
+        return 0n;
       case 'BurnToken':
         return 0n;
       case 'IssueNft':
