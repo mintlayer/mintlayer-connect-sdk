@@ -1,4 +1,4 @@
-import { AccountProvider, Client } from '../src/mintlayer-connect-sdk';
+import { AccountProvider, Client, Signer } from '../src/mintlayer-connect-sdk';
 import fetchMock from 'jest-fetch-mock';
 
 import { addresses, utxos } from './__mocks__/accounts/account_signer'
@@ -17,6 +17,15 @@ class TestAccountProvider implements AccountProvider {
   }
 
   async request(method: any, params: any) {
+    if( method === 'signTransaction') {
+      console.log('params', params);
+      const signer = new Signer({});
+      const transaction_signed = signer.sign(params.txData);
+      console.log('transaction_signed', transaction_signed);
+
+      return Promise.resolve('signed-transaction');
+    }
+
     return Promise.resolve('signed-transaction-custom-signer');
   }
 }

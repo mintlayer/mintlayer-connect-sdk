@@ -3011,7 +3011,7 @@ class Client {
   }
 }
 
-export class TransactionSigner {
+class Signer {
   private keys: Record<string, Uint8Array>;
 
   constructor(privateKeys: Record<string, Uint8Array>) {
@@ -3147,6 +3147,6 @@ export class TransactionSigner {
   }
 }
 
-export { Client };
+export { Client, Signer };
 
 console.log('[Mintlayer Connect SDK] Loaded');
