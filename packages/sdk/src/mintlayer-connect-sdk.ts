@@ -41,6 +41,9 @@ import initWasm, {
   encode_output_data_deposit,
   encode_output_create_delegation,
   encode_output_delegate_staking,
+  encode_signed_transaction,
+  encode_witness,
+  SignatureHashType,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -170,13 +173,42 @@ interface UtxoEntry {
   utxo: Utxo;
 }
 
-type Utxo = {
-  type: 'Transfer' | 'LockThenTransfer' | 'IssueNft';
+type BaseUtxo = {
   value: Value;
   destination: string;
   token_id?: string;
-  data?: any; // split NFT utxo
 };
+
+type TransferUtxo = BaseUtxo & {
+  type: 'Transfer';
+};
+
+type LockThenTransferUtxo = BaseUtxo & {
+  type: 'LockThenTransfer';
+  lock: {
+    type: 'ForBlockCount' | 'UntilTime';
+    content: string;
+  };
+};
+
+type IssueNftUtxo = {
+  type: 'IssueNft';
+  value: Value;
+  destination: string;
+  token_id?: string;
+  data: {
+    name: { hex: string; string: string };
+    ticker: { hex: string; string: string };
+    description: { hex: string; string: string };
+    media_hash: { hex: string; string: string };
+    media_uri: { hex: string; string: string };
+    icon_uri: { hex: string; string: string };
+    additional_metadata_uri: { hex: string; string: string };
+    creator: string | null;
+  };
+};
+
+type Utxo = TransferUtxo | LockThenTransferUtxo | IssueNftUtxo;
 
 type UtxoInput = {
   input: {
@@ -1086,10 +1118,10 @@ class Client {
   async request({ method, params }: { method: string; params?: Record<string, any> }): Promise<any> {
     this.ensureInitialized();
 
-    if (typeof window !== 'undefined' && window.mojito?.request) {
-      return await window.mojito.request(method, params);
+    if (typeof this.accountProvider.request !== 'undefined') {
+      return await this.accountProvider.request(method, params);
     } else {
-      throw new Error('Mojito extension not available');
+      throw new Error('request method not implemented in the account provider');
     }
   }
 
@@ -2835,7 +2867,7 @@ class Client {
     });
 
     tx.JSONRepresentation.outputs.forEach((output, index) => {
-      if (output.type === 'Transfer' || output.type === 'LockThenTransfer') {
+      if (output.type === 'Transfer') {
         created.push({
           outpoint: {
             index,
@@ -2846,6 +2878,21 @@ class Client {
             type: output.type,
             value: output.value,
             destination: output.destination,
+          },
+        });
+      }
+      if (output.type === 'LockThenTransfer') {
+        created.push({
+          outpoint: {
+            index,
+            source_type: SourceId.Transaction,
+            source_id: tx.transaction_id,
+          },
+          utxo: {
+            type: output.type,
+            value: output.value,
+            destination: output.destination,
+            lock: output.lock,
           },
         });
       }
@@ -2964,6 +3011,142 @@ class Client {
   }
 }
 
-export { Client };
+class Signer {
+  private keys: Record<string, Uint8Array>;
+
+  constructor(privateKeys: Record<string, Uint8Array>) {
+    this.keys = privateKeys;
+  }
+
+  private getPrivateKey(address: string): Uint8Array | undefined {
+    return this.keys[address];
+  }
+
+  private createSignature(tx: Transaction) {
+    const network = Network.Testnet; // TODO: make network configurable
+    const optUtxos_ = tx.JSONRepresentation.inputs.map((input) => {
+      if (input.input.input_type !== 'UTXO') {
+        return 0
+      }
+      const { utxo }: UtxoInput = input as UtxoInput;
+      if (input.input.input_type === 'UTXO') {
+        if (utxo.type === 'Transfer') {
+          if (utxo.value.type === 'TokenV1') {
+            return encode_output_token_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, utxo.value.token_id, network);
+          } else {
+            return encode_output_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, network);
+          }
+        }
+        if (utxo.type === 'LockThenTransfer') {
+          let lockEncoded: Uint8Array = new Uint8Array();
+          if (utxo.lock.type === 'UntilTime') {
+            // @ts-ignore
+            lockEncoded = encode_lock_until_time(BigInt(utxo.lock.content.timestamp)); // TODO: check if timestamp is correct
+          }
+          if (utxo.lock.type === 'ForBlockCount') {
+            lockEncoded = encode_lock_for_block_count(BigInt(utxo.lock.content));
+          }
+          if (utxo.value.type === 'TokenV1') {
+            return encode_output_token_lock_then_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, utxo.value.token_id, lockEncoded, network);
+          } else {
+            return encode_output_lock_then_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, lockEncoded, network);
+          }
+        }
+        return null
+      }
+    })
+
+    const optUtxosArray: number[] = [];
+
+    for (let i = 0; i < optUtxos_.length; i++) {
+      const utxoBytes = optUtxos_[i];
+      if (tx.JSONRepresentation.inputs[i].input.input_type !== 'UTXO') {
+        optUtxosArray.push(0);
+      } else {
+        if (!(utxoBytes instanceof Uint8Array)) {
+          throw new Error(`optUtxos_[${i}] is not a valid Uint8Array`);
+        }
+        optUtxosArray.push(1);
+        optUtxosArray.push(...utxoBytes);
+      }
+    }
+
+    const optUtxos = new Uint8Array(optUtxosArray);
+
+    const encodedWitnesses = tx.JSONRepresentation.inputs.map(
+      (input, index) => {
+        let address: string | undefined = undefined;
+
+        if(input.input.input_type === 'UTXO') {
+          const utxoInput = input as UtxoInput;
+          address = utxoInput.utxo.destination;
+        }
+
+        if (input.input.input_type === 'AccountCommand') {
+          // @ts-ignore
+          address = input.input.authority;
+        }
+
+        if (input.input.input_type === 'AccountCommand' && input.input.command === 'FillOrder') {
+          address = input.input.destination;
+        }
+
+        if (address === undefined) {
+          throw new Error(`Address not found for input at index ${index}`);
+        }
+
+        const addressPrivateKey = this.getPrivateKey(address)
+
+        if (!addressPrivateKey) {
+          throw new Error(`Private key not found for address: ${address}`);
+        }
+
+        const transaction = this.hexToUint8Array(tx.HEXRepresentation_unsigned);
+
+        const witness = encode_witness(
+          SignatureHashType.ALL,
+          addressPrivateKey,
+          address,
+          transaction,
+          optUtxos,
+          index,
+          network,
+        )
+        return witness
+      },
+    )
+
+    const signature = mergeUint8Arrays(encodedWitnesses);
+    return signature;
+  }
+
+  private hexToUint8Array(hex: string): Uint8Array {
+    if (hex.length % 2 !== 0) {
+      throw new Error("Hex string must have an even length");
+    }
+
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
+    }
+    return bytes;
+  }
+
+  private encodeSignedTransaction(tx: Transaction, signature: Uint8Array): string {
+    const transaction_signed = encode_signed_transaction(
+      this.hexToUint8Array(tx.HEXRepresentation_unsigned),
+      signature
+    );
+    const transaction_signed_hex = transaction_signed.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '');
+    return transaction_signed_hex;
+  }
+
+  sign(tx: Transaction): string {
+    const signature = this.createSignature(tx);
+    return this.encodeSignedTransaction(tx, signature);
+  }
+}
+
+export { Client, Signer };
 
 console.log('[Mintlayer Connect SDK] Loaded');
