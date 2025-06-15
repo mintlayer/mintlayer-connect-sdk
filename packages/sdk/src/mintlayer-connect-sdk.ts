@@ -2131,8 +2131,6 @@ class Client {
         id: 'to_be_filled_in'
       };
 
-      console.log('JSONRepresentation', JSONRepresentation);
-
       const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
 
       const transaction_size_in_bytes = BigInt(Math.ceil(BINRepresentation.transactionsize));
@@ -2477,10 +2475,6 @@ class Client {
         inputAddresses.push(transactionJSONrepresentation.inputs[0].input.authority);
       }
     }
-
-    console.log('inputsArray', inputsArray);
-    console.log('outputsArray', outputsArray);
-
 
     const transactionsize = estimate_transaction_size(
       mergeUint8Arrays(inputsArray),
