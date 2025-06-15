@@ -1,6 +1,6 @@
 {
   "name": "@mintlayer/sdk",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "",
   "main": "dist/mintlayer-connect-sdk.js",
   "types": "dist/mintlayer-connect-sdk.d.ts",
