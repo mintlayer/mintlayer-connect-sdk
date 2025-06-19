@@ -66,7 +66,7 @@ function stringToUint8Array(str: string): Uint8Array {
   return new TextEncoder().encode(str);
 }
 
-function atomsToDecimal(atoms: string | number, decimals: number): string {
+export function atomsToDecimal(atoms: string | number, decimals: number): string {
   const atomsStr = atoms.toString();
   const atomsLength = atomsStr.length;
 
@@ -85,6 +85,13 @@ function atomsToDecimal(atoms: string | number, decimals: number): string {
   const fractionalPart = atomsStr.slice(atomsLength - decimals).replace(/0+$/, '');
 
   return fractionalPart === '' ? integerPart : `${integerPart}.${fractionalPart}`;
+}
+
+export function decimalsToAtoms(value: string | number, decimals: number): bigint {
+  const [intPart, fracPart = ""] = value.toString().split(".");
+  const paddedFrac = (fracPart + "0".repeat(decimals)).slice(0, decimals);
+  const full = intPart + paddedFrac;
+  return BigInt(full);
 }
 
 type Address = {
@@ -1355,12 +1362,12 @@ class Client {
         fee = token_change_authority_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
         return BigInt(fee.atoms());
       case 'ChangeMetadataUri':
-        return BigInt(50 * Math.pow(10, 11));
+        return decimalsToAtoms(50, 11);
       case 'FreezeToken':
         fee = token_freeze_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
         return BigInt(fee.atoms());
       case 'UnfreezeToken':
-        return BigInt(50 * Math.pow(10, 11));
+        return decimalsToAtoms(50,  11);
       case 'DataDeposit':
         fee = data_deposit_fee(block_height, this.network === 'mainnet' ? Network.Mainnet : Network.Testnet);
         return BigInt(fee.atoms());
@@ -1396,13 +1403,13 @@ class Client {
       const { token_id, token_details } = params;
 
       if (token_details) {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details.number_of_decimals));
+        input_amount_token_req += decimalsToAtoms(params.amount!,token_details.number_of_decimals);
         send_token = {
           token_id,
           number_of_decimals: token_details.number_of_decimals,
         };
       } else {
-        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
+        input_amount_coin_req += decimalsToAtoms(params.amount!, 11);
       }
 
       outputs.push({
@@ -1418,13 +1425,13 @@ class Client {
             ? {
                 amount: {
                   decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+                  atoms: decimalsToAtoms(params.amount!, token_details.number_of_decimals).toString(),
                 },
               }
             : {
                 amount: {
                   decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                  atoms: decimalsToAtoms(params.amount!, 11).toString(),
                 },
               }),
         },
@@ -1435,13 +1442,13 @@ class Client {
       const { token_id, token_details } = params;
 
       if (token_details) {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details.number_of_decimals));
+        input_amount_token_req += decimalsToAtoms(params.amount!, token_details.number_of_decimals);
         send_token = {
           token_id,
           number_of_decimals: token_details.number_of_decimals,
         };
       } else {
-        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
+        input_amount_coin_req += decimalsToAtoms(params.amount!,11);
       }
 
       outputs.push({
@@ -1455,7 +1462,7 @@ class Client {
               }),
           amount: {
             decimal: params.amount!.toString(),
-            atoms: (params.amount! * Math.pow(10, 11)).toString(),
+            atoms: decimalsToAtoms(params.amount!, 11).toString(),
           },
         },
       });
@@ -1472,7 +1479,7 @@ class Client {
         total_supply = {
           type: 'Fixed',
           amount: {
-            atoms: (params.supply_amount! * Math.pow(10, params.number_of_decimals!)).toString(),
+            atoms: decimalsToAtoms(params.supply_amount!, params.number_of_decimals!).toString(),
             decimal: params.supply_amount!.toString(),
           },
         };
@@ -1538,7 +1545,7 @@ class Client {
 
     if (type === 'MintToken') {
       const amount = {
-        atoms: (params.amount! * Math.pow(10, params.token_details!.number_of_decimals)).toString(),
+        atoms: decimalsToAtoms(params.amount!, params.token_details!.number_of_decimals).toString(),
         decimal: params.amount!.toString(),
       };
 
@@ -1573,7 +1580,7 @@ class Client {
       const token_id = params.token_id;
       const token_details = params.token_details;
 
-      input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details!.number_of_decimals));
+      input_amount_token_req += decimalsToAtoms(params.amount!, token_details!.number_of_decimals);
       send_token = {
         token_id,
         number_of_decimals: token_details!.number_of_decimals,
@@ -1693,8 +1700,8 @@ class Client {
     if (type === 'DelegateStaking') {
       const { delegation_id, amount } = params;
 
-      const amount_atoms = amount! * Math.pow(10, 11);
-      input_amount_coin_req += BigInt(amount! * Math.pow(10, 11));
+      const amount_atoms = decimalsToAtoms(amount!, 11);
+      input_amount_coin_req += decimalsToAtoms(amount!, 11);
 
       outputs.push({
         type: 'DelegateStaking',
@@ -1709,7 +1716,7 @@ class Client {
     if (type === 'DelegationWithdraw') {
       const { delegation_id, amount, delegation_details } = params;
 
-      const amount_atoms = amount! * Math.pow(10, 11);
+      const amount_atoms = decimalsToAtoms(amount!, 11);
 
       inputs.push({
         input: {
@@ -1753,9 +1760,9 @@ class Client {
       } = params;
 
       if (give_token === 'Coin') {
-        input_amount_coin_req += BigInt(give_amount! * Math.pow(10, 11));
+        input_amount_coin_req += decimalsToAtoms(give_amount!, 11);
       } else if (give_token_details) {
-        input_amount_token_req += BigInt(give_amount! * Math.pow(10, give_token_details.number_of_decimals));
+        input_amount_token_req += decimalsToAtoms(give_amount!, give_token_details.number_of_decimals);
         send_token = {
           token_id: give_token,
           number_of_decimals: give_token_details.number_of_decimals,
@@ -1770,27 +1777,27 @@ class Client {
         ask_currency: ask_token === 'Coin' ? { type: 'Coin' } : { token_id: ask_token, type: 'TokenV1' },
         ask_balance: {
           atoms: ask_token_details
-            ? (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString()
-            : (ask_amount! * Math.pow(10, 11)).toString(),
+            ? decimalsToAtoms(ask_amount!, ask_token_details.number_of_decimals).toString()
+            : decimalsToAtoms(ask_amount!, 11).toString(),
           decimal: ask_amount!.toString(),
         },
         initially_asked: {
           atoms: ask_token_details
-            ? (ask_amount! * Math.pow(10, ask_token_details.number_of_decimals)).toString()
-            : (ask_amount! * Math.pow(10, 11)).toString(),
+            ? decimalsToAtoms(ask_amount!, ask_token_details.number_of_decimals).toString()
+            : decimalsToAtoms(ask_amount!,  11).toString(),
           decimal: ask_amount!.toString(),
         },
         give_currency: give_token === 'Coin' ? { type: 'Coin' } : { token_id: give_token, type: 'TokenV1' },
         give_balance: {
           atoms: give_token_details
-            ? (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString()
-            : (give_amount! * Math.pow(10, 11)).toString(),
+            ? decimalsToAtoms(give_amount!, give_token_details.number_of_decimals).toString()
+            : decimalsToAtoms(give_amount!,  11).toString(),
           decimal: give_amount!.toString(),
         },
         initially_given: {
           atoms: give_token_details
-            ? (give_amount! * Math.pow(10, give_token_details.number_of_decimals)).toString()
-            : (give_amount! * Math.pow(10, 11)).toString(),
+            ? decimalsToAtoms(give_amount!, give_token_details.number_of_decimals).toString()
+            : decimalsToAtoms(give_amount!, 11).toString(),
           decimal: give_amount!.toString(),
         },
       });
@@ -1860,8 +1867,8 @@ class Client {
       const give_amount = amount; // Amount to fill in the order. Give _to_ order as counterpart of ask
       const give_amount_atoms =
         order_details.ask_currency.type === 'Token'
-          ? give_amount! * Math.pow(10, ask_token_details!.number_of_decimals)
-          : give_amount! * Math.pow(10, 11); // Coin decimal
+          ? decimalsToAtoms(give_amount!, ask_token_details!.number_of_decimals)
+          : decimalsToAtoms(give_amount!, 11); // Coin decimal
       if (order_details.ask_currency.type === 'Coin') {
         input_amount_coin_req += BigInt(give_amount_atoms);
       } else if (ask_token_details) {
@@ -1872,9 +1879,15 @@ class Client {
         };
       }
 
+      const asked = BigInt(order_details.initially_asked.atoms);
+      const given = BigInt(order_details.initially_given.atoms);
+
+      const give_atoms = BigInt(give_amount_atoms);
+      const ask_amount_atoms_bigint = (give_atoms * given) / asked;
+
       const rate = parseInt(order_details.initially_asked.atoms) / parseInt(order_details.initially_given.atoms);
 
-      const ask_amount_atoms = Math.floor(give_amount_atoms / rate);
+      const ask_amount_atoms = ask_amount_atoms_bigint.toString();
       const ask_amount =
         order_details.give_currency.type === 'Token'
           ? atomsToDecimal(ask_amount_atoms, give_token_details!.number_of_decimals)
@@ -1993,7 +2006,7 @@ class Client {
             type: 'Coin',
             amount: {
               atoms: changeAmountCoin.toString(),
-              decimal: (Number(changeAmountCoin) / 1e11).toString(),
+              decimal: atomsToDecimal(changeAmountCoin.toString(), 11).toString(),
             },
           },
           destination: currentAddress.change[0],
@@ -2009,7 +2022,7 @@ class Client {
             token_id: send_token.token_id,
             amount: {
               atoms: changeAmountToken.toString(),
-              decimal: (Number(changeAmountToken) / Math.pow(10, decimals)).toString(),
+              decimal: atomsToDecimal(changeAmountToken.toString(), decimals).toString(),
             },
           },
           destination: currentAddress.change[0],
