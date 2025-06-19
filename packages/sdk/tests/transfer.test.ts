@@ -200,7 +200,7 @@ test('buildTransaction for transfer, decimal test 1', async () => {
 
   const result = await spy.mock.results[0]?.value;
 
-  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+  expect(result).toMatchSnapshot();
 });
 
 test('buildTransaction for transfer, decimal test 2', async () => {
@@ -216,8 +216,7 @@ test('buildTransaction for transfer, decimal test 2', async () => {
   });
 
   const result = await spy.mock.results[0]?.value;
-
-  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+  expect(result).toMatchSnapshot();
 });
 
 test('buildTransaction for transfer, decimal test 3', async () => {
@@ -234,7 +233,7 @@ test('buildTransaction for transfer, decimal test 3', async () => {
 
   const result = await spy.mock.results[0]?.value;
 
-  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+  expect(result).toMatchSnapshot();
 });
 
 test('buildTransaction for transfer, decimal test 4', async () => {
@@ -251,5 +250,5 @@ test('buildTransaction for transfer, decimal test 4', async () => {
 
   const result = await spy.mock.results[0]?.value;
 
-  console.log(JSON.stringify(result.JSONRepresentation, null, 2));
+  expect(result).toMatchSnapshot();
 });
