@@ -185,3 +185,70 @@ test('transfer transfer fee precise', async () => {
     decimal: "0.206"
   });
 });
+
+test('buildTransaction for transfer, decimal test 1', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 0.009,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  expect(result).toMatchSnapshot();
+});
+
+test('buildTransaction for transfer, decimal test 2', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 1.005,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+  expect(result).toMatchSnapshot();
+});
+
+test('buildTransaction for transfer, decimal test 3', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 0.00001,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  expect(result).toMatchSnapshot();
+});
+
+test('buildTransaction for transfer, decimal test 4', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 0.1,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  expect(result).toMatchSnapshot();
+});
