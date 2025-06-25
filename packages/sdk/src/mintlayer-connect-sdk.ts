@@ -81,6 +81,12 @@ function hexToUint8Array(hex: any) {
   return array;
 }
 
+function uint8ArrayToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 export function atomsToDecimal(atoms: string | number, decimals: number): string {
   const atomsStr = atoms.toString();
   const atomsLength = atomsStr.length;
@@ -2073,7 +2079,13 @@ class Client {
     const data = await response.json();
 
     // @ts-ignore
-    const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo || [];
+    const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo ? arg?.opts?.forceSpendUtxo.map((item: UtxoEntry) => ({
+      input: {
+        ...item.outpoint,
+        input_type: 'UTXO',
+      },
+      utxo: item.utxo,
+    })) : [];
 
     const utxos: UtxoEntry[] = data.utxos;
 
@@ -2478,7 +2490,8 @@ class Client {
     const outputsArray = outputsArrayItems.filter((x): x is NonNullable<typeof x> => x !== undefined);
 
     const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
-      .filter(({ input, utxo }) => input.input_type === 'UTXO')
+      // @ts-ignore
+      .filter(({ input, utxo }) => input.input_type === 'UTXO' || utxo.htlc)
       .map((input) => {
         if (input.utxo.destination){
           return input.utxo.destination;
@@ -2486,9 +2499,9 @@ class Client {
         // @ts-ignore
         if (input.utxo.htlc) {
           // @ts-ignore
-          return input.utxo.htlc.refund_key; // TODO: need to handle spend too
+          return [input.utxo.htlc.spend_key, input.utxo.htlc.refund_key]; // TODO: need to handle spend too
         }
-      });
+      }).flat();
 
     // @ts-ignore
     if (transactionJSONrepresentation.inputs[0].input.account_type === 'DelegationBalance') {
@@ -3060,6 +3073,7 @@ class Client {
     const {
       transaction_id,
       transaction_hex,
+      format = 'Uint8Array', // 'bytes' or 'hex'
     } = arg;
 
     const res = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
@@ -3091,6 +3105,10 @@ class Client {
       htlc_outpoint_source_id,
       htlc_output_index
     );
+
+    if(format === 'hex') {
+      return uint8ArrayToHex(secret);
+    }
 
     return secret;
   }
