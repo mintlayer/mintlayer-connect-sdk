@@ -152,7 +152,7 @@ export class MojitoAccountProvider implements AccountProvider {
 
   async request(method: any, params: any) {
     if (typeof window !== 'undefined' && window.mojito?.request) {
-      return window.mojito.request(params.method, params.params);
+      return window.mojito.request(method, params);
     } else {
       throw new Error('Mojito extension not available');
     }
