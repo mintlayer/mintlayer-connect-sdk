@@ -2491,13 +2491,13 @@ class Client {
 
     const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
       // @ts-ignore
-      .filter(({ input, utxo }) => input.input_type === 'UTXO' || utxo.htlc)
+      .filter(({ input, utxo }) => input.input_type === 'UTXO' || utxo?.htlc)
       .map((input) => {
         if (input.utxo.destination){
           return input.utxo.destination;
         }
         // @ts-ignore
-        if (input.utxo.htlc) {
+        if (input?.utxo?.htlc) {
           // @ts-ignore
           return [input.utxo.htlc.spend_key, input.utxo.htlc.refund_key]; // TODO: need to handle spend too
         }
