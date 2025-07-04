@@ -98,3 +98,33 @@ test('decorate with utxo change', async () => {
 
   expect(result).toBe('signed-transaction');
 });
+
+test('utxo change with build function approach', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  const transaction = await client.buildTransaction({
+    type: 'Transfer',
+    params: {
+      to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+      amount: 10,
+    }
+  });
+
+  const { spent, created } = client.previewUtxoChange(transaction);
+
+  // now you can get transaction from the helper function
+  const transactionBuild = await client.buildTransfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 10,
+  });
+
+  const result = await client.signTransaction(transactionBuild);
+
+  const { spent: spentFromBuilder, created: createdFromBuilder } = client.previewUtxoChange(transactionBuild);
+
+  expect(spentFromBuilder).toEqual(spent);
+  expect(createdFromBuilder).toEqual(created);
+
+  expect(result).toBe('signed-transaction');
+});

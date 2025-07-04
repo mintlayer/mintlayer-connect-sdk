@@ -2550,13 +2550,13 @@ class Client {
   }
 
   /**
-   * Transfers coins or tokens to a specified address.
+   * Builds a transfer transaction without signing it.
    * If a token_id is provided, token will be transferred instead of base coin.
    *
    * @param {TransferArgs} args Transfer arguments
-   * @returns A signed transaction
+   * @returns A transaction ready to be signed
    */
-  async transfer({ to, amount, token_id }: TransferArgs): Promise<SignedTransaction> {
+  async buildTransfer({ to, amount, token_id }: TransferArgs): Promise<Transaction> {
     this.ensureInitialized();
     if (token_id) {
       const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
@@ -2565,20 +2565,30 @@ class Client {
       }
       const token = await request.json();
       const token_details: TokenDetails = token;
-      const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
-      return this.signTransaction(tx);
+      return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
     } else {
-      const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount } });
-      return this.signTransaction(tx);
+      return this.buildTransaction({ type: 'Transfer', params: { to, amount } });
     }
   }
 
   /**
-   * Transfers NFT to a given address.
+   * Transfers coins or tokens to a specified address.
+   * If a token_id is provided, token will be transferred instead of base coin.
+   *
+   * @param {TransferArgs} args Transfer arguments
+   * @returns A signed transaction
+   */
+  async transfer({ to, amount, token_id }: TransferArgs): Promise<SignedTransaction> {
+    const tx = await this.buildTransfer({ to, amount, token_id });
+    return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds an NFT transfer transaction without signing it.
    * @param to
    * @param token_id
    */
-  async transferNft({ to, token_id }: TransferNftArgs): Promise<SignedTransaction> {
+  async buildTransferNft({ to, token_id }: TransferNftArgs): Promise<Transaction> {
     this.ensureInitialized();
 
     if (!token_id) {
@@ -2593,18 +2603,37 @@ class Client {
     const token = await request.json();
     const token_details: TokenDetails = token;
     token_details.number_of_decimals = 0; // that's NFT
-    const tx = await this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
+    return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
+  }
+
+  /**
+   * Transfers NFT to a given address.
+   * @param to
+   * @param token_id
+   */
+  async transferNft({ to, token_id }: TransferNftArgs): Promise<SignedTransaction> {
+    const tx = await this.buildTransferNft({ to, token_id });
     return this.signTransaction(tx);
   }
 
   ////////
-  async delegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<SignedTransaction> {
+  /**
+   * Builds a delegation creation transaction without signing it.
+   */
+  async buildDelegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<Transaction> {
     this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
+    return this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
+  }
+
+  async delegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<SignedTransaction> {
+    const tx = await this.buildDelegate({ pool_id, destination });
     return this.signTransaction(tx);
   }
 
-  async issueNft(tokenData: IssueNftArgs): Promise<SignedTransaction> {
+  /**
+   * Builds an NFT issuance transaction without signing it.
+   */
+  async buildIssueNft(tokenData: IssueNftArgs): Promise<Transaction> {
     this.ensureInitialized();
     const description = tokenData.description;
 
@@ -2619,8 +2648,31 @@ class Client {
     }
 
     tokenData.description = descriptionBase58;
-    const tx = await this.buildTransaction({ type: 'IssueNft', params: tokenData });
+    return this.buildTransaction({ type: 'IssueNft', params: tokenData });
+  }
+
+  async issueNft(tokenData: IssueNftArgs): Promise<SignedTransaction> {
+    const tx = await this.buildIssueNft(tokenData);
     return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds a fungible token issuance transaction without signing it.
+   */
+  async buildIssueToken({
+    authority,
+    is_freezable,
+    metadata_uri,
+    number_of_decimals,
+    token_ticker,
+    supply_type,
+    supply_amount,
+  }: IssueTokenArgs): Promise<Transaction> {
+    this.ensureInitialized();
+    return this.buildTransaction({
+      type: 'IssueFungibleToken',
+      params: { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, supply_type, supply_amount },
+    });
   }
 
   async issueToken({
@@ -2632,15 +2684,22 @@ class Client {
     supply_type,
     supply_amount,
   }: IssueTokenArgs): Promise<SignedTransaction> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({
-      type: 'IssueFungibleToken',
-      params: { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, supply_type, supply_amount },
+    const tx = await this.buildIssueToken({
+      authority,
+      is_freezable,
+      metadata_uri,
+      number_of_decimals,
+      token_ticker,
+      supply_type,
+      supply_amount,
     });
     return this.signTransaction(tx);
   }
 
-  async mintToken({ destination, amount, token_id }: MintTokenArgs): Promise<SignedTransaction> {
+  /**
+   * Builds a token minting transaction without signing it.
+   */
+  async buildMintToken({ destination, amount, token_id }: MintTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2649,14 +2708,41 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'MintToken',
       params: { destination, amount, token_id, token_details },
     });
+  }
+
+  async mintToken({ destination, amount, token_id }: MintTokenArgs): Promise<SignedTransaction> {
+    const tx = await this.buildMintToken({ destination, amount, token_id });
     return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds a token unminting transaction without signing it.
+   */
+  async buildUnmintToken({ amount, token_id }: UnmintTokenArgs): Promise<Transaction> {
+    this.ensureInitialized();
+    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
+    if (!request.ok) {
+      throw new Error('Failed to fetch token');
+    }
+    const token = await request.json();
+    const token_details = token;
+
+    return this.buildTransaction({ type: 'UnmintToken', params: { amount, token_id, token_details } });
   }
 
   async unmintToken({ amount, token_id }: UnmintTokenArgs): Promise<SignedTransaction> {
+    const tx = await this.buildUnmintToken({ amount, token_id });
+    return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds a token supply locking transaction without signing it.
+   */
+  async buildLockTokenSupply({ token_id }: LockTokenSupplyArgs): Promise<Transaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2665,24 +2751,18 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({ type: 'UnmintToken', params: { amount, token_id, token_details } });
-    return this.signTransaction(tx);
+    return this.buildTransaction({ type: 'LockTokenSupply', params: { token_id, token_details } });
   }
 
   async lockTokenSupply({ token_id }: LockTokenSupplyArgs): Promise<SignedTransaction> {
-    this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
-    const token_details = token;
-
-    const tx = await this.buildTransaction({ type: 'LockTokenSupply', params: { token_id, token_details } });
+    const tx = await this.buildLockTokenSupply({ token_id });
     return this.signTransaction(tx);
   }
 
-  async changeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<SignedTransaction> {
+  /**
+   * Builds a token authority change transaction without signing it.
+   */
+  async buildChangeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<Transaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2691,14 +2771,21 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'ChangeTokenAuthority',
       params: { token_id, new_authority, token_details },
     });
+  }
+
+  async changeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<SignedTransaction> {
+    const tx = await this.buildChangeTokenAuthority({ token_id, new_authority });
     return this.signTransaction(tx);
   }
 
-  async changeMetadataUri({ token_id, new_metadata_uri }: ChangeMetadataUriArgs): Promise<SignedTransaction> {
+  /**
+   * Builds a token metadata URI change transaction without signing it.
+   */
+  async buildChangeMetadataUri({ token_id, new_metadata_uri }: ChangeMetadataUriArgs): Promise<Transaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2707,14 +2794,21 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'ChangeMetadataUri',
       params: { token_id, new_metadata_uri, token_details },
     });
+  }
+
+  async changeMetadataUri({ token_id, new_metadata_uri }: ChangeMetadataUriArgs): Promise<SignedTransaction> {
+    const tx = await this.buildChangeMetadataUri({ token_id, new_metadata_uri });
     return this.signTransaction(tx);
   }
 
-  async freezeToken({ token_id, is_unfreezable }: FreezeTokenArgs): Promise<SignedTransaction> {
+  /**
+   * Builds a token freezing transaction without signing it.
+   */
+  async buildFreezeToken({ token_id, is_unfreezable }: FreezeTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2723,14 +2817,21 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'FreezeToken',
       params: { token_id, is_unfreezable, token_details },
     });
+  }
+
+  async freezeToken({ token_id, is_unfreezable }: FreezeTokenArgs): Promise<SignedTransaction> {
+    const tx = await this.buildFreezeToken({ token_id, is_unfreezable });
     return this.signTransaction(tx);
   }
 
-  async unfreezeToken({ token_id }: UnfreezeTokenArgs): Promise<SignedTransaction> {
+  /**
+   * Builds a token unfreezing transaction without signing it.
+   */
+  async buildUnfreezeToken({ token_id }: UnfreezeTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
     const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
     if (!request.ok) {
@@ -2739,17 +2840,24 @@ class Client {
     const token = await request.json();
     const token_details = token;
 
-    const tx = await this.buildTransaction({ type: 'UnfreezeToken', params: { token_id, token_details } });
+    return this.buildTransaction({ type: 'UnfreezeToken', params: { token_id, token_details } });
+  }
+
+  async unfreezeToken({ token_id }: UnfreezeTokenArgs): Promise<SignedTransaction> {
+    const tx = await this.buildUnfreezeToken({ token_id });
     return this.signTransaction(tx);
   }
 
-  async createOrder({
+  /**
+   * Builds an order creation transaction without signing it.
+   */
+  async buildCreateOrder({
     conclude_destination,
     ask_token,
     ask_amount,
     give_token,
     give_amount,
-  }: CreateOrderArgs): Promise<SignedTransaction> {
+  }: CreateOrderArgs): Promise<Transaction> {
     this.ensureInitialized();
 
     let ask_token_details = null;
@@ -2771,7 +2879,7 @@ class Client {
       give_token_details = await request.json();
     }
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'CreateOrder',
       params: {
         conclude_destination,
@@ -2783,10 +2891,29 @@ class Client {
         give_token_details,
       },
     });
+  }
+
+  async createOrder({
+    conclude_destination,
+    ask_token,
+    ask_amount,
+    give_token,
+    give_amount,
+  }: CreateOrderArgs): Promise<SignedTransaction> {
+    const tx = await this.buildCreateOrder({
+      conclude_destination,
+      ask_token,
+      ask_amount,
+      give_token,
+      give_amount,
+    });
     return this.signTransaction(tx);
   }
 
-  async fillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<SignedTransaction> {
+  /**
+   * Builds an order fill transaction without signing it.
+   */
+  async buildFillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<Transaction> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
     if (!response.ok) {
@@ -2816,10 +2943,14 @@ class Client {
       give_token_details = await request.json();
     }
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'FillOrder',
       params: { order_id, amount, destination, order_details, ask_token_details, give_token_details },
     });
+  }
+
+  async fillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<SignedTransaction> {
+    const tx = await this.buildFillOrder({ order_id, amount, destination });
     return this.signTransaction(tx);
   }
 
@@ -2835,7 +2966,10 @@ class Client {
     return orders;
   }
 
-  async concludeOrder({ order_id }: ConcludeOrderArgs): Promise<SignedTransaction> {
+  /**
+   * Builds an order conclusion transaction without signing it.
+   */
+  async buildConcludeOrder({ order_id }: ConcludeOrderArgs): Promise<Transaction> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
     if (!response.ok) {
@@ -2843,11 +2977,18 @@ class Client {
     }
     const order: OrderData = await response.json();
 
-    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
+    return this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
+  }
+
+  async concludeOrder({ order_id }: ConcludeOrderArgs): Promise<SignedTransaction> {
+    const tx = await this.buildConcludeOrder({ order_id });
     return this.signTransaction(tx);
   }
 
-  async bridgeRequest({ destination, amount, token_id, intent }: BridgeRequestArgs): Promise<SignedTransaction> {
+  /**
+   * Builds a bridge request transaction without signing it.
+   */
+  async buildBridgeRequest({ destination, amount, token_id, intent }: BridgeRequestArgs): Promise<Transaction> {
     this.ensureInitialized();
 
     if (!token_id) {
@@ -2864,10 +3005,18 @@ class Client {
       type: 'Transfer',
       params: { to: destination, amount, token_id, token_details },
     });
-    return this.signTransaction({ ...tx, intent });
+    return { ...tx, intent };
   }
 
-  async burn({ token_id, amount }: BurnArgs): Promise<SignedTransaction> {
+  async bridgeRequest({ destination, amount, token_id, intent }: BridgeRequestArgs): Promise<SignedTransaction> {
+    const tx = await this.buildBridgeRequest({ destination, amount, token_id, intent });
+    return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds a burn transaction without signing it.
+   */
+  async buildBurn({ token_id, amount }: BurnArgs): Promise<Transaction> {
     this.ensureInitialized();
     let token_details: TokenDetails | undefined = undefined;
 
@@ -2879,23 +3028,44 @@ class Client {
       token_details = await request.json();
     }
 
-    const tx = await this.buildTransaction({ type: 'BurnToken', params: { token_id, amount, token_details } });
+    return this.buildTransaction({ type: 'BurnToken', params: { token_id, amount, token_details } });
+  }
+
+  async burn({ token_id, amount }: BurnArgs): Promise<SignedTransaction> {
+    const tx = await this.buildBurn({ token_id, amount });
     return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds a data deposit transaction without signing it.
+   */
+  async buildDataDeposit({ data }: DataDepositArgs): Promise<Transaction> {
+    this.ensureInitialized();
+    return this.buildTransaction({ type: 'DataDeposit', params: { data } });
   }
 
   async dataDeposit({ data }: DataDepositArgs): Promise<SignedTransaction> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'DataDeposit', params: { data } });
+    const tx = await this.buildDataDeposit({ data });
     return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds a delegation creation transaction without signing it.
+   */
+  async buildDelegationCreate({ pool_id, destination }: DelegationCreateArgs): Promise<Transaction> {
+    this.ensureInitialized();
+    return this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
   }
 
   async delegationCreate({ pool_id, destination }: DelegationCreateArgs): Promise<SignedTransaction> {
-    this.ensureInitialized();
-    const tx = await this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
+    const tx = await this.buildDelegationCreate({ pool_id, destination });
     return this.signTransaction(tx);
   }
 
-  async delegationStake(params: DelegationStakeArgs): Promise<SignedTransaction> {
+  /**
+   * Builds a delegation staking transaction without signing it.
+   */
+  async buildDelegationStake(params: DelegationStakeArgs): Promise<Transaction> {
     this.ensureInitialized();
 
     const amount = params.amount;
@@ -2907,8 +3077,7 @@ class Client {
     }
 
     if (delegation_id) {
-      const tx = await this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id, amount } });
-      return this.signTransaction(tx);
+      return this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id, amount } });
     } else if (pool_id) {
       const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
       const data: DelegationDetails[] = await response.json();
@@ -2937,17 +3106,24 @@ class Client {
         throw new Error('No delegation id found for the given pool id');
       }
 
-      const tx = await this.buildTransaction({
+      return this.buildTransaction({
         type: 'DelegateStaking',
         params: { delegation_id: first_delegation_id, amount },
       });
-      return this.signTransaction(tx);
     } else {
       throw new Error('Delegation id or pool id is required');
     }
   }
 
-  async delegationWithdraw(params: DelegationWithdrawArgs): Promise<SignedTransaction> {
+  async delegationStake(params: DelegationStakeArgs): Promise<SignedTransaction> {
+    const tx = await this.buildDelegationStake(params);
+    return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds a delegation withdrawal transaction without signing it.
+   */
+  async buildDelegationWithdraw(params: DelegationWithdrawArgs): Promise<Transaction> {
     this.ensureInitialized();
     const amount = params.amount;
     const delegation_id = params.delegation_id;
@@ -2965,11 +3141,10 @@ class Client {
       }
       const delegation_details: DelegationDetails = data;
 
-      const tx = await this.buildTransaction({
+      return this.buildTransaction({
         type: 'DelegationWithdraw',
         params: { delegation_id, amount, delegation_details },
       });
-      return this.signTransaction(tx);
     } else if (pool_id) {
       const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
       const data = await response.json();
@@ -2997,17 +3172,24 @@ class Client {
         throw new Error('No delegation id found for the given pool id');
       }
 
-      const tx = await this.buildTransaction({
+      return this.buildTransaction({
         type: 'DelegationWithdraw',
         params: { delegation_id: first_delegation.delegation_id, amount, delegation_details: first_delegation },
       });
-      return this.signTransaction(tx);
     } else {
       throw new Error('Delegation id or pool id is required');
     }
   }
 
-  async createHtlc(params: CreateHtlcArgs): Promise<SignedTransaction> {
+  async delegationWithdraw(params: DelegationWithdrawArgs): Promise<SignedTransaction> {
+    const tx = await this.buildDelegationWithdraw(params);
+    return this.signTransaction(tx);
+  }
+
+  /**
+   * Builds an HTLC creation transaction without signing it.
+   */
+  async buildCreateHtlc(params: CreateHtlcArgs): Promise<Transaction> {
     this.ensureInitialized();
 
     let token_details: TokenDetails | undefined = undefined;
@@ -3021,7 +3203,7 @@ class Client {
       token_details = token;
     }
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'Htlc',
       params: {
         amount: params.amount,
@@ -3034,10 +3216,17 @@ class Client {
         refund_timelock: params.refund_timelock,
       },
     });
+  }
+
+  async createHtlc(params: CreateHtlcArgs): Promise<SignedTransaction> {
+    const tx = await this.buildCreateHtlc(params);
     return this.signTransaction(tx);
   }
 
-  async refundHtlc(params: any): Promise<any> {
+  /**
+   * Builds an HTLC refund transaction without signing it.
+   */
+  async buildRefundHtlc(params: any): Promise<Transaction> {
     this.ensureInitialized();
 
     const { transaction_id, utxo } = params;
@@ -3056,7 +3245,7 @@ class Client {
       useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
     }
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'Transfer',
       params: {
         to: useHtlcUtxo[0].utxo.htlc.refund_key,
@@ -3066,10 +3255,17 @@ class Client {
         forceSpendUtxo: useHtlcUtxo,
       }
     });
+  }
+
+  async refundHtlc(params: any): Promise<any> {
+    const tx = await this.buildRefundHtlc(params);
     return this.signTransaction(tx);
   }
 
-  async spendHtlc(params: any): Promise<any> {
+  /**
+   * Builds an HTLC spend transaction without signing it.
+   */
+  async buildSpendHtlc(params: any): Promise<Transaction> {
     this.ensureInitialized();
 
     const { transaction_id, utxo } = params;
@@ -3088,7 +3284,7 @@ class Client {
       useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
     }
 
-    const tx = await this.buildTransaction({
+    return this.buildTransaction({
       type: 'Transfer',
       params: {
         to: useHtlcUtxo[0].utxo.htlc.spend_key,
@@ -3098,6 +3294,10 @@ class Client {
         forceSpendUtxo: useHtlcUtxo,
       }
     });
+  }
+
+  async spendHtlc(params: any): Promise<any> {
+    const tx = await this.buildSpendHtlc(params);
     return this.signTransaction(tx);
   }
 
