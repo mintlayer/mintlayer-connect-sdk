@@ -73,6 +73,7 @@
                 <button onclick="toggleSection('requestSecretHash')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Request Secret Hash</button>
                 <button onclick="toggleSection('createHtlc')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Create Htlc</button>
                 <button onclick="toggleSection('refundHtlc')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Refund Htlc</button>
+                <button onclick="toggleSection('spendHtlc')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Spend Htlc</button>
                 <button onclick="toggleSection('extractHtlcSecret')" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">Extract Htlc secret</button>
             </div>
 
@@ -369,9 +370,18 @@
                 </div>
             </div>
 
+            <!-- Spend HTLC Section -->
+            <div id="spendHtlc" class="bg-white p-6 rounded-lg shadow-md hidden">
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Spend HTLC</h3>
+                <div class="space-y-4">
+                    <input type="text" id="spend_htlc_transaction_id" placeholder="Transaction ID with HTLC" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <button onclick="spendHTLC()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Spend HTLC</button>
+                </div>
+            </div>
+
             <!-- Extract HTLC Secret Section -->
             <div id="extractHtlcSecret" class="bg-white p-6 rounded-lg shadow-md hidden">
-                <h3 class="text-lg font-semibold text-gray-700 mb-4">Refund HTLC</h3>
+                <h3 class="text-lg font-semibold text-gray-700 mb-4">Extract Secret from HTLC</h3>
                 <div class="space-y-4">
                     <input type="text" id="extract_htlc_transaction_id" placeholder="Transaction ID with HTLC spend" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="extract_htlc_transaction_hex" placeholder="Transaction HEX" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
@@ -401,7 +411,7 @@
       'lockTokenSupply', 'changeTokenAuthority', 'changeTokenMetadata', 'createOrder',
       'fillOrder', 'concludeOrder', 'bridgeRequest', 'broadcastTx', 'freezeToken',
       'unfreezeToken', 'burn', 'dataDeposit', 'createDelegation', 'delegationStake',
-      'delegationWithdraw', 'signChallenge', 'createHtlc', 'refundHtlc', 'requestSecretHash', 'extractHtlcSecret'
+      'delegationWithdraw', 'signChallenge', 'createHtlc', 'refundHtlc', 'spendHtlc', 'requestSecretHash', 'extractHtlcSecret'
     ];
     sections.forEach(id => {
       const el = document.getElementById(id);
@@ -1006,6 +1016,20 @@
 
     try {
       const result = await window.mintlayer.refundHtlc({
+        transaction_id,
+      });
+
+      displayOutput(`Signature: ${JSON.stringify(result, null, 2)}`);
+    } catch (error) {
+      displayOutput(`Error: ${error.message}`);
+    }
+  }
+
+  async function spendHTLC () {
+    const transaction_id = document.getElementById('spend_htlc_transaction_id').value;
+
+    try {
+      const result = await window.mintlayer.spendHtlc({
         transaction_id,
       });
 

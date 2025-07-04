@@ -3069,6 +3069,38 @@ class Client {
     return this.signTransaction(tx);
   }
 
+  async spendHtlc(params: any): Promise<any> {
+    this.ensureInitialized();
+
+    const { transaction_id, utxo } = params;
+
+    let useHtlcUtxo: any[] = [];
+
+    if (transaction_id) {
+      const response = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch transaction');
+      }
+      const transaction: TransactionJSONRepresentation = await response.json();
+      // @ts-ignore
+      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
+      // @ts-ignore
+      useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
+    }
+
+    const tx = await this.buildTransaction({
+      type: 'Transfer',
+      params: {
+        to: useHtlcUtxo[0].utxo.htlc.spend_key,
+        amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+      },
+      opts: {
+        forceSpendUtxo: useHtlcUtxo,
+      }
+    });
+    return this.signTransaction(tx);
+  }
+
   async extractHtlcSecret(arg: any): Promise<any> {
     const {
       transaction_id,
@@ -3295,14 +3327,16 @@ class Client {
     return this.request({ method: 'getXPub' });
   }
 
-  async broadcastTx(tx: string): Promise<any> {
+  async broadcastTx(tx: string | { hex: string, json: TransactionJSONRepresentation }): Promise<any> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/transaction`, {
       method: 'POST',
-      headers: {
+      headers: typeof tx === 'string' ? {
         'Content-Type': 'text/plain',
+      } : {
+        'Content-Type': 'application/json',
       },
-      body: tx,
+      body: typeof tx === 'string' ? tx : JSON.stringify({ transaction: tx.hex, json: tx.json }),
     });
 
     if (!response.ok) {
