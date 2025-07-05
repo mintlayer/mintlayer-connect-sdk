@@ -132,6 +132,10 @@ export interface AccountProvider {
 }
 
 export class MojitoAccountProvider implements AccountProvider {
+  /**
+   * Connects to the Mojito wallet extension.
+   * @returns Promise that resolves to the connected addresses
+   */
   async connect() {
     if (typeof window !== 'undefined' && window.mojito?.connect) {
       return window.mojito.connect();
@@ -140,6 +144,10 @@ export class MojitoAccountProvider implements AccountProvider {
     }
   }
 
+  /**
+   * Restores the session from the Mojito wallet extension.
+   * @returns Promise that resolves to the restored addresses
+   */
   async restore() {
     if (typeof window !== 'undefined' && window.mojito?.restore) {
       return window.mojito.restore();
@@ -148,6 +156,10 @@ export class MojitoAccountProvider implements AccountProvider {
     }
   }
 
+  /**
+   * Disconnects from the Mojito wallet extension.
+   * @returns Promise that resolves when disconnection is complete
+   */
   async disconnect() {
     if (typeof window !== 'undefined' && window.mojito?.disconnect) {
       return window.mojito.disconnect();
@@ -156,6 +168,12 @@ export class MojitoAccountProvider implements AccountProvider {
     }
   }
 
+  /**
+   * Makes a request to the Mojito wallet extension.
+   * @param method - The method to call
+   * @param params - The parameters for the method
+   * @returns Promise that resolves to the response from the wallet
+   */
   async request(method: any, params: any) {
     if (typeof window !== 'undefined' && window.mojito?.request) {
       return window.mojito.request(method, params);
@@ -2553,7 +2571,9 @@ class Client {
    * Builds a transfer transaction without signing it.
    * If a token_id is provided, token will be transferred instead of base coin.
    *
-   * @param {TransferArgs} args Transfer arguments
+   * @param to - The recipient address
+   * @param amount - The amount to transfer
+   * @param token_id - Optional token ID (if transferring tokens instead of base coin)
    * @returns A transaction ready to be signed
    */
   async buildTransfer({ to, amount, token_id }: TransferArgs): Promise<Transaction> {
@@ -2575,7 +2595,9 @@ class Client {
    * Transfers coins or tokens to a specified address.
    * If a token_id is provided, token will be transferred instead of base coin.
    *
-   * @param {TransferArgs} args Transfer arguments
+   * @param to - The recipient address
+   * @param amount - The amount to transfer
+   * @param token_id - Optional token ID (if transferring tokens instead of base coin)
    * @returns A signed transaction
    */
   async transfer({ to, amount, token_id }: TransferArgs): Promise<SignedTransaction> {
@@ -2585,8 +2607,9 @@ class Client {
 
   /**
    * Builds an NFT transfer transaction without signing it.
-   * @param to
-   * @param token_id
+   * @param to - The recipient address
+   * @param token_id - The NFT token ID to transfer
+   * @returns A transaction ready to be signed
    */
   async buildTransferNft({ to, token_id }: TransferNftArgs): Promise<Transaction> {
     this.ensureInitialized();
@@ -2608,8 +2631,9 @@ class Client {
 
   /**
    * Transfers NFT to a given address.
-   * @param to
-   * @param token_id
+   * @param to - The recipient address
+   * @param token_id - The NFT token ID to transfer
+   * @returns A signed transaction
    */
   async transferNft({ to, token_id }: TransferNftArgs): Promise<SignedTransaction> {
     const tx = await this.buildTransferNft({ to, token_id });
@@ -2625,6 +2649,12 @@ class Client {
     return this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
   }
 
+  /**
+   * Creates a delegation and signs the transaction.
+   * @param pool_id - The pool ID to delegate to
+   * @param destination - The destination address for the delegation
+   * @returns Promise that resolves to a signed transaction
+   */
   async delegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<SignedTransaction> {
     const tx = await this.buildDelegate({ pool_id, destination });
     return this.signTransaction(tx);
@@ -2651,6 +2681,11 @@ class Client {
     return this.buildTransaction({ type: 'IssueNft', params: tokenData });
   }
 
+  /**
+   * Issues an NFT and signs the transaction.
+   * @param tokenData - The NFT data including metadata
+   * @returns Promise that resolves to a signed transaction
+   */
   async issueNft(tokenData: IssueNftArgs): Promise<SignedTransaction> {
     const tx = await this.buildIssueNft(tokenData);
     return this.signTransaction(tx);
@@ -2675,6 +2710,17 @@ class Client {
     });
   }
 
+  /**
+   * Issues a fungible token and signs the transaction.
+   * @param authority - The authority address for the token
+   * @param is_freezable - Whether the token can be frozen
+   * @param metadata_uri - URI for token metadata
+   * @param number_of_decimals - Number of decimal places for the token
+   * @param token_ticker - Token ticker symbol
+   * @param supply_type - Type of supply (Unlimited, Lockable, or Fixed)
+   * @param supply_amount - Initial supply amount (if applicable)
+   * @returns Promise that resolves to a signed transaction
+   */
   async issueToken({
     authority,
     is_freezable,
@@ -2714,6 +2760,13 @@ class Client {
     });
   }
 
+  /**
+   * Mints tokens to a specified destination and signs the transaction.
+   * @param destination - The destination address to mint tokens to
+   * @param amount - The amount of tokens to mint
+   * @param token_id - The ID of the token to mint
+   * @returns Promise that resolves to a signed transaction
+   */
   async mintToken({ destination, amount, token_id }: MintTokenArgs): Promise<SignedTransaction> {
     const tx = await this.buildMintToken({ destination, amount, token_id });
     return this.signTransaction(tx);
@@ -2734,6 +2787,12 @@ class Client {
     return this.buildTransaction({ type: 'UnmintToken', params: { amount, token_id, token_details } });
   }
 
+  /**
+   * Unmints (burns) tokens from circulation and signs the transaction.
+   * @param amount - The amount of tokens to unmint
+   * @param token_id - The ID of the token to unmint
+   * @returns Promise that resolves to a signed transaction
+   */
   async unmintToken({ amount, token_id }: UnmintTokenArgs): Promise<SignedTransaction> {
     const tx = await this.buildUnmintToken({ amount, token_id });
     return this.signTransaction(tx);
@@ -2754,6 +2813,11 @@ class Client {
     return this.buildTransaction({ type: 'LockTokenSupply', params: { token_id, token_details } });
   }
 
+  /**
+   * Locks the token supply to prevent further minting and signs the transaction.
+   * @param token_id - The ID of the token to lock supply for
+   * @returns Promise that resolves to a signed transaction
+   */
   async lockTokenSupply({ token_id }: LockTokenSupplyArgs): Promise<SignedTransaction> {
     const tx = await this.buildLockTokenSupply({ token_id });
     return this.signTransaction(tx);
@@ -2777,6 +2841,12 @@ class Client {
     });
   }
 
+  /**
+   * Changes the authority of a token and signs the transaction.
+   * @param token_id - The ID of the token to change authority for
+   * @param new_authority - The new authority address
+   * @returns Promise that resolves to a signed transaction
+   */
   async changeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<SignedTransaction> {
     const tx = await this.buildChangeTokenAuthority({ token_id, new_authority });
     return this.signTransaction(tx);
@@ -2800,6 +2870,12 @@ class Client {
     });
   }
 
+  /**
+   * Changes the metadata URI of a token and signs the transaction.
+   * @param token_id - The ID of the token to change metadata URI for
+   * @param new_metadata_uri - The new metadata URI
+   * @returns Promise that resolves to a signed transaction
+   */
   async changeMetadataUri({ token_id, new_metadata_uri }: ChangeMetadataUriArgs): Promise<SignedTransaction> {
     const tx = await this.buildChangeMetadataUri({ token_id, new_metadata_uri });
     return this.signTransaction(tx);
@@ -2823,6 +2899,12 @@ class Client {
     });
   }
 
+  /**
+   * Freezes a token to prevent transfers and signs the transaction.
+   * @param token_id - The ID of the token to freeze
+   * @param is_unfreezable - Whether the token can be unfrozen later
+   * @returns Promise that resolves to a signed transaction
+   */
   async freezeToken({ token_id, is_unfreezable }: FreezeTokenArgs): Promise<SignedTransaction> {
     const tx = await this.buildFreezeToken({ token_id, is_unfreezable });
     return this.signTransaction(tx);
@@ -2843,6 +2925,11 @@ class Client {
     return this.buildTransaction({ type: 'UnfreezeToken', params: { token_id, token_details } });
   }
 
+  /**
+   * Unfreezes a previously frozen token and signs the transaction.
+   * @param token_id - The ID of the token to unfreeze
+   * @returns Promise that resolves to a signed transaction
+   */
   async unfreezeToken({ token_id }: UnfreezeTokenArgs): Promise<SignedTransaction> {
     const tx = await this.buildUnfreezeToken({ token_id });
     return this.signTransaction(tx);
@@ -2893,6 +2980,15 @@ class Client {
     });
   }
 
+  /**
+   * Creates a trading order and signs the transaction.
+   * @param conclude_destination - The destination address for order conclusion
+   * @param ask_token - The token being requested
+   * @param ask_amount - The amount of tokens being requested
+   * @param give_token - The token being offered
+   * @param give_amount - The amount of tokens being offered
+   * @returns Promise that resolves to a signed transaction
+   */
   async createOrder({
     conclude_destination,
     ask_token,
@@ -2949,11 +3045,22 @@ class Client {
     });
   }
 
+  /**
+   * Fills an existing trading order and signs the transaction.
+   * @param order_id - The ID of the order to fill
+   * @param amount - The amount to fill
+   * @param destination - The destination address for the filled order
+   * @returns Promise that resolves to a signed transaction
+   */
   async fillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<SignedTransaction> {
     const tx = await this.buildFillOrder({ order_id, amount, destination });
     return this.signTransaction(tx);
   }
 
+  /**
+   * Gets all orders created by the connected account.
+   * @returns Promise that resolves to an array of order data
+   */
   async getAccountOrders(): Promise<OrderData[]> {
     this.ensureInitialized();
     const allOrders = await this.getAvailableOrders();
@@ -2980,6 +3087,11 @@ class Client {
     return this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
   }
 
+  /**
+   * Concludes a trading order and signs the transaction.
+   * @param order_id - The ID of the order to conclude
+   * @returns Promise that resolves to a signed transaction
+   */
   async concludeOrder({ order_id }: ConcludeOrderArgs): Promise<SignedTransaction> {
     const tx = await this.buildConcludeOrder({ order_id });
     return this.signTransaction(tx);
@@ -3008,6 +3120,14 @@ class Client {
     return { ...tx, intent };
   }
 
+  /**
+   * Creates a bridge request transaction and signs it.
+   * @param destination - The destination address for the bridge request
+   * @param amount - The amount to bridge
+   * @param token_id - The ID of the token to bridge
+   * @param intent - The bridge intent information
+   * @returns Promise that resolves to a signed transaction
+   */
   async bridgeRequest({ destination, amount, token_id, intent }: BridgeRequestArgs): Promise<SignedTransaction> {
     const tx = await this.buildBridgeRequest({ destination, amount, token_id, intent });
     return this.signTransaction(tx);
@@ -3031,6 +3151,12 @@ class Client {
     return this.buildTransaction({ type: 'BurnToken', params: { token_id, amount, token_details } });
   }
 
+  /**
+   * Burns tokens or coins and signs the transaction.
+   * @param token_id - The ID of the token to burn (or 'Coin' for base coin)
+   * @param amount - The amount to burn
+   * @returns Promise that resolves to a signed transaction
+   */
   async burn({ token_id, amount }: BurnArgs): Promise<SignedTransaction> {
     const tx = await this.buildBurn({ token_id, amount });
     return this.signTransaction(tx);
@@ -3044,6 +3170,11 @@ class Client {
     return this.buildTransaction({ type: 'DataDeposit', params: { data } });
   }
 
+  /**
+   * Creates a data deposit transaction and signs it.
+   * @param data - The data to deposit on the blockchain
+   * @returns Promise that resolves to a signed transaction
+   */
   async dataDeposit({ data }: DataDepositArgs): Promise<SignedTransaction> {
     const tx = await this.buildDataDeposit({ data });
     return this.signTransaction(tx);
@@ -3057,6 +3188,12 @@ class Client {
     return this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
   }
 
+  /**
+   * Creates a delegation ID and signs the transaction.
+   * @param pool_id - The pool ID to create delegation for
+   * @param destination - The destination address for the delegation
+   * @returns Promise that resolves to a signed transaction
+   */
   async delegationCreate({ pool_id, destination }: DelegationCreateArgs): Promise<SignedTransaction> {
     const tx = await this.buildDelegationCreate({ pool_id, destination });
     return this.signTransaction(tx);
@@ -3115,6 +3252,11 @@ class Client {
     }
   }
 
+  /**
+   * Stakes tokens to a delegation and signs the transaction.
+   * @param params - The delegation staking parameters including amount and delegation/pool ID
+   * @returns Promise that resolves to a signed transaction
+   */
   async delegationStake(params: DelegationStakeArgs): Promise<SignedTransaction> {
     const tx = await this.buildDelegationStake(params);
     return this.signTransaction(tx);
@@ -3181,6 +3323,11 @@ class Client {
     }
   }
 
+  /**
+   * Withdraws tokens from a delegation and signs the transaction.
+   * @param params - The delegation withdrawal parameters including amount and delegation/pool ID
+   * @returns Promise that resolves to a signed transaction
+   */
   async delegationWithdraw(params: DelegationWithdrawArgs): Promise<SignedTransaction> {
     const tx = await this.buildDelegationWithdraw(params);
     return this.signTransaction(tx);
@@ -3218,6 +3365,11 @@ class Client {
     });
   }
 
+  /**
+   * Creates a Hash Time Locked Contract (HTLC) and signs the transaction.
+   * @param params - The HTLC parameters including amount, addresses, and timelock
+   * @returns Promise that resolves to a signed transaction
+   */
   async createHtlc(params: CreateHtlcArgs): Promise<SignedTransaction> {
     const tx = await this.buildCreateHtlc(params);
     return this.signTransaction(tx);
@@ -3257,6 +3409,11 @@ class Client {
     });
   }
 
+  /**
+   * Refunds an HTLC after the timelock expires and signs the transaction.
+   * @param params - The refund parameters including transaction ID or UTXO
+   * @returns Promise that resolves to a signed transaction
+   */
   async refundHtlc(params: any): Promise<any> {
     const tx = await this.buildRefundHtlc(params);
     return this.signTransaction(tx);
@@ -3296,11 +3453,24 @@ class Client {
     });
   }
 
+  /**
+   * Spends an HTLC by providing the secret and signs the transaction.
+   * @param params - The spend parameters including transaction ID or UTXO
+   * @returns Promise that resolves to a signed transaction
+   */
   async spendHtlc(params: any): Promise<any> {
     const tx = await this.buildSpendHtlc(params);
     return this.signTransaction(tx);
   }
 
+  /**
+   * Extracts the secret from an HTLC spend transaction.
+   * @param arg - Object containing transaction_id, transaction_hex, and optional format
+   * @param arg.transaction_id - The transaction ID containing the HTLC spend
+   * @param arg.transaction_hex - The hex representation of the signed transaction
+   * @param arg.format - The format for the returned secret ('Uint8Array' or 'hex')
+   * @returns Promise that resolves to the extracted secret
+   */
   async extractHtlcSecret(arg: any): Promise<any> {
     const {
       transaction_id,
@@ -3345,6 +3515,11 @@ class Client {
     return secret;
   }
 
+  /**
+   * Signs a transaction using the connected wallet.
+   * @param tx - The transaction to sign
+   * @returns Promise that resolves to the signed transaction hex
+   */
   async signTransaction(tx: Transaction): Promise<SignedTransaction> {
     this.ensureInitialized();
     return this.request({
@@ -3369,6 +3544,11 @@ class Client {
     });
   }
 
+  /**
+   * Requests a secret hash from the wallet for HTLC operations.
+   * @param args - Additional arguments (currently unused)
+   * @returns Promise that resolves to the secret hash
+   */
   async requestSecretHash(args: any): Promise<any> {
     this.ensureInitialized();
     return this.request({
@@ -3521,12 +3701,22 @@ class Client {
     }
   }
 
+  /**
+   * Gets the extended public key (xpub) from the connected wallet.
+   * @returns Promise that resolves to the extended public key string
+   * @warning Sharing xPub exposes all derived addresses. Use with caution.
+   */
   async getXPub(): Promise<string> {
     this.ensureInitialized();
     console.warn('[Mintlayer SDK] Warning: Sharing xPub exposes all derived addresses. Use with caution.');
     return this.request({ method: 'getXPub' });
   }
 
+  /**
+   * Broadcasts a signed transaction to the network.
+   * @param tx - The transaction to broadcast (hex string or object with hex and json)
+   * @returns Promise that resolves to the broadcast response
+   */
   async broadcastTx(tx: string | { hex: string, json: TransactionJSONRepresentation }): Promise<any> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/transaction`, {
@@ -3550,6 +3740,11 @@ class Client {
     return data;
   }
 
+  /**
+   * Registers an event listener for wallet events.
+   * @param eventName - The name of the event to listen for
+   * @param callback - The callback function to execute when the event occurs
+   */
   on(eventName: string, callback: (data: any) => void): void {
     this.ensureInitialized();
     window.addEventListener('message', (event: MessageEvent) => {
@@ -3559,6 +3754,10 @@ class Client {
     });
   }
 
+  /**
+   * Gets all available trading orders from the network.
+   * @returns Promise that resolves to an array of order data
+   */
   async getAvailableOrders(): Promise<OrderData[]> {
     this.ensureInitialized();
     const response = await fetch(`${this.getApiServer()}/order`);
