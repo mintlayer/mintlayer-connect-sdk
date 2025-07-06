@@ -13,6 +13,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   const [generatingSecret, setGeneratingSecret] = useState(false)
   const [creatingHtlc, setCreatingHtlc] = useState(false)
   const [creatingCounterpartyHtlc, setCreatingCounterpartyHtlc] = useState(false)
+  const [claimingHtlc, setClaimingHtlc] = useState(false)
   const [tokens, setTokens] = useState<any[]>([])
 
   useEffect(() => {
@@ -216,6 +217,147 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       alert('Failed to create counterparty HTLC. Please try again.')
     } finally {
       setCreatingCounterpartyHtlc(false)
+    }
+  }
+
+  const claimHtlc = async () => {
+    if (!client || !userAddress || !swap?.offer) {
+      alert('Missing required data for HTLC claiming')
+      return
+    }
+
+    // Determine which HTLC to claim based on user role
+    const isUserCreator = swap.offer.creatorMLAddress === userAddress
+    const isUserTaker = swap.takerMLAddress === userAddress
+
+    if (!isUserCreator && !isUserTaker) {
+      alert('You are not authorized to claim this HTLC')
+      return
+    }
+
+    setClaimingHtlc(true)
+    try {
+      let htlcTxHash: string
+      let secret: string
+
+      if (isUserCreator) {
+        // Creator claims taker's HTLC using the secret stored in their wallet
+        if (!swap.takerHtlcTxHash) {
+          alert('Taker HTLC not found')
+          return
+        }
+        htlcTxHash = swap.takerHtlcTxHash
+        // The wallet will automatically use the secret it generated earlier
+        // We don't need to provide it explicitly - the wallet knows it
+      } else {
+        // Taker claims creator's HTLC (needs to provide the secret they learned)
+        if (!swap.creatorHtlcTxHash) {
+          alert('Creator HTLC not found')
+          return
+        }
+        htlcTxHash = swap.creatorHtlcTxHash
+        // For the taker, they need to input the secret they obtained somehow
+        // In a real implementation, they would have learned this secret from somewhere
+        const inputSecret = prompt('Enter the secret to claim the HTLC:')
+        if (!inputSecret) {
+          alert('Secret is required to claim HTLC')
+          return
+        }
+        secret = inputSecret
+      }
+
+      // Build spend HTLC parameters
+      const spendParams = isUserCreator
+        ? { transaction_id: htlcTxHash } // Creator: wallet provides secret automatically
+        : { transaction_id: htlcTxHash, secret: secret } // Taker: must provide secret
+
+      // Step 1: Sign the spend transaction
+      const signedSpendTxHex = await client.spendHtlc(spendParams)
+      console.log('HTLC spend signed:', signedSpendTxHex)
+
+      // Step 2: Broadcast the spend transaction
+      const broadcastResult = await client.broadcastTx(signedSpendTxHex)
+      console.log('HTLC spend broadcast result:', broadcastResult)
+
+      const spendTxId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+      // Step 3: Update swap status with both transaction ID and hex
+      // Note: We save the claim transaction hex because it's needed to extract the secret
+      const updateData: any = {
+        status: 'completed',
+        claimTxHash: spendTxId,
+        claimTxHex: signedSpendTxHex
+      }
+
+      // Only include secret if taker provided it (creator's secret is in wallet)
+      if (!isUserCreator && secret) {
+        updateData.secret = secret
+      }
+
+      await fetch(`/api/swaps/${swap.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      })
+
+      // Refresh swap data
+      fetchSwap()
+      alert(`HTLC claimed successfully! Spend TX ID: ${spendTxId}`)
+    } catch (error) {
+      console.error('Error claiming HTLC:', error)
+      alert('Failed to claim HTLC. Please try again.')
+    } finally {
+      setClaimingHtlc(false)
+    }
+  }
+
+  const extractSecretFromClaim = async () => {
+    if (!client || !swap) {
+      alert('Missing required data for secret extraction')
+      return
+    }
+
+    try {
+      // Check if there's a claim transaction to extract secret from
+      if (!swap.claimTxHex) {
+        alert('No claim transaction hex found')
+        return
+      }
+
+      // Determine which HTLC transaction hex to use for extraction
+      // We need the original HTLC transaction hex that was claimed
+      const isUserCreator = swap.offer?.creatorMLAddress === userAddress
+      const originalHtlcTxHex = isUserCreator ? swap.takerHtlcTxHex : swap.creatorHtlcTxHex
+
+      if (!originalHtlcTxHex) {
+        alert('Original HTLC transaction hex not found')
+        return
+      }
+
+      // Extract secret using the claim transaction hex and original HTLC hex
+      const extractedSecret = await client.extractHtlcSecret({
+        transaction_id: swap.claimTxHash || '', // We still need the transaction ID
+        transaction_hex: swap.claimTxHex, // Use the claim transaction hex
+        format: 'hex'
+      })
+
+      console.log('Extracted secret:', extractedSecret)
+
+      // Update swap with extracted secret
+      await fetch(`/api/swaps/${swap.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: extractedSecret
+        })
+      })
+
+      // Refresh swap data
+      fetchSwap()
+      alert(`Secret extracted successfully: ${extractedSecret}`)
+    } catch (error) {
+      console.error('Error extracting secret:', error)
+      alert('Failed to extract secret. Please try again.')
     }
   }
 
@@ -474,24 +616,65 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
         {swap.status === 'in_progress' && (
           <div className="bg-purple-50 p-4 rounded-md">
-            <p className="text-purple-800">
-              Both HTLCs are created. You can now claim your tokens by revealing the secret.
+            <p className="text-purple-800 mb-4">
+              Both HTLCs are created. You can now claim your tokens. Claiming will reveal the secret and allow the other party to claim their tokens.
             </p>
-            <button className="mt-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">
-              Claim Tokens
-            </button>
+            <div className="space-y-3">
+              <div className="bg-white p-3 rounded border">
+                <p className="text-sm font-medium text-gray-700 mb-2">Available to Claim:</p>
+                <div className="text-xs text-gray-600 space-y-1">
+                  {isUserCreator && (
+                    <div>
+                      <strong>You can claim:</strong> {swap.offer?.amountB} {getTokenSymbol(swap.offer?.tokenB || '')} from taker's HTLC
+                      <br />
+                      <span className="text-green-600">✓ Your wallet has the secret</span>
+                    </div>
+                  )}
+                  {isUserTaker && (
+                    <div>
+                      <strong>You can claim:</strong> {swap.offer?.amountA} {getTokenSymbol(swap.offer?.tokenA || '')} from creator's HTLC
+                      <br />
+                      <span className="text-orange-600">⚠ You need to provide the secret</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={claimHtlc}
+                disabled={claimingHtlc || !userAddress}
+                className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+              >
+                {claimingHtlc ? 'Claiming HTLC...' : 'Claim Tokens'}
+              </button>
+            </div>
           </div>
         )}
 
         {swap.status === 'completed' && (
           <div className="bg-green-50 p-4 rounded-md">
-            <p className="text-green-800">
-              🎉 Swap completed successfully! Both parties have received their tokens.
+            <p className="text-green-800 mb-3">
+              🎉 Swap completed successfully!
             </p>
             {swap.claimTxHash && (
-              <p className="text-sm text-green-700 mt-2">
-                Transaction: {swap.claimTxHash}
-              </p>
+              <div className="space-y-2">
+                <p className="text-sm text-green-700">
+                  Claim Transaction: {swap.claimTxHash}
+                </p>
+                {swap.secret && (
+                  <div className="bg-white p-2 rounded border">
+                    <p className="text-xs font-medium text-gray-700">Revealed Secret:</p>
+                    <p className="text-xs font-mono text-gray-600 break-all">{swap.secret}</p>
+                  </div>
+                )}
+                {!swap.secret && (
+                  <button
+                    onClick={extractSecretFromClaim}
+                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                  >
+                    Extract Secret from Claim
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}

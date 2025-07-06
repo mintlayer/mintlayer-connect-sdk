@@ -24,6 +24,7 @@ export interface Swap {
   takerHtlcTxHash?: string
   takerHtlcTxHex?: string
   claimTxHash?: string
+  claimTxHex?: string
   createdAt: Date
   offer?: Offer
 }
@@ -51,4 +52,5 @@ export interface UpdateSwapRequest {
   takerHtlcTxHash?: string
   takerHtlcTxHex?: string
   claimTxHash?: string
+  claimTxHex?: string
 }

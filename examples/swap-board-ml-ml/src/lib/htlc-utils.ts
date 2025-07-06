@@ -89,20 +89,20 @@ export function buildCounterpartyHTLCParams(
 }
 
 /**
- * Extract secret from a completed HTLC transaction
+ * Extract secret from a completed HTLC claim transaction
  * @param client - Mintlayer client
- * @param spendTransactionId - The transaction ID that spent the HTLC
- * @param originalHtlcTxHex - The original signed HTLC transaction hex
+ * @param claimTransactionId - The transaction ID that claimed/spent the HTLC
+ * @param claimTransactionHex - The signed claim transaction hex (contains the secret)
  * @returns The extracted secret in hex format
  */
 export async function extractHTLCSecret(
   client: Client,
-  spendTransactionId: string,
-  originalHtlcTxHex: string
+  claimTransactionId: string,
+  claimTransactionHex: string
 ): Promise<string> {
   return await client.extractHtlcSecret({
-    transaction_id: spendTransactionId,
-    transaction_hex: originalHtlcTxHex,
+    transaction_id: claimTransactionId,
+    transaction_hex: claimTransactionHex,
     format: 'hex'
   })
 }
@@ -116,6 +116,32 @@ export async function createAndBroadcastHTLC(
 ): Promise<{ txId: string, txHex: string }> {
   // Step 1: Sign the transaction
   const signedTxHex = await client.createHtlc(params)
+
+  // Step 2: Broadcast to network
+  const broadcastResult = await client.broadcastTx(signedTxHex)
+  const txId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+  return { txId, txHex: signedTxHex }
+}
+
+/**
+ * Claim/spend an HTLC
+ * @param client - Mintlayer client
+ * @param htlcTxHash - Hash of the HTLC transaction to spend
+ * @param secret - Secret to reveal (optional if wallet has it)
+ */
+export async function claimHTLC(
+  client: Client,
+  htlcTxHash: string,
+  secret?: string
+): Promise<{ txId: string, txHex: string }> {
+  // Step 1: Sign the spend transaction
+  const spendParams: any = { htlc_tx_hash: htlcTxHash }
+  if (secret) {
+    spendParams.secret = secret
+  }
+
+  const signedTxHex = await client.spendHtlc(spendParams)
 
   // Step 2: Broadcast to network
   const broadcastResult = await client.broadcastTx(signedTxHex)

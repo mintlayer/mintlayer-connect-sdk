@@ -38,6 +38,7 @@ model Swap {
   takerHtlcTxHash       String?  // Taker's HTLC transaction ID
   takerHtlcTxHex        String?  // Taker's signed HTLC transaction hex
   claimTxHash           String?  // Final claim transaction ID
+  claimTxHex            String?  // Final claim transaction hex (needed for secret extraction)
   createdAt             DateTime @default(now())
 
   offer                 Offer    @relation(fields: [offerId], references: [id])

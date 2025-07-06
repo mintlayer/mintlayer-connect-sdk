@@ -77,6 +77,7 @@ export async function POST(
     if (body.takerHtlcTxHash) updateData.takerHtlcTxHash = body.takerHtlcTxHash
     if (body.takerHtlcTxHex) updateData.takerHtlcTxHex = body.takerHtlcTxHex
     if (body.claimTxHash) updateData.claimTxHash = body.claimTxHash
+    if (body.claimTxHex) updateData.claimTxHex = body.claimTxHex
     
     const updatedSwap = await prisma.swap.update({
       where: { id: swapId },
