@@ -238,7 +238,6 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     setClaimingHtlc(true)
     try {
       let htlcTxHash: string
-      let secret: string
 
       if (isUserCreator) {
         // Creator claims taker's HTLC using the secret stored in their wallet
@@ -263,15 +262,48 @@ export default function SwapPage({ params }: { params: { id: string } }) {
           alert('Secret is required to claim HTLC')
           return
         }
-        secret = inputSecret
+
+        // Build spend HTLC parameters for taker (with secret)
+        const spendParams = {
+          transaction_id: htlcTxHash,
+          secret: inputSecret
+        }
+
+        // Step 1: Sign the spend transaction
+        const signedSpendTxHex = await client.spendHtlc(spendParams)
+        console.log('HTLC spend signed:', signedSpendTxHex)
+
+        // Step 2: Broadcast the spend transaction
+        const broadcastResult = await client.broadcastTx(signedSpendTxHex)
+        console.log('HTLC spend broadcast result:', broadcastResult)
+
+        const spendTxId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+        // Step 3: Update swap status with both transaction ID and hex
+        // Note: We save the claim transaction hex because it's needed to extract the secret
+        const updateData: any = {
+          status: 'completed',
+          claimTxHash: spendTxId,
+          claimTxHex: signedSpendTxHex,
+          secret: inputSecret
+        }
+
+        await fetch(`/api/swaps/${swap.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updateData)
+        })
+
+        // Refresh swap data
+        fetchSwap()
+        alert(`HTLC claimed successfully! Spend TX ID: ${spendTxId}`)
+        return
       }
 
-      // Build spend HTLC parameters
-      const spendParams = isUserCreator
-        ? { transaction_id: htlcTxHash } // Creator: wallet provides secret automatically
-        : { transaction_id: htlcTxHash, secret: secret } // Taker: must provide secret
+      // Build spend HTLC parameters for creator (no secret needed)
+      const spendParams = { transaction_id: htlcTxHash }
 
-      // Step 1: Sign the spend transaction
+      // Step 1: Sign the spend transaction (creator case)
       const signedSpendTxHex = await client.spendHtlc(spendParams)
       console.log('HTLC spend signed:', signedSpendTxHex)
 
@@ -283,15 +315,10 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
       // Step 3: Update swap status with both transaction ID and hex
       // Note: We save the claim transaction hex because it's needed to extract the secret
-      const updateData: any = {
+      const updateData = {
         status: 'completed',
         claimTxHash: spendTxId,
         claimTxHex: signedSpendTxHex
-      }
-
-      // Only include secret if taker provided it (creator's secret is in wallet)
-      if (!isUserCreator && secret) {
-        updateData.secret = secret
       }
 
       await fetch(`/api/swaps/${swap.id}`, {
@@ -382,7 +409,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     try {
       // Use the extracted secret to claim creator's HTLC
       const spendParams = {
-        htlc_tx_hash: swap.creatorHtlcTxHash,
+        transaction_id: swap.creatorHtlcTxHash,
         secret: swap.secret
       }
 
