@@ -12,6 +12,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   const [secretHash, setSecretHash] = useState<any>(null)
   const [generatingSecret, setGeneratingSecret] = useState(false)
   const [creatingHtlc, setCreatingHtlc] = useState(false)
+  const [creatingCounterpartyHtlc, setCreatingCounterpartyHtlc] = useState(false)
 
   useEffect(() => {
     fetchSwap()
@@ -119,6 +120,52 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       alert('Failed to create HTLC. Please try again.')
     } finally {
       setCreatingHtlc(false)
+    }
+  }
+
+  const createCounterpartyHtlc = async () => {
+    if (!client || !userAddress || !swap?.offer || !swap.secretHash) {
+      alert('Missing required data for counterparty HTLC creation')
+      return
+    }
+
+    setCreatingCounterpartyHtlc(true)
+    try {
+      // Parse the stored secret hash from the creator's HTLC
+      const creatorSecretHash = JSON.parse(swap.secretHash)
+
+      const htlcParams = {
+        amount: swap.offer.amountB, // Taker gives amountB
+        token_id: swap.offer.tokenB === 'ML' ? null : swap.offer.tokenB,
+        secret_hash: { hex: creatorSecretHash.secret_hash_hex }, // Use same secret hash
+        spend_address: swap.offer.creatorMLAddress, // Creator can spend with secret
+        refund_address: userAddress, // Taker can refund after timelock
+        refund_timelock: {
+          type: 'ForBlockCount',
+          content: 144 // ~24 hours assuming 10min blocks
+        }
+      }
+
+      const signedTx = await client.createHtlc(htlcParams)
+      console.log('Counterparty HTLC created:', signedTx)
+
+      // Update swap status
+      await fetch(`/api/swaps/${swap.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'in_progress'
+        })
+      })
+
+      // Refresh swap data
+      fetchSwap()
+      alert('Counterparty HTLC created successfully!')
+    } catch (error) {
+      console.error('Error creating counterparty HTLC:', error)
+      alert('Failed to create counterparty HTLC. Please try again.')
+    } finally {
+      setCreatingCounterpartyHtlc(false)
     }
   }
 
@@ -340,16 +387,34 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
         {swap.status === 'htlc_created' && (
           <div className="bg-blue-50 p-4 rounded-md">
-            <p className="text-blue-800">
+            <p className="text-blue-800 mb-4">
               {isUserTaker
                 ? "The creator has created their HTLC. You need to create your counterparty HTLC."
                 : "You've created your HTLC. Waiting for the taker to create their counterparty HTLC."
               }
             </p>
             {isUserTaker && (
-              <button className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                Create Counterparty HTLC
-              </button>
+              <div className="space-y-3">
+                <div className="bg-white p-3 rounded border">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Creator's HTLC Details:</p>
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <div>Amount: {swap.offer?.amountA} {swap.offer?.tokenA}</div>
+                    <div>Secret Hash: {swap.secretHash ? JSON.parse(swap.secretHash).secret_hash_hex.slice(0, 20) + '...' : 'N/A'}</div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-blue-700 mb-2">
+                    Create your counterparty HTLC with {swap.offer?.amountB} {swap.offer?.tokenB}
+                  </p>
+                  <button
+                    onClick={createCounterpartyHtlc}
+                    disabled={creatingCounterpartyHtlc || !userAddress}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                  >
+                    {creatingCounterpartyHtlc ? 'Creating Counterparty HTLC...' : 'Create Counterparty HTLC'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}

@@ -35,7 +35,7 @@ export async function createHTLC(client: Client, params: HTLCParams): Promise<st
 }
 
 /**
- * Build HTLC parameters for a swap offer
+ * Build HTLC parameters for a swap offer (creator's HTLC)
  */
 export function buildHTLCParams(
   offer: any,
@@ -50,6 +50,29 @@ export function buildHTLCParams(
     secret_hash: { hex: secretHash.secret_hash_hex },
     spend_address: spendAddress,
     refund_address: refundAddress,
+    refund_timelock: {
+      type: 'ForBlockCount',
+      content: timelockBlocks
+    }
+  }
+}
+
+/**
+ * Build counterparty HTLC parameters (taker's HTLC)
+ */
+export function buildCounterpartyHTLCParams(
+  offer: any,
+  secretHashHex: string,
+  spendAddress: string,
+  refundAddress: string,
+  timelockBlocks: number = 144 // ~24 hours
+): HTLCParams {
+  return {
+    amount: offer.amountB, // Taker gives amountB
+    token_id: offer.tokenB === 'ML' ? null : offer.tokenB,
+    secret_hash: { hex: secretHashHex }, // Use same secret hash as creator
+    spend_address: spendAddress, // Creator can spend with secret
+    refund_address: refundAddress, // Taker can refund after timelock
     refund_timelock: {
       type: 'ForBlockCount',
       content: timelockBlocks
