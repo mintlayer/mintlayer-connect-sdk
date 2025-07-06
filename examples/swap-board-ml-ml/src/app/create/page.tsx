@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react'
 import { Client } from '@mintlayer/sdk'
 
+interface Token {
+  token_id: string
+  symbol: string
+  number_of_decimals: number
+}
+
 export default function CreateOfferPage() {
   const [formData, setFormData] = useState({
     tokenA: '',
@@ -14,9 +20,12 @@ export default function CreateOfferPage() {
   const [loading, setLoading] = useState(false)
   const [userAddress, setUserAddress] = useState<string>('')
   const [client, setClient] = useState<Client | null>(null)
+  const [tokens, setTokens] = useState<Token[]>([])
+  const [loadingTokens, setLoadingTokens] = useState(true)
 
   useEffect(() => {
     initializeClient()
+    fetchTokens()
   }, [])
 
   const initializeClient = async () => {
@@ -26,6 +35,29 @@ export default function CreateOfferPage() {
       setClient(newClient)
     } catch (error) {
       console.error('Error initializing client:', error)
+    }
+  }
+
+  const fetchTokens = async () => {
+    try {
+      setLoadingTokens(true)
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const networkId = network === 'mainnet' ? 0 : 1
+      const response = await fetch(`https://api.mintini.app/dex_tokens?network=${networkId}`)
+
+      if (response.ok) {
+        const tokenData = await response.json()
+        // Add native ML token at the beginning
+        const allTokens = [
+          { token_id: 'ML', symbol: 'ML', number_of_decimals: 11 },
+          ...tokenData
+        ]
+        setTokens(allTokens)
+      }
+    } catch (error) {
+      console.error('Error fetching tokens:', error)
+    } finally {
+      setLoadingTokens(false)
     }
   }
 
@@ -42,12 +74,24 @@ export default function CreateOfferPage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
       [name]: value
     }))
+  }
+
+  const getTokenDisplay = (tokenId: string) => {
+    if (tokenId === 'ML') return 'ML (Native)'
+    const token = tokens.find(t => t.token_id === tokenId)
+    if (!token) return tokenId
+    const shortId = token.token_id.slice(-8) // Last 8 characters
+    return `${token.symbol} (...${shortId})`
+  }
+
+  const getSelectedToken = (tokenId: string) => {
+    return tokens.find(t => t.token_id === tokenId)
   }
 
   const calculatePrice = () => {
@@ -119,16 +163,32 @@ export default function CreateOfferPage() {
               <label htmlFor="tokenA" className="block text-sm font-medium text-gray-700 mb-2">
                 Token to Give *
               </label>
-              <input
-                type="text"
-                id="tokenA"
-                name="tokenA"
-                value={formData.tokenA}
-                onChange={handleInputChange}
-                placeholder="e.g., tmltk1abc..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mintlayer-500"
-                required
-              />
+              {loadingTokens ? (
+                <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                  Loading tokens...
+                </div>
+              ) : (
+                <select
+                  id="tokenA"
+                  name="tokenA"
+                  value={formData.tokenA}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mintlayer-500"
+                  required
+                >
+                  <option value="">Select a token</option>
+                  {tokens.map((token) => (
+                    <option key={token.token_id} value={token.token_id}>
+                      {getTokenDisplay(token.token_id)}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {formData.tokenA && getSelectedToken(formData.tokenA) && (
+                <div className="mt-1 text-xs text-gray-500">
+                  Decimals: {getSelectedToken(formData.tokenA)?.number_of_decimals}
+                </div>
+              )}
             </div>
 
             <div>
@@ -155,16 +215,32 @@ export default function CreateOfferPage() {
               <label htmlFor="tokenB" className="block text-sm font-medium text-gray-700 mb-2">
                 Token to Receive *
               </label>
-              <input
-                type="text"
-                id="tokenB"
-                name="tokenB"
-                value={formData.tokenB}
-                onChange={handleInputChange}
-                placeholder="e.g., tmltk1def..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mintlayer-500"
-                required
-              />
+              {loadingTokens ? (
+                <div className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50">
+                  Loading tokens...
+                </div>
+              ) : (
+                <select
+                  id="tokenB"
+                  name="tokenB"
+                  value={formData.tokenB}
+                  onChange={handleInputChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-mintlayer-500"
+                  required
+                >
+                  <option value="">Select a token</option>
+                  {tokens.map((token) => (
+                    <option key={token.token_id} value={token.token_id}>
+                      {getTokenDisplay(token.token_id)}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {formData.tokenB && getSelectedToken(formData.tokenB) && (
+                <div className="mt-1 text-xs text-gray-500">
+                  Decimals: {getSelectedToken(formData.tokenB)?.number_of_decimals}
+                </div>
+              )}
             </div>
 
             <div>

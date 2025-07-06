@@ -72,6 +72,10 @@ export async function POST(
     if (body.status) updateData.status = body.status
     if (body.secretHash) updateData.secretHash = body.secretHash
     if (body.secret) updateData.secret = body.secret
+    if (body.creatorHtlcTxHash) updateData.creatorHtlcTxHash = body.creatorHtlcTxHash
+    if (body.creatorHtlcTxHex) updateData.creatorHtlcTxHex = body.creatorHtlcTxHex
+    if (body.takerHtlcTxHash) updateData.takerHtlcTxHash = body.takerHtlcTxHash
+    if (body.takerHtlcTxHex) updateData.takerHtlcTxHex = body.takerHtlcTxHex
     if (body.claimTxHash) updateData.claimTxHash = body.claimTxHash
     
     const updatedSwap = await prisma.swap.update({

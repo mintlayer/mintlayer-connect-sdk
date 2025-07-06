@@ -14,6 +14,7 @@ export interface HTLCParams {
 
 export interface SecretHashResponse {
   secret: string
+  secret_hash_hex: string
   secret_hash: {
     hex: string
     string?: string | null
@@ -28,10 +29,17 @@ export async function generateSecretHash(client: Client): Promise<SecretHashResp
 }
 
 /**
- * Create an HTLC with the given parameters
+ * Create an HTLC with the given parameters and broadcast it
  */
-export async function createHTLC(client: Client, params: HTLCParams): Promise<string> {
-  return await client.createHtlc(params)
+export async function createHTLC(client: Client, params: HTLCParams): Promise<{ txHex: string, txId: string }> {
+  // Sign the transaction
+  const signedTxHex = await client.createHtlc(params)
+
+  // Broadcast to network
+  const broadcastResult = await client.broadcastTx(signedTxHex)
+  const txId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+  return { txHex: signedTxHex, txId }
 }
 
 /**
@@ -82,17 +90,38 @@ export function buildCounterpartyHTLCParams(
 
 /**
  * Extract secret from a completed HTLC transaction
+ * @param client - Mintlayer client
+ * @param spendTransactionId - The transaction ID that spent the HTLC
+ * @param originalHtlcTxHex - The original signed HTLC transaction hex
+ * @returns The extracted secret in hex format
  */
 export async function extractHTLCSecret(
   client: Client,
-  transactionId: string,
-  transactionHex: string
+  spendTransactionId: string,
+  originalHtlcTxHex: string
 ): Promise<string> {
   return await client.extractHtlcSecret({
-    transaction_id: transactionId,
-    transaction_hex: transactionHex,
+    transaction_id: spendTransactionId,
+    transaction_hex: originalHtlcTxHex,
     format: 'hex'
   })
+}
+
+/**
+ * Create and broadcast an HTLC, returning both transaction ID and hex
+ */
+export async function createAndBroadcastHTLC(
+  client: Client,
+  params: HTLCParams
+): Promise<{ txId: string, txHex: string }> {
+  // Step 1: Sign the transaction
+  const signedTxHex = await client.createHtlc(params)
+
+  // Step 2: Broadcast to network
+  const broadcastResult = await client.broadcastTx(signedTxHex)
+  const txId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+  return { txId, txHex: signedTxHex }
 }
 
 /**

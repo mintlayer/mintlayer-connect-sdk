@@ -22,19 +22,23 @@ model Offer {
   contact          String?
   status           String   @default("open") // open, taken, completed, cancelled
   createdAt        DateTime @default(now())
-  
+
   swaps            Swap[]
 }
 
 model Swap {
-  id              Int      @id @default(autoincrement())
-  offerId         Int
-  takerMLAddress  String
-  status          String   @default("pending") // pending, htlc_created, in_progress, completed, refunded
-  secretHash      String?
-  secret          String?
-  claimTxHash     String?
-  createdAt       DateTime @default(now())
+  id                    Int      @id @default(autoincrement())
+  offerId               Int
+  takerMLAddress        String
+  status                String   @default("pending") // pending, htlc_created, in_progress, completed, refunded
+  secretHash            String?
+  secret                String?
+  creatorHtlcTxHash     String?  // Creator's HTLC transaction ID
+  creatorHtlcTxHex      String?  // Creator's signed HTLC transaction hex
+  takerHtlcTxHash       String?  // Taker's HTLC transaction ID
+  takerHtlcTxHex        String?  // Taker's signed HTLC transaction hex
+  claimTxHash           String?  // Final claim transaction ID
+  createdAt             DateTime @default(now())
 
-  offer           Offer    @relation(fields: [offerId], references: [id])
+  offer                 Offer    @relation(fields: [offerId], references: [id])
 }

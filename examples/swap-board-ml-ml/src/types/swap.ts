@@ -19,6 +19,10 @@ export interface Swap {
   status: 'pending' | 'htlc_created' | 'in_progress' | 'completed' | 'refunded'
   secretHash?: string
   secret?: string
+  creatorHtlcTxHash?: string
+  creatorHtlcTxHex?: string
+  takerHtlcTxHash?: string
+  takerHtlcTxHex?: string
   claimTxHash?: string
   createdAt: Date
   offer?: Offer
@@ -42,5 +46,9 @@ export interface UpdateSwapRequest {
   status?: Swap['status']
   secretHash?: string
   secret?: string
+  creatorHtlcTxHash?: string
+  creatorHtlcTxHex?: string
+  takerHtlcTxHash?: string
+  takerHtlcTxHex?: string
   claimTxHash?: string
 }

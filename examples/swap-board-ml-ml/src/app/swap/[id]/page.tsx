@@ -13,10 +13,12 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   const [generatingSecret, setGeneratingSecret] = useState(false)
   const [creatingHtlc, setCreatingHtlc] = useState(false)
   const [creatingCounterpartyHtlc, setCreatingCounterpartyHtlc] = useState(false)
+  const [tokens, setTokens] = useState<any[]>([])
 
   useEffect(() => {
     fetchSwap()
     initializeClient()
+    fetchTokens()
 
     // Poll for updates every 10 seconds
     const interval = setInterval(fetchSwap, 10000)
@@ -31,6 +33,31 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     } catch (error) {
       console.error('Error initializing client:', error)
     }
+  }
+
+  const fetchTokens = async () => {
+    try {
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const networkId = network === 'mainnet' ? 0 : 1
+      const response = await fetch(`https://api.mintini.app/dex_tokens?network=${networkId}`)
+
+      if (response.ok) {
+        const tokenData = await response.json()
+        const allTokens = [
+          { token_id: 'ML', symbol: 'ML', number_of_decimals: 11 },
+          ...tokenData
+        ]
+        setTokens(allTokens)
+      }
+    } catch (error) {
+      console.error('Error fetching tokens:', error)
+    }
+  }
+
+  const getTokenSymbol = (tokenId: string) => {
+    if (tokenId === 'ML') return 'ML'
+    const token = tokens.find((t: any) => t.token_id === tokenId)
+    return token ? token.symbol : tokenId.slice(-8)
   }
 
   const fetchSwap = async () => {
@@ -87,6 +114,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
     setCreatingHtlc(true)
     try {
+      // Step 1: Build the HTLC transaction
       const htlcParams = {
         amount: swap.offer.amountA,
         token_id: swap.offer.tokenA === 'ML' ? null : swap.offer.tokenA,
@@ -99,22 +127,33 @@ export default function SwapPage({ params }: { params: { id: string } }) {
         }
       }
 
-      const signedTx = await client.createHtlc(htlcParams)
-      console.log('HTLC created:', signedTx)
+      // Step 2: Sign the transaction
+      const signedTxHex = await client.createHtlc(htlcParams)
+      console.log('HTLC signed:', signedTxHex)
 
-      // Update swap status
+      // Step 3: Broadcast the transaction to the network
+      const broadcastResult = await client.broadcastTx(signedTxHex)
+      console.log('HTLC broadcast result:', broadcastResult)
+
+      const txId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+      // Step 4: Update swap status with transaction ID and hex
+      // Note: We save the signed transaction hex because it's needed later
+      // to extract the secret when someone claims the HTLC using extractHtlcSecret()
       await fetch(`/api/swaps/${swap.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'htlc_created',
-          secretHash: JSON.stringify(secretHash)
+          secretHash: JSON.stringify(secretHash),
+          creatorHtlcTxHash: txId,
+          creatorHtlcTxHex: signedTxHex
         })
       })
 
       // Refresh swap data
       fetchSwap()
-      alert('HTLC created successfully!')
+      alert(`HTLC created and broadcasted successfully! TX ID: ${txId}`)
     } catch (error) {
       console.error('Error creating HTLC:', error)
       alert('Failed to create HTLC. Please try again.')
@@ -146,21 +185,32 @@ export default function SwapPage({ params }: { params: { id: string } }) {
         }
       }
 
-      const signedTx = await client.createHtlc(htlcParams)
-      console.log('Counterparty HTLC created:', signedTx)
+      // Step 2: Sign the transaction
+      const signedTxHex = await client.createHtlc(htlcParams)
+      console.log('Counterparty HTLC signed:', signedTxHex)
 
-      // Update swap status
+      // Step 3: Broadcast the transaction to the network
+      const broadcastResult = await client.broadcastTx(signedTxHex)
+      console.log('Counterparty HTLC broadcast result:', broadcastResult)
+
+      const txId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+      // Step 4: Update swap status with transaction ID and hex
+      // Note: We save the signed transaction hex because it's needed later
+      // to extract the secret when someone claims the HTLC using extractHtlcSecret()
       await fetch(`/api/swaps/${swap.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: 'in_progress'
+          status: 'in_progress',
+          takerHtlcTxHash: txId,
+          takerHtlcTxHex: signedTxHex
         })
       })
 
       // Refresh swap data
       fetchSwap()
-      alert('Counterparty HTLC created successfully!')
+      alert(`Counterparty HTLC created and broadcasted successfully! TX ID: ${txId}`)
     } catch (error) {
       console.error('Error creating counterparty HTLC:', error)
       alert('Failed to create counterparty HTLC. Please try again.')
@@ -251,7 +301,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
             <div className="flex items-center justify-center py-4">
               <div className="text-center">
                 <div className="text-lg font-semibold text-gray-900">
-                  {swap.offer?.amountA} {swap.offer?.tokenA.substring(0, 5)}
+                  {swap.offer?.amountA} {getTokenSymbol(swap.offer?.tokenA || '')}
                 </div>
                 <div className="text-sm text-gray-600">From Creator</div>
               </div>
@@ -260,7 +310,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
               </svg>
               <div className="text-center">
                 <div className="text-lg font-semibold text-gray-900">
-                  {swap.offer?.amountB} {swap.offer?.tokenB.substring(0, 5)}
+                  {swap.offer?.amountB} {getTokenSymbol(swap.offer?.tokenB || '')}
                 </div>
                 <div className="text-sm text-gray-600">To Taker</div>
               </div>
@@ -400,6 +450,9 @@ export default function SwapPage({ params }: { params: { id: string } }) {
                   <div className="text-xs text-gray-600 space-y-1">
                     <div>Amount: {swap.offer?.amountA} {swap.offer?.tokenA}</div>
                     <div>Secret Hash: {swap.secretHash ? JSON.parse(swap.secretHash).secret_hash_hex.slice(0, 20) + '...' : 'N/A'}</div>
+                    {swap.creatorHtlcTxHash && (
+                      <div>TX ID: {swap.creatorHtlcTxHash.slice(0, 20)}...</div>
+                    )}
                   </div>
                 </div>
                 <div>

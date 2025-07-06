@@ -4,16 +4,24 @@ import { useState, useEffect } from 'react'
 import { Client } from '@mintlayer/sdk'
 import { Offer } from '@/types/swap'
 
+interface Token {
+  token_id: string
+  symbol: string
+  number_of_decimals: number
+}
+
 export default function OffersPage() {
   const [offers, setOffers] = useState<Offer[]>([])
   const [loading, setLoading] = useState(true)
   const [accepting, setAccepting] = useState<number | null>(null)
   const [client, setClient] = useState<Client | null>(null)
   const [userAddress, setUserAddress] = useState<string>('')
+  const [tokens, setTokens] = useState<Token[]>([])
 
   useEffect(() => {
     fetchOffers()
     initializeClient()
+    fetchTokens()
   }, [])
 
   const initializeClient = async () => {
@@ -23,6 +31,25 @@ export default function OffersPage() {
       setClient(newClient)
     } catch (error) {
       console.error('Error initializing client:', error)
+    }
+  }
+
+  const fetchTokens = async () => {
+    try {
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const networkId = network === 'mainnet' ? 0 : 1
+      const response = await fetch(`https://api.mintini.app/dex_tokens?network=${networkId}`)
+
+      if (response.ok) {
+        const tokenData = await response.json()
+        const allTokens = [
+          { token_id: 'ML', symbol: 'ML', number_of_decimals: 11 },
+          ...tokenData
+        ]
+        setTokens(allTokens)
+      }
+    } catch (error) {
+      console.error('Error fetching tokens:', error)
     }
   }
 
@@ -49,6 +76,12 @@ export default function OffersPage() {
       console.error('Error connecting wallet:', error)
       alert('Failed to connect wallet. Please make sure Mojito wallet is installed.')
     }
+  }
+
+  const getTokenSymbol = (tokenId: string) => {
+    if (tokenId === 'ML') return 'ML'
+    const token = tokens.find(t => t.token_id === tokenId)
+    return token ? token.symbol : tokenId.slice(-8)
   }
 
   const acceptOffer = async (offerId: number) => {
@@ -132,17 +165,17 @@ export default function OffersPage() {
                 <div className="flex-1">
                   <div className="flex items-center mb-2">
                     <span className="text-lg font-semibold text-gray-900">
-                      {offer.amountA} {offer.tokenA.substring(0, 5)}
+                      {offer.amountA} {getTokenSymbol(offer.tokenA)}
                     </span>
                     <svg className="w-5 h-5 mx-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
                     <span className="text-lg font-semibold text-gray-900">
-                      {offer.amountB} {offer.tokenB.substring(0, 5)}
+                      {offer.amountB} {getTokenSymbol(offer.tokenB)}
                     </span>
                   </div>
                   <div className="text-sm text-gray-600 mb-2">
-                    Price: {offer.price.toFixed(6)} {offer.tokenB.substring(0, 5)}/{offer.tokenA.substring(0, 5)}
+                    Price: {offer.price.toFixed(6)} {getTokenSymbol(offer.tokenB)}/{getTokenSymbol(offer.tokenA)}
                   </div>
                   <div className="text-sm text-gray-600 mb-2">
                     Creator: {offer.creatorMLAddress.slice(0, 20)}...
