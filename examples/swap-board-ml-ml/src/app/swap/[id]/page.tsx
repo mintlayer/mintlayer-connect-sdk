@@ -361,6 +361,62 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     }
   }
 
+  const claimWithExtractedSecret = async () => {
+    if (!client || !userAddress || !swap?.secret) {
+      alert('Missing required data for claiming with extracted secret')
+      return
+    }
+
+    const isUserTaker = swap.takerMLAddress === userAddress
+    if (!isUserTaker) {
+      alert('Only the taker can use this function')
+      return
+    }
+
+    if (!swap.creatorHtlcTxHash) {
+      alert('Creator HTLC not found')
+      return
+    }
+
+    setClaimingHtlc(true)
+    try {
+      // Use the extracted secret to claim creator's HTLC
+      const spendParams = {
+        htlc_tx_hash: swap.creatorHtlcTxHash,
+        secret: swap.secret
+      }
+
+      // Step 1: Sign the spend transaction
+      const signedSpendTxHex = await client.spendHtlc(spendParams)
+      console.log('Taker HTLC spend signed:', signedSpendTxHex)
+
+      // Step 2: Broadcast the spend transaction
+      const broadcastResult = await client.broadcastTx(signedSpendTxHex)
+      console.log('Taker HTLC spend broadcast result:', broadcastResult)
+
+      const spendTxId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+      // Step 3: Update swap status to fully completed
+      await fetch(`/api/swaps/${swap.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'completed'
+          // Note: We don't update claimTxHash here as it refers to the first claim
+        })
+      })
+
+      // Refresh swap data
+      fetchSwap()
+      alert(`Successfully claimed creator's HTLC! TX ID: ${spendTxId}. Atomic swap completed!`)
+    } catch (error) {
+      console.error('Error claiming with extracted secret:', error)
+      alert('Failed to claim HTLC with extracted secret. Please try again.')
+    } finally {
+      setClaimingHtlc(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'text-yellow-600 bg-yellow-100'
@@ -493,7 +549,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
           <div className="space-y-4">
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                ['pending', 'htlc_created', 'in_progress', 'completed'].includes(swap.status) 
+                ['pending', 'htlc_created', 'in_progress', 'completed'].includes(swap.status)
                   ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
               <span className="text-sm">Offer accepted</span>
@@ -501,25 +557,39 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                ['htlc_created', 'in_progress', 'completed'].includes(swap.status) 
+                ['htlc_created', 'in_progress', 'completed'].includes(swap.status)
                   ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
-              <span className="text-sm">HTLC created</span>
+              <span className="text-sm">Creator HTLC created</span>
             </div>
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                ['in_progress', 'completed'].includes(swap.status) 
+                ['in_progress', 'completed'].includes(swap.status)
                   ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
-              <span className="text-sm">Counterparty HTLC created</span>
+              <span className="text-sm">Taker HTLC created</span>
             </div>
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                swap.status === 'completed' ? 'bg-green-500' : 'bg-gray-300'
+                swap.status === 'completed' && swap.claimTxHash ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
-              <span className="text-sm">Tokens claimed</span>
+              <span className="text-sm">First HTLC claimed (secret revealed)</span>
+            </div>
+
+            <div className="flex items-center">
+              <div className={`w-4 h-4 rounded-full mr-3 ${
+                swap.status === 'completed' && swap.secret ? 'bg-green-500' : 'bg-gray-300'
+              }`}></div>
+              <span className="text-sm">Secret extracted</span>
+            </div>
+
+            <div className="flex items-center">
+              <div className={`w-4 h-4 rounded-full mr-3 ${
+                swap.status === 'completed' && swap.secret && isUserCreator ? 'bg-green-500' : 'bg-gray-300'
+              }`}></div>
+              <span className="text-sm">Second HTLC claimed (swap complete)</span>
             </div>
           </div>
         </div>
@@ -652,27 +722,55 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
         {swap.status === 'completed' && (
           <div className="bg-green-50 p-4 rounded-md">
-            <p className="text-green-800 mb-3">
-              🎉 Swap completed successfully!
-            </p>
             {swap.claimTxHash && (
-              <div className="space-y-2">
+              <div className="space-y-3">
+                <p className="text-green-800">
+                  {isUserCreator ? "You have claimed the taker's HTLC!" : "The creator has claimed your HTLC!"}
+                </p>
                 <p className="text-sm text-green-700">
                   Claim Transaction: {swap.claimTxHash}
                 </p>
-                {swap.secret && (
-                  <div className="bg-white p-2 rounded border">
-                    <p className="text-xs font-medium text-gray-700">Revealed Secret:</p>
-                    <p className="text-xs font-mono text-gray-600 break-all">{swap.secret}</p>
+
+                {swap.secret ? (
+                  <div>
+                    <div className="bg-white p-2 rounded border mb-3">
+                      <p className="text-xs font-medium text-gray-700">Revealed Secret:</p>
+                      <p className="text-xs font-mono text-gray-600 break-all">{swap.secret}</p>
+                    </div>
+
+                    {isUserTaker && (
+                      <div className="space-y-2">
+                        <p className="text-blue-800 text-sm">
+                          Now you can claim the creator's HTLC using this secret:
+                        </p>
+                        <button
+                          onClick={claimWithExtractedSecret}
+                          disabled={claimingHtlc}
+                          className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
+                        >
+                          {claimingHtlc ? 'Claiming Creator HTLC...' : 'Claim Creator HTLC'}
+                        </button>
+                      </div>
+                    )}
+
+                    {isUserCreator && (
+                      <p className="text-green-700 text-sm">
+                        ✅ Atomic swap completed! Both parties have their tokens.
+                      </p>
+                    )}
                   </div>
-                )}
-                {!swap.secret && (
-                  <button
-                    onClick={extractSecretFromClaim}
-                    className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                  >
-                    Extract Secret from Claim
-                  </button>
+                ) : (
+                  <div>
+                    <p className="text-blue-800 text-sm mb-2">
+                      {isUserTaker ? "Extract the secret to claim the creator's HTLC:" : "The taker needs to extract the secret:"}
+                    </p>
+                    <button
+                      onClick={extractSecretFromClaim}
+                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+                    >
+                      Extract Secret from Claim
+                    </button>
+                  </div>
                 )}
               </div>
             )}
