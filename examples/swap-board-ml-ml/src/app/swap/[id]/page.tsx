@@ -448,7 +448,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
                 <div className="bg-white p-3 rounded border">
                   <p className="text-sm font-medium text-gray-700 mb-2">Creator's HTLC Details:</p>
                   <div className="text-xs text-gray-600 space-y-1">
-                    <div>Amount: {swap.offer?.amountA} {swap.offer?.tokenA}</div>
+                    <div>Amount: {swap.offer?.amountA} {getTokenSymbol(swap.offer?.tokenA || '')}</div>
                     <div>Secret Hash: {swap.secretHash ? JSON.parse(swap.secretHash).secret_hash_hex.slice(0, 20) + '...' : 'N/A'}</div>
                     {swap.creatorHtlcTxHash && (
                       <div>TX ID: {swap.creatorHtlcTxHash.slice(0, 20)}...</div>
@@ -457,7 +457,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
                 </div>
                 <div>
                   <p className="text-sm text-blue-700 mb-2">
-                    Create your counterparty HTLC with {swap.offer?.amountB} {swap.offer?.tokenB}
+                    Create your counterparty HTLC with {swap.offer?.amountB} {getTokenSymbol(swap.offer?.tokenB || '')}
                   </p>
                   <button
                     onClick={createCounterpartyHtlc}
