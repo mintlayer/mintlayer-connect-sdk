@@ -3402,6 +3402,11 @@ class Client {
       params: {
         to: useHtlcUtxo[0].utxo.htlc.refund_key,
         amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+        ...(
+          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
+            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
+            : {}
+        )
       },
       opts: {
         forceSpendUtxo: useHtlcUtxo,
@@ -3446,6 +3451,11 @@ class Client {
       params: {
         to: useHtlcUtxo[0].utxo.htlc.spend_key,
         amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+        ...(
+          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
+            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
+            : {}
+        )
       },
       opts: {
         forceSpendUtxo: useHtlcUtxo,
