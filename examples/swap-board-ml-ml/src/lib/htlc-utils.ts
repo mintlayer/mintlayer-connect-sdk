@@ -136,7 +136,7 @@ export async function claimHTLC(
   secret?: string
 ): Promise<{ txId: string, txHex: string }> {
   // Step 1: Sign the spend transaction
-  const spendParams: any = { htlc_tx_hash: htlcTxHash }
+  const spendParams: any = { transaction_id: htlcTxHash }
   if (secret) {
     spendParams.secret = secret
   }

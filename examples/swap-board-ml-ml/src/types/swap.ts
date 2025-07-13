@@ -16,7 +16,7 @@ export interface Swap {
   id: number
   offerId: number
   takerMLAddress: string
-  status: 'pending' | 'htlc_created' | 'in_progress' | 'completed' | 'refunded'
+  status: 'pending' | 'htlc_created' | 'in_progress' | 'completed' | 'fully_completed' | 'refunded'
   secretHash?: string
   secret?: string
   creatorHtlcTxHash?: string

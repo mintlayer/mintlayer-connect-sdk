@@ -30,7 +30,7 @@ model Swap {
   id                    Int      @id @default(autoincrement())
   offerId               Int
   takerMLAddress        String
-  status                String   @default("pending") // pending, htlc_created, in_progress, completed, refunded
+  status                String   @default("pending") // pending, htlc_created, in_progress, completed, fully_completed, refunded
   secretHash            String?
   secret                String?
   creatorHtlcTxHash     String?  // Creator's HTLC transaction ID

@@ -428,7 +428,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: 'completed'
+          status: 'fully_completed'
           // Note: We don't update claimTxHash here as it refers to the first claim
         })
       })
@@ -614,7 +614,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                swap.status === 'completed' && swap.secret && isUserCreator ? 'bg-green-500' : 'bg-gray-300'
+                swap.status === 'fully_completed' ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
               <span className="text-sm">Second HTLC claimed (swap complete)</span>
             </div>
@@ -747,12 +747,17 @@ export default function SwapPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {swap.status === 'completed' && (
+        {(swap.status === 'completed' || swap.status === 'fully_completed') && (
           <div className="bg-green-50 p-4 rounded-md">
             {swap.claimTxHash && (
               <div className="space-y-3">
                 <p className="text-green-800">
-                  {isUserCreator ? "You have claimed the taker's HTLC!" : "The creator has claimed your HTLC!"}
+                  {swap.status === 'fully_completed'
+                    ? "🎉 Atomic swap completed successfully! Both parties have their tokens."
+                    : isUserCreator
+                      ? "You have claimed the taker's HTLC!"
+                      : "The creator has claimed your HTLC!"
+                  }
                 </p>
                 <p className="text-sm text-green-700">
                   Claim Transaction: {swap.claimTxHash}
