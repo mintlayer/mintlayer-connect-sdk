@@ -39,9 +39,6 @@ importers:
 
   examples/swap-board-ml-ml:
     dependencies:
-      '@mintlayer/react':
-        specifier: workspace:*
-        version: link:../../packages/react
       '@mintlayer/sdk':
         specifier: workspace:*
         version: link:../../packages/sdk
