@@ -3397,11 +3397,27 @@ class Client {
       useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
     }
 
+    let token_details = undefined;
+
+    if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
+      const request = await fetch(`${this.getApiServer()}/token/${useHtlcUtxo[0].utxo.value.token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      token_details = await request.json();
+    }
+
     return this.buildTransaction({
       type: 'Transfer',
       params: {
         to: useHtlcUtxo[0].utxo.htlc.refund_key,
         amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+        ...(
+          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
+            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
+            : {}
+        ),
+        token_details
       },
       opts: {
         forceSpendUtxo: useHtlcUtxo,
@@ -3441,11 +3457,27 @@ class Client {
       useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
     }
 
+    let token_details = undefined;
+
+    if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
+      const request = await fetch(`${this.getApiServer()}/token/${useHtlcUtxo[0].utxo.value.token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      token_details = await request.json();
+    }
+
     return this.buildTransaction({
       type: 'Transfer',
       params: {
         to: useHtlcUtxo[0].utxo.htlc.spend_key,
         amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+        ...(
+          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
+            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
+            : {}
+        ),
+        token_details,
       },
       opts: {
         forceSpendUtxo: useHtlcUtxo,
