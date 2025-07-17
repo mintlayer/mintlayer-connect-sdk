@@ -91,6 +91,9 @@ export default function CreateOfferPage() {
   }
 
   const getSelectedToken = (tokenId: string) => {
+    if (tokenId === 'BTC') {
+      return { token_id: 'BTC', symbol: 'BTC', number_of_decimals: 8 }
+    }
     return tokens.find(t => t.token_id === tokenId)
   }
 
@@ -117,6 +120,26 @@ export default function CreateOfferPage() {
 
     setLoading(true)
     try {
+      let creatorBTCAddress, creatorBTCPublicKey;
+
+      // If offering BTC or requesting BTC, get BTC credentials
+      if (formData.tokenA === 'BTC' || formData.tokenB === 'BTC') {
+        if (!client) {
+          alert('Wallet client not initialized')
+          return
+        }
+
+        try {
+          // Get BTC credentials from wallet
+          creatorBTCAddress = await (client as any).getBTCAddress()
+          creatorBTCPublicKey = await (client as any).getBTCPublicKey()
+        } catch (error) {
+          console.error('Error getting BTC credentials:', error)
+          alert('Failed to get BTC credentials from wallet. Please make sure your wallet supports BTC.')
+          return
+        }
+      }
+
       const response = await fetch('/api/offers', {
         method: 'POST',
         headers: {
@@ -125,6 +148,8 @@ export default function CreateOfferPage() {
         body: JSON.stringify({
           ...formData,
           creatorMLAddress: userAddress,
+          creatorBTCAddress,
+          creatorBTCPublicKey,
         }),
       })
 
@@ -177,6 +202,7 @@ export default function CreateOfferPage() {
                   required
                 >
                   <option value="">Select a token</option>
+                  <option value="BTC">BTC (Bitcoin)</option>
                   {tokens.map((token) => (
                     <option key={token.token_id} value={token.token_id}>
                       {getTokenDisplay(token.token_id)}
@@ -229,6 +255,7 @@ export default function CreateOfferPage() {
                   required
                 >
                   <option value="">Select a token</option>
+                  <option value="BTC">BTC (Bitcoin)</option>
                   {tokens.map((token) => (
                     <option key={token.token_id} value={token.token_id}>
                       {getTokenDisplay(token.token_id)}

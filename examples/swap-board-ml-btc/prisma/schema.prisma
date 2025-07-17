@@ -11,34 +11,53 @@ datasource db {
 }
 
 model Offer {
-  id               Int      @id @default(autoincrement())
-  direction        String   // "tokenA->tokenB"
-  tokenA           String
-  tokenB           String
-  amountA          String
-  amountB          String
-  price            Float
-  creatorMLAddress String
-  contact          String?
-  status           String   @default("open") // open, taken, completed, cancelled
-  createdAt        DateTime @default(now())
+  id                  Int      @id @default(autoincrement())
+  direction           String   // "tokenA->tokenB"
+  tokenA              String
+  tokenB              String
+  amountA             String
+  amountB             String
+  price               Float
+  creatorMLAddress    String
+  creatorBTCAddress   String?  // Creator's BTC address (when offering BTC)
+  creatorBTCPublicKey String?  // Creator's BTC public key (when offering BTC)
+  contact             String?
+  status              String   @default("open") // open, taken, completed, cancelled
+  createdAt           DateTime @default(now())
 
-  swaps            Swap[]
+  swaps               Swap[]
 }
 
 model Swap {
   id                    Int      @id @default(autoincrement())
   offerId               Int
   takerMLAddress        String
-  status                String   @default("pending") // pending, htlc_created, in_progress, completed, fully_completed, refunded
+  takerBTCAddress       String?  // Taker's BTC address (when accepting BTC offer)
+  takerBTCPublicKey     String?  // Taker's BTC public key (when accepting BTC offer)
+  status                String   @default("pending") // pending, htlc_created, btc_htlc_created, both_htlcs_created, in_progress, completed, fully_completed, refunded, btc_refunded
   secretHash            String?
   secret                String?
+
+  // Mintlayer HTLC fields
   creatorHtlcTxHash     String?  // Creator's HTLC transaction ID
   creatorHtlcTxHex      String?  // Creator's signed HTLC transaction hex
   takerHtlcTxHash       String?  // Taker's HTLC transaction ID
   takerHtlcTxHex        String?  // Taker's signed HTLC transaction hex
   claimTxHash           String?  // Final claim transaction ID
   claimTxHex            String?  // Final claim transaction hex (needed for secret extraction)
+
+  // BTC HTLC contract details
+  btcHtlcAddress        String?  // Generated BTC HTLC contract address
+  btcRedeemScript       String?  // BTC HTLC redeem script
+
+  // BTC transaction tracking
+  btcHtlcTxId           String?  // BTC HTLC funding transaction ID
+  btcHtlcTxHex          String?  // BTC HTLC signed transaction hex
+  btcClaimTxId          String?  // BTC claim transaction ID
+  btcClaimTxHex         String?  // BTC claim signed transaction hex
+  btcRefundTxId         String?  // BTC refund transaction ID
+  btcRefundTxHex        String?  // BTC refund signed transaction hex
+
   createdAt             DateTime @default(now())
 
   offer                 Offer    @relation(fields: [offerId], references: [id])

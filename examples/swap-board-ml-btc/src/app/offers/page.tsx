@@ -80,6 +80,7 @@ export default function OffersPage() {
 
   const getTokenSymbol = (tokenId: string) => {
     if (tokenId === 'ML') return 'ML'
+    if (tokenId === 'BTC') return 'BTC'
     const token = tokens.find(t => t.token_id === tokenId)
     return token ? token.symbol : tokenId.slice(-8)
   }
@@ -92,6 +93,28 @@ export default function OffersPage() {
 
     setAccepting(offerId)
     try {
+      // Find the offer to check if BTC is involved
+      const offer = offers.find(o => o.id === offerId)
+      let takerBTCAddress, takerBTCPublicKey;
+
+      // If offer involves BTC, get BTC credentials
+      if (offer && (offer.tokenA === 'BTC' || offer.tokenB === 'BTC')) {
+        if (!client) {
+          alert('Wallet client not initialized')
+          return
+        }
+
+        try {
+          // Get BTC credentials from wallet
+          takerBTCAddress = await (client as any).getBTCAddress()
+          takerBTCPublicKey = await (client as any).getBTCPublicKey()
+        } catch (error) {
+          console.error('Error getting BTC credentials:', error)
+          alert('Failed to get BTC credentials from wallet. Please make sure your wallet supports BTC.')
+          return
+        }
+      }
+
       const response = await fetch('/api/swaps', {
         method: 'POST',
         headers: {
@@ -100,6 +123,8 @@ export default function OffersPage() {
         body: JSON.stringify({
           offerId,
           takerMLAddress: userAddress,
+          takerBTCAddress,
+          takerBTCPublicKey,
         }),
       })
 

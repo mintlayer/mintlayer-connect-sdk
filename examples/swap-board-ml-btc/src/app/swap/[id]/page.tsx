@@ -3,6 +3,17 @@
 import { useState, useEffect } from 'react'
 import { Client } from '@mintlayer/sdk'
 import { Swap } from '@/types/swap'
+import {
+  buildCreatorBTCHTLCRequest,
+  buildTakerBTCHTLCRequest,
+  buildBTCHTLCSpendRequest,
+  buildBTCHTLCRefundRequest,
+  validateSwapForBTCHTLC,
+  offerInvolvesBTC,
+  isCreatorOfferingBTC,
+  getBTCExplorerURL,
+  getBTCAddressExplorerURL
+} from '@/lib/btc-request-builder'
 
 export default function SwapPage({ params }: { params: { id: string } }) {
   const [swap, setSwap] = useState<Swap | null>(null)
@@ -15,6 +26,12 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   const [creatingCounterpartyHtlc, setCreatingCounterpartyHtlc] = useState(false)
   const [claimingHtlc, setClaimingHtlc] = useState(false)
   const [tokens, setTokens] = useState<any[]>([])
+
+  // BTC-related state
+  const [userBTCAddress, setUserBTCAddress] = useState<string>('')
+  const [creatingBTCHtlc, setCreatingBTCHtlc] = useState(false)
+  const [claimingBTCHtlc, setClaimingBTCHtlc] = useState(false)
+  const [refundingBTCHtlc, setRefundingBTCHtlc] = useState(false)
 
   useEffect(() => {
     fetchSwap()
@@ -57,6 +74,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
   const getTokenSymbol = (tokenId: string) => {
     if (tokenId === 'ML') return 'ML'
+    if (tokenId === 'BTC') return 'BTC'
     const token = tokens.find((t: any) => t.token_id === tokenId)
     return token ? token.symbol : tokenId.slice(-8)
   }
@@ -81,6 +99,17 @@ export default function SwapPage({ params }: { params: { id: string } }) {
         const connect = await client.connect()
         const address = connect.testnet.receiving[0]
         setUserAddress(address)
+
+        // If swap involves BTC, also get BTC address
+        if (swap && offerInvolvesBTC(swap.offer!)) {
+          try {
+            const btcAddress = await (client as any).getBTCAddress()
+            setUserBTCAddress(btcAddress)
+          } catch (error) {
+            console.error('Error getting BTC address:', error)
+            // Don't fail the whole connection for BTC address
+          }
+        }
       }
     } catch (error) {
       console.error('Error connecting wallet:', error)
@@ -444,13 +473,170 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     }
   }
 
+  // BTC HTLC Functions
+  const createBTCHTLC = async () => {
+    if (!client || !userAddress || !swap?.offer || !swap.secretHash) {
+      alert('Missing required data for BTC HTLC creation')
+      return
+    }
+
+    if (!offerInvolvesBTC(swap.offer)) {
+      alert('This swap does not involve BTC')
+      return
+    }
+
+    setCreatingBTCHtlc(true)
+    try {
+      validateSwapForBTCHTLC(swap, swap.offer)
+
+      const isUserCreator = swap.offer.creatorMLAddress === userAddress
+      let request;
+
+      if (isUserCreator && isCreatorOfferingBTC(swap.offer)) {
+        // Creator is offering BTC
+        request = buildCreatorBTCHTLCRequest(swap, swap.offer, swap.secretHash)
+      } else if (!isUserCreator && !isCreatorOfferingBTC(swap.offer)) {
+        // Taker is offering BTC (creator wants BTC)
+        request = buildTakerBTCHTLCRequest(swap, swap.offer, swap.secretHash)
+      } else {
+        alert('You are not the one who should create the BTC HTLC')
+        return
+      }
+
+      // Create BTC HTLC via wallet
+      const response = await (client as any).createBTCHTLC(request)
+
+      // Broadcast the transaction
+      await (client as any).broadcastBTCTransaction(response.signedTxHex)
+
+      // Update swap with BTC HTLC details
+      await fetch(`/api/swaps/${swap.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          btcHtlcAddress: response.htlcAddress,
+          btcHtlcTxId: response.transactionId,
+          btcHtlcTxHex: response.signedTxHex,
+          btcRedeemScript: response.redeemScript,
+          status: swap.creatorHtlcTxHash || swap.takerHtlcTxHash ? 'both_htlcs_created' : 'btc_htlc_created'
+        })
+      })
+
+      fetchSwap()
+      alert(`BTC HTLC created successfully! TX ID: ${response.transactionId}`)
+    } catch (error) {
+      console.error('Error creating BTC HTLC:', error)
+      alert('Failed to create BTC HTLC. Please try again.')
+    } finally {
+      setCreatingBTCHtlc(false)
+    }
+  }
+
+  const claimBTCHTLC = async () => {
+    if (!client || !userAddress || !swap?.offer || !userBTCAddress) {
+      alert('Missing required data for BTC HTLC claiming')
+      return
+    }
+
+    if (!swap.btcHtlcTxId || !swap.btcRedeemScript) {
+      alert('BTC HTLC not found or missing redeem script')
+      return
+    }
+
+    const isUserCreator = swap.offer.creatorMLAddress === userAddress
+    let secret = swap.secret
+
+    // If user is taker and no secret is stored, they need to provide it
+    if (!isUserCreator && !secret) {
+      secret = prompt('Please enter the secret to claim BTC:')
+      if (!secret) return
+    }
+
+    setClaimingBTCHtlc(true)
+    try {
+      const request = buildBTCHTLCSpendRequest(swap, secret || '', userBTCAddress)
+
+      // Spend BTC HTLC via wallet
+      const response = await (client as any).spendBTCHTLC(request)
+
+      // Broadcast the claim transaction
+      await (client as any).broadcastBTCTransaction(response.signedTxHex)
+
+      // Update swap with claim details
+      await fetch(`/api/swaps/${swap.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          btcClaimTxId: response.transactionId,
+          btcClaimTxHex: response.signedTxHex,
+          secret: secret,
+          status: 'completed'
+        })
+      })
+
+      fetchSwap()
+      alert(`BTC HTLC claimed successfully! TX ID: ${response.transactionId}`)
+    } catch (error) {
+      console.error('Error claiming BTC HTLC:', error)
+      alert('Failed to claim BTC HTLC. Please try again.')
+    } finally {
+      setClaimingBTCHtlc(false)
+    }
+  }
+
+  const refundBTCHTLC = async () => {
+    if (!client || !userAddress || !swap?.offer || !userBTCAddress) {
+      alert('Missing required data for BTC HTLC refund')
+      return
+    }
+
+    if (!swap.btcHtlcTxId || !swap.btcRedeemScript) {
+      alert('BTC HTLC not found or missing redeem script')
+      return
+    }
+
+    setRefundingBTCHtlc(true)
+    try {
+      const request = buildBTCHTLCRefundRequest(swap, userBTCAddress)
+
+      // Refund BTC HTLC via wallet
+      const response = await (client as any).refundBTCHTLC(request)
+
+      // Broadcast the refund transaction
+      await (client as any).broadcastBTCTransaction(response.signedTxHex)
+
+      // Update swap with refund details
+      await fetch(`/api/swaps/${swap.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          btcRefundTxId: response.transactionId,
+          btcRefundTxHex: response.signedTxHex,
+          status: 'btc_refunded'
+        })
+      })
+
+      fetchSwap()
+      alert(`BTC HTLC refunded successfully! TX ID: ${response.transactionId}`)
+    } catch (error) {
+      console.error('Error refunding BTC HTLC:', error)
+      alert('Failed to refund BTC HTLC. Please try again.')
+    } finally {
+      setRefundingBTCHtlc(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'text-yellow-600 bg-yellow-100'
       case 'htlc_created': return 'text-blue-600 bg-blue-100'
+      case 'btc_htlc_created': return 'text-orange-600 bg-orange-100'
+      case 'both_htlcs_created': return 'text-purple-600 bg-purple-100'
       case 'in_progress': return 'text-purple-600 bg-purple-100'
       case 'completed': return 'text-green-600 bg-green-100'
+      case 'fully_completed': return 'text-green-700 bg-green-200'
       case 'refunded': return 'text-red-600 bg-red-100'
+      case 'btc_refunded': return 'text-red-700 bg-red-200'
       default: return 'text-gray-600 bg-gray-100'
     }
   }
@@ -458,10 +644,14 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   const getStatusDescription = (status: string) => {
     switch (status) {
       case 'pending': return 'Waiting for HTLC creation'
-      case 'htlc_created': return 'HTLC created, waiting for counterparty'
-      case 'in_progress': return 'Both HTLCs created, ready to claim'
-      case 'completed': return 'Swap completed successfully'
-      case 'refunded': return 'Swap was refunded'
+      case 'htlc_created': return 'ML HTLC created, waiting for counterparty'
+      case 'btc_htlc_created': return 'BTC HTLC created, waiting for ML HTLC'
+      case 'both_htlcs_created': return 'Both HTLCs created, ready to claim'
+      case 'in_progress': return 'Claims in progress'
+      case 'completed': return 'First claim completed, waiting for final claim'
+      case 'fully_completed': return 'Atomic swap completed successfully'
+      case 'refunded': return 'ML HTLC refunded due to timeout'
+      case 'btc_refunded': return 'BTC HTLC refunded due to timeout'
       default: return 'Unknown status'
     }
   }
@@ -544,16 +734,46 @@ export default function SwapPage({ params }: { params: { id: string } }) {
             <div className="border-t pt-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Creator:</span>
+                  <span className="text-gray-600">Creator ML:</span>
                   <div className="font-mono text-xs break-all">
                     {swap.offer?.creatorMLAddress}
                   </div>
+                  {swap.offer?.creatorBTCAddress && (
+                    <>
+                      <span className="text-gray-600 mt-2 block">Creator BTC:</span>
+                      <div className="font-mono text-xs break-all">
+                        <a
+                          href={getBTCAddressExplorerURL(swap.offer.creatorBTCAddress)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {swap.offer.creatorBTCAddress}
+                        </a>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div>
-                  <span className="text-gray-600">Taker:</span>
+                  <span className="text-gray-600">Taker ML:</span>
                   <div className="font-mono text-xs break-all">
                     {swap.takerMLAddress}
                   </div>
+                  {swap.takerBTCAddress && (
+                    <>
+                      <span className="text-gray-600 mt-2 block">Taker BTC:</span>
+                      <div className="font-mono text-xs break-all">
+                        <a
+                          href={getBTCAddressExplorerURL(swap.takerBTCAddress)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {swap.takerBTCAddress}
+                        </a>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -576,47 +796,54 @@ export default function SwapPage({ params }: { params: { id: string } }) {
           <div className="space-y-4">
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                ['pending', 'htlc_created', 'in_progress', 'completed'].includes(swap.status)
-                  ? 'bg-green-500' : 'bg-gray-300'
+                !['pending'].includes(swap.status) ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
               <span className="text-sm">Offer accepted</span>
             </div>
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                ['htlc_created', 'in_progress', 'completed'].includes(swap.status)
+                swap.creatorHtlcTxHash ? 'bg-green-500' : 'bg-gray-300'
+              }`}></div>
+              <span className="text-sm">ML HTLC created</span>
+            </div>
+
+            {swap.offer && offerInvolvesBTC(swap.offer) && (
+              <div className="flex items-center">
+                <div className={`w-4 h-4 rounded-full mr-3 ${
+                  swap.btcHtlcTxId ? 'bg-orange-500' : 'bg-gray-300'
+                }`}></div>
+                <span className="text-sm">BTC HTLC created</span>
+              </div>
+            )}
+
+            <div className="flex items-center">
+              <div className={`w-4 h-4 rounded-full mr-3 ${
+                ['both_htlcs_created', 'in_progress', 'completed', 'fully_completed'].includes(swap.status)
                   ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
-              <span className="text-sm">Creator HTLC created</span>
+              <span className="text-sm">Both HTLCs ready</span>
             </div>
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                ['in_progress', 'completed'].includes(swap.status)
-                  ? 'bg-green-500' : 'bg-gray-300'
+                (swap.claimTxHash || swap.btcClaimTxId) ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
-              <span className="text-sm">Taker HTLC created</span>
+              <span className="text-sm">First claim completed (secret revealed)</span>
             </div>
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                swap.status === 'completed' && swap.claimTxHash ? 'bg-green-500' : 'bg-gray-300'
-              }`}></div>
-              <span className="text-sm">First HTLC claimed (secret revealed)</span>
-            </div>
-
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-full mr-3 ${
-                swap.status === 'completed' && swap.secret ? 'bg-green-500' : 'bg-gray-300'
+                swap.secret ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
               <span className="text-sm">Secret extracted</span>
             </div>
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                swap.status === 'fully_completed' ? 'bg-green-500' : 'bg-gray-300'
+                ['fully_completed'].includes(swap.status) ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
-              <span className="text-sm">Second HTLC claimed (swap complete)</span>
+              <span className="text-sm">Atomic swap completed</span>
             </div>
           </div>
         </div>
@@ -814,6 +1041,106 @@ export default function SwapPage({ params }: { params: { id: string } }) {
             <p className="text-red-800">
               The swap was manually refunded after the timelock expired.
             </p>
+          </div>
+        )}
+
+        {/* BTC HTLC Section */}
+        {swap.offer && offerInvolvesBTC(swap.offer) && (
+          <div className="bg-orange-50 p-4 rounded-md mt-4">
+            <h3 className="text-lg font-semibold text-orange-900 mb-3">
+              BTC HTLC {isCreatorOfferingBTC(swap.offer) ? '(Creator → Taker)' : '(Taker → Creator)'}
+            </h3>
+
+            {swap.btcHtlcAddress ? (
+              <div className="space-y-3">
+                <div className="bg-white p-3 rounded border">
+                  <p className="text-sm font-medium text-gray-700 mb-1">BTC HTLC Contract Address:</p>
+                  <a
+                    href={getBTCAddressExplorerURL(swap.btcHtlcAddress)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline font-mono text-xs break-all"
+                  >
+                    {swap.btcHtlcAddress}
+                  </a>
+                </div>
+
+                {swap.btcHtlcTxId && (
+                  <div className="bg-white p-3 rounded border">
+                    <p className="text-sm font-medium text-gray-700 mb-1">BTC Funding Transaction:</p>
+                    <a
+                      href={getBTCExplorerURL(swap.btcHtlcTxId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-mono text-xs break-all"
+                    >
+                      {swap.btcHtlcTxId}
+                    </a>
+                  </div>
+                )}
+
+                {swap.btcClaimTxId && (
+                  <div className="bg-white p-3 rounded border">
+                    <p className="text-sm font-medium text-gray-700 mb-1">BTC Claim Transaction:</p>
+                    <a
+                      href={getBTCExplorerURL(swap.btcClaimTxId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-mono text-xs break-all"
+                    >
+                      {swap.btcClaimTxId}
+                    </a>
+                  </div>
+                )}
+
+                {!swap.btcClaimTxId && userAddress && (
+                  <div className="space-y-2">
+                    {userBTCAddress && (
+                      <p className="text-sm text-gray-600">
+                        Your BTC Address: <span className="font-mono text-xs">{userBTCAddress}</span>
+                      </p>
+                    )}
+
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={claimBTCHTLC}
+                        disabled={claimingBTCHtlc || !userBTCAddress}
+                        className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:bg-gray-400"
+                      >
+                        {claimingBTCHtlc ? 'Claiming BTC...' : 'Claim BTC'}
+                      </button>
+
+                      <button
+                        onClick={refundBTCHTLC}
+                        disabled={refundingBTCHtlc || !userBTCAddress}
+                        className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:bg-gray-400"
+                      >
+                        {refundingBTCHtlc ? 'Refunding BTC...' : 'Refund BTC'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-orange-800">
+                  {((isUserCreator && isCreatorOfferingBTC(swap.offer)) || (!isUserCreator && !isCreatorOfferingBTC(swap.offer)))
+                    ? "You need to create the BTC HTLC."
+                    : "Waiting for counterparty to create BTC HTLC."
+                  }
+                </p>
+
+                {((isUserCreator && isCreatorOfferingBTC(swap.offer)) || (!isUserCreator && !isCreatorOfferingBTC(swap.offer))) && (
+                  <button
+                    onClick={createBTCHTLC}
+                    disabled={creatingBTCHtlc || !userAddress || !swap.secretHash}
+                    className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:bg-gray-400"
+                  >
+                    {creatingBTCHtlc ? 'Creating BTC HTLC...' : 'Create BTC HTLC'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
