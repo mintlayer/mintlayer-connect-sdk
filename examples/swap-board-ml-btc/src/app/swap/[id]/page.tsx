@@ -45,6 +45,9 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
   const initializeClient = async () => {
     try {
+      // Only initialize client on the client side
+      if (typeof window === 'undefined') return
+
       const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
       const newClient = await Client.create({ network })
       setClient(newClient)
@@ -548,6 +551,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
     // If user is taker and no secret is stored, they need to provide it
     if (!isUserCreator && !secret) {
+      // @ts-ignore
       secret = prompt('Please enter the secret to claim BTC:')
       if (!secret) return
     }

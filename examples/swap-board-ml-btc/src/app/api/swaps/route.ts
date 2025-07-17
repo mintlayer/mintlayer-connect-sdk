@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
         data: {
           offerId: body.offerId,
           takerMLAddress: body.takerMLAddress,
+          // @ts-ignore
           takerBTCAddress: body.takerBTCAddress || null,
           takerBTCPublicKey: body.takerBTCPublicKey || null,
           status: 'pending'

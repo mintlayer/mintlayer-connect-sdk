@@ -26,6 +26,9 @@ export default function OffersPage() {
 
   const initializeClient = async () => {
     try {
+      // Only initialize client on the client side
+      if (typeof window === 'undefined') return
+
       const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
       const newClient = await Client.create({ network })
       setClient(newClient)

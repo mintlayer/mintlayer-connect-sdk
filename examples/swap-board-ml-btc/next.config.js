@@ -7,6 +7,10 @@ const nextConfig = {
     };
     return config;
   },
+  // Disable static generation for pages that might use browser APIs
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  }
 }
 
 module.exports = nextConfig

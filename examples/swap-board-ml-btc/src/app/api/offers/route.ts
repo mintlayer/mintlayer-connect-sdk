@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         amountB: body.amountB,
         price: price,
         creatorMLAddress: body.creatorMLAddress,
+        // @ts-ignore
         creatorBTCAddress: body.creatorBTCAddress || null,
         creatorBTCPublicKey: body.creatorBTCPublicKey || null,
         contact: body.contact || null,

@@ -30,6 +30,9 @@ export default function CreateOfferPage() {
 
   const initializeClient = async () => {
     try {
+      // Only initialize client on the client side
+      if (typeof window === 'undefined') return
+
       const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
       const newClient = await Client.create({ network })
       setClient(newClient)
@@ -131,8 +134,10 @@ export default function CreateOfferPage() {
 
         try {
           // Get BTC credentials from wallet
-          creatorBTCAddress = await (client as any).getBTCAddress()
-          creatorBTCPublicKey = await (client as any).getBTCPublicKey()
+          const BTCData = await (client as any).request({ method: 'getData', params: { items: ['btcAddress', 'btcPublicKey']} })
+
+          creatorBTCAddress = BTCData.btcAddress
+          creatorBTCPublicKey = BTCData.btcPublicKey
         } catch (error) {
           console.error('Error getting BTC credentials:', error)
           alert('Failed to get BTC credentials from wallet. Please make sure your wallet supports BTC.')
