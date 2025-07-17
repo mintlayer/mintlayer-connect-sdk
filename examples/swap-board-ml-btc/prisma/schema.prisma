@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Offer {
+  id               Int      @id @default(autoincrement())
+  direction        String   // "tokenA->tokenB"
+  tokenA           String
+  tokenB           String
+  amountA          String
+  amountB          String
+  price            Float
+  creatorMLAddress String
+  contact          String?
+  status           String   @default("open") // open, taken, completed, cancelled
+  createdAt        DateTime @default(now())
+
+  swaps            Swap[]
+}
+
+model Swap {
+  id                    Int      @id @default(autoincrement())
+  offerId               Int
+  takerMLAddress        String
+  status                String   @default("pending") // pending, htlc_created, in_progress, completed, fully_completed, refunded
+  secretHash            String?
+  secret                String?
+  creatorHtlcTxHash     String?  // Creator's HTLC transaction ID
+  creatorHtlcTxHex      String?  // Creator's signed HTLC transaction hex
+  takerHtlcTxHash       String?  // Taker's HTLC transaction ID
+  takerHtlcTxHex        String?  // Taker's signed HTLC transaction hex
+  claimTxHash           String?  // Final claim transaction ID
+  claimTxHex            String?  // Final claim transaction hex (needed for secret extraction)
+  createdAt             DateTime @default(now())
+
+  offer                 Offer    @relation(fields: [offerId], references: [id])
+}
