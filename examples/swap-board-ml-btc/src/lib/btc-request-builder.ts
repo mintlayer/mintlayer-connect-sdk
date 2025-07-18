@@ -129,40 +129,50 @@ export function buildTakerBTCHTLCRequest(
 }
 
 /**
- * Build BTC HTLC spend request
+ * Build BTC HTLC spend request with UTXO data
  */
-export function buildBTCHTLCSpendRequest(
+export async function buildBTCHTLCSpendRequest(
   swap: Swap,
   secret: string,
-  destinationAddress: string
-): BTCHTLCSpendRequest {
-  if (!swap.btcHtlcTxId || !swap.btcRedeemScript) {
-    throw new Error('Missing BTC HTLC transaction ID or redeem script')
+  destinationAddress: string,
+  isTestnet: boolean = true
+): Promise<any> {
+  if (!swap.btcHtlcTxId || !swap.btcRedeemScript || !swap.btcHtlcAddress) {
+    throw new Error('Missing BTC HTLC transaction ID, redeem script, or HTLC address')
   }
-  
+
+  // Fetch the HTLC UTXO data from Blockstream API
+  const htlcUtxo = await findHTLCUTXO(swap.btcHtlcTxId, swap.btcHtlcAddress, isTestnet)
+
   return {
-    htlcTxId: swap.btcHtlcTxId,
-    redeemScript: swap.btcRedeemScript,
-    secret: secret,
-    destinationAddress: destinationAddress
+    type: 'spendHtlc',
+    utxo: htlcUtxo,
+    redeemScriptHex: swap.btcRedeemScript,
+    to: destinationAddress,
+    secret: secret
   }
 }
 
 /**
- * Build BTC HTLC refund request
+ * Build BTC HTLC refund request with UTXO data
  */
-export function buildBTCHTLCRefundRequest(
+export async function buildBTCHTLCRefundRequest(
   swap: Swap,
-  destinationAddress: string
-): BTCHTLCRefundRequest {
-  if (!swap.btcHtlcTxId || !swap.btcRedeemScript) {
-    throw new Error('Missing BTC HTLC transaction ID or redeem script')
+  destinationAddress: string,
+  isTestnet: boolean = true
+): Promise<any> {
+  if (!swap.btcHtlcTxId || !swap.btcRedeemScript || !swap.btcHtlcAddress) {
+    throw new Error('Missing BTC HTLC transaction ID, redeem script, or HTLC address')
   }
-  
+
+  // Fetch the HTLC UTXO data from Blockstream API
+  const htlcUtxo = await findHTLCUTXO(swap.btcHtlcTxId, swap.btcHtlcAddress, isTestnet)
+
   return {
-    htlcTxId: swap.btcHtlcTxId,
-    redeemScript: swap.btcRedeemScript,
-    destinationAddress: destinationAddress
+    type: 'refundHtlc',
+    utxo: htlcUtxo,
+    redeemScriptHex: swap.btcRedeemScript,
+    to: destinationAddress
   }
 }
 
@@ -219,8 +229,119 @@ export function getBTCExplorerURL(txId: string, isTestnet: boolean = true): stri
  * Get BTC block explorer URL for address
  */
 export function getBTCAddressExplorerURL(address: string, isTestnet: boolean = true): string {
-  const baseUrl = isTestnet 
-    ? 'https://blockstream.info/testnet/address/' 
+  const baseUrl = isTestnet
+    ? 'https://blockstream.info/testnet/address/'
     : 'https://blockstream.info/address/'
   return `${baseUrl}${address}`
+}
+
+/**
+ * Fetch UTXO data for a BTC address from Blockstream API
+ */
+export async function fetchBTCUTXOs(address: string, isTestnet: boolean = true): Promise<any[]> {
+  const apiUrl = isTestnet
+    ? `https://blockstream.info/testnet/api/address/${address}/utxo`
+    : `https://blockstream.info/api/address/${address}/utxo`
+
+  try {
+    const response = await fetch(apiUrl)
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch UTXOs: ${response.status}`)
+    }
+
+    const utxos = await response.json()
+    return utxos
+  } catch (error) {
+    console.error('Error fetching BTC UTXOs:', error)
+    throw error
+  }
+}
+
+/**
+ * Find the HTLC UTXO from a BTC HTLC transaction
+ */
+export async function findHTLCUTXO(htlcTxId: string, htlcAddress: string, isTestnet: boolean = true): Promise<any> {
+  try {
+    // Fetch UTXOs for the HTLC address
+    const utxos = await fetchBTCUTXOs(htlcAddress, isTestnet)
+
+    // Find the UTXO that matches our HTLC transaction
+    const htlcUtxo = utxos.find(utxo => utxo.txid === htlcTxId)
+
+    if (!htlcUtxo) {
+      throw new Error(`HTLC UTXO not found for transaction ${htlcTxId}`)
+    }
+
+    return htlcUtxo
+  } catch (error) {
+    console.error('Error finding HTLC UTXO:', error)
+    throw error
+  }
+}
+
+/**
+ * Extract secret from BTC HTLC claim transaction
+ */
+export async function extractSecretFromBTCTransaction(txId: string, isTestnet: boolean = true): Promise<string> {
+  const apiUrl = isTestnet
+    ? `https://blockstream.info/testnet/api/tx/${txId}`
+    : `https://blockstream.info/api/tx/${txId}`
+
+  try {
+    const response = await fetch(apiUrl)
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch BTC transaction: ${response.status}`)
+    }
+
+    const txData = await response.json()
+
+    // Look for inputs that have witness data (HTLC spend)
+    for (const input of txData.vin) {
+      if (input.witness && input.witness.length >= 2) {
+        // In BTC HTLC, the secret is typically the second witness item
+        const secret = input.witness[1]
+        if (secret && secret.length > 0) {
+          return secret
+        }
+      }
+    }
+
+    throw new Error('No secret found in BTC transaction witness data')
+  } catch (error) {
+    console.error('Error extracting secret from BTC transaction:', error)
+    throw error
+  }
+}
+
+/**
+ * Broadcast BTC transaction using Blockstream API
+ */
+export async function broadcastBTCTransaction(signedTxHex: string, isTestnet: boolean = true): Promise<string> {
+  const apiUrl = isTestnet
+    ? 'https://blockstream.info/testnet/api/tx'
+    : 'https://blockstream.info/api/tx'
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain',
+      },
+      body: signedTxHex
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Failed to broadcast BTC transaction: ${response.status} ${errorText}`)
+    }
+
+    // The response is the transaction ID
+    const txId = await response.text()
+    return txId
+  } catch (error) {
+    console.error('Error broadcasting BTC transaction:', error)
+    throw error
+  }
 }

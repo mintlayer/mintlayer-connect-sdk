@@ -109,8 +109,10 @@ export default function OffersPage() {
 
         try {
           // Get BTC credentials from wallet
-          takerBTCAddress = await (client as any).getBTCAddress()
-          takerBTCPublicKey = await (client as any).getBTCPublicKey()
+          const BTCData = await (client as any).request({ method: 'getData', params: { items: ['btcAddress', 'btcPublicKey']} })
+
+          takerBTCAddress = BTCData.btcAddress
+          takerBTCPublicKey = BTCData.btcPublicKey
         } catch (error) {
           console.error('Error getting BTC credentials:', error)
           alert('Failed to get BTC credentials from wallet. Please make sure your wallet supports BTC.')
