@@ -57,51 +57,6 @@ The BTC integration allows users to:
 - **Offers List**: Handles BTC credential exchange during acceptance
 - **Swap Detail**: Full BTC HTLC management interface
 
-## Wallet Integration Requirements
-
-The wallet extension must implement these methods:
-
-```typescript
-interface BTCWalletMethods {
-  // Get user's BTC receiving address
-  getBTCAddress(): Promise<string>
-  
-  // Get user's BTC public key for HTLC creation
-  getBTCPublicKey(): Promise<string>
-  
-  // Create BTC HTLC transaction
-  createBTCHTLC(request: BTCHTLCCreateRequest): Promise<BTCHTLCCreateResponse>
-  
-  // Spend/claim BTC HTLC
-  spendBTCHTLC(request: BTCHTLCSpendRequest): Promise<BTCHTLCSpendResponse>
-  
-  // Refund BTC HTLC after timeout
-  refundBTCHTLC(request: BTCHTLCRefundRequest): Promise<BTCHTLCSpendResponse>
-  
-  // Broadcast BTC transaction to network
-  broadcastBTCTransaction(txHex: string): Promise<BTCBroadcastResponse>
-}
-```
-
-### Request/Response Types
-
-```typescript
-interface BTCHTLCCreateRequest {
-  amount: string // in satoshis
-  secretHash: string // hex format
-  recipientPublicKey: string // who can claim with secret
-  refundPublicKey: string // who can refund after timeout
-  timeoutBlocks: number // BTC blocks
-}
-
-interface BTCHTLCCreateResponse {
-  signedTxHex: string // ready to broadcast
-  transactionId: string // transaction ID
-  htlcAddress: string // HTLC contract address
-  redeemScript: string // for spending operations
-}
-```
-
 ## Swap Flow
 
 ### ML → BTC Swap
@@ -159,8 +114,6 @@ node test-btc-integration.js
 - API endpoint updates
 - Frontend BTC integration
 - Status tracking and UI
-
-### 🔄 Pending (Wallet Extension)
 - BTC wallet method implementations
 - BTC HTLC script generation
 - BTC transaction building and signing
@@ -172,15 +125,6 @@ node test-btc-integration.js
 - Error handling and edge cases
 - Network compatibility (testnet/mainnet)
 - Performance optimization
-
-## Next Steps
-
-1. **Implement wallet BTC methods** in browser extension
-2. **Test with actual BTC transactions** on testnet
-3. **Add comprehensive error handling**
-4. **Optimize user experience** and add loading states
-5. **Add transaction monitoring** and confirmation tracking
-6. **Security audit** of BTC integration
 
 ## Support
 
