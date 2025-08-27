@@ -231,6 +231,11 @@ type TransferUtxo = BaseUtxo & {
   type: 'Transfer';
 };
 
+type HtlcUtxo = BaseUtxo & {
+  type: 'Htlc';
+  htlc: any;
+};
+
 type LockThenTransferUtxo = BaseUtxo & {
   type: 'LockThenTransfer';
   lock: {
@@ -256,7 +261,7 @@ type IssueNftUtxo = {
   };
 };
 
-type Utxo = TransferUtxo | LockThenTransferUtxo | IssueNftUtxo;
+type Utxo = TransferUtxo | LockThenTransferUtxo | IssueNftUtxo | HtlcUtxo;
 
 type UtxoInput = {
   input: {
@@ -2105,7 +2110,14 @@ class Client {
       utxo: item.utxo,
     })) : [];
 
-    const utxos: UtxoEntry[] = data.utxos;
+    const utxos: UtxoEntry[] = data.utxos.filter((item: UtxoEntry) => {
+      // filter out UTXO with type htlc, they have to be added manually
+      if (item.utxo.type === 'Htlc') {
+        return false;
+      }
+
+      return true;
+    });
 
     const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
       this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
