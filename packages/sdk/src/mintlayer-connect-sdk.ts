@@ -183,7 +183,14 @@ export class MojitoAccountProvider implements AccountProvider {
   }
 }
 
-type CreateHtlcArgs = any;
+type CreateHtlcArgs = {
+  amount: number;
+  token_id?: string;
+  secret_hash: string;
+  spend_address: string;
+  refund_address: string;
+  refund_timelock: Timelock;
+};
 
 type AmountFields = {
   atoms: string;
@@ -712,7 +719,7 @@ type BuildTransactionParams =
         secret_hash: string;
         spend_address: string;
         refund_address: string;
-        refund_timelock: string;
+        refund_timelock: Timelock;
       };
     };
 
@@ -2033,10 +2040,7 @@ class Client {
         type: 'Htlc',
         htlc: {
           refund_key: params.refund_address,
-          refund_timelock: {
-            content: 20,
-            type: 'ForBlockCount',
-          },
+          refund_timelock: params.refund_timelock,
           secret_hash: {
             // @ts-ignore
             hex: params.secret_hash.hex,
