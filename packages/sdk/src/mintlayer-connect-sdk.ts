@@ -188,6 +188,7 @@ type CreateHtlcArgs = {
   token_id?: string;
   secret_hash: string;
   spend_address: string;
+  spend_pubkey: string;
   refund_address: string;
   refund_timelock: Timelock;
 };
@@ -526,6 +527,7 @@ interface Transaction {
   BINRepresentation: Record<string, any>;
   HEXRepresentation_unsigned: string;
   intent?: string;
+  htlc?: { spend_pubkey: string };
   transaction_id: string;
 }
 
@@ -872,10 +874,12 @@ export type SignChallengeResponse = {
 class Client {
   private network: 'mainnet' | 'testnet';
   private connectedAddresses: {
-    [key: string]: {
-      receiving: string[];
-      change: string[];
-    };
+    receiving: string[];
+    change: string[];
+  };
+  private publicKeys: {
+    receiving: string[];
+    change: string[];
   };
   private isInitialized: boolean;
   private accountProvider: AccountProvider;
@@ -886,7 +890,8 @@ class Client {
    */
   constructor(options: ClientOptions = {}) {
     this.network = options.network || 'mainnet';
-    this.connectedAddresses = {};
+    this.connectedAddresses = { receiving: [], change: [] };
+    this.publicKeys = { receiving: [], change: [] };
     this.isInitialized = false;
     this.accountProvider = options.accountProvider || new MojitoAccountProvider();
   }
@@ -1169,7 +1174,7 @@ class Client {
    */
   isConnected() {
     this.ensureInitialized();
-    return this.connectedAddresses[this.network]?.receiving?.length > 0;
+    return this.connectedAddresses?.receiving?.length > 0;
   }
 
   /**
@@ -1177,8 +1182,9 @@ class Client {
    */
   async connect(): Promise<Address> {
     this.ensureInitialized();
-    const addresses = await this.accountProvider.connect();
-    this.connectedAddresses = addresses;
+    const addresses: any = await this.accountProvider.connect();
+    this.connectedAddresses = addresses.addressesByChain.mintlayer;
+    this.publicKeys = addresses.addressesByChain.mintlayer.publicKeys;
     return addresses;
   }
 
@@ -1234,8 +1240,8 @@ class Client {
    */
   getAddresses(): { receiving: string[]; change: string[] } {
     this.ensureInitialized();
-    if (this.connectedAddresses[this.network].receiving.length > 0) {
-      return this.connectedAddresses[this.network];
+    if (this.connectedAddresses.receiving.length > 0) {
+      return this.connectedAddresses;
     }
     return { receiving: [], change: [] };
   }
@@ -1247,9 +1253,9 @@ class Client {
   async getBalance(): Promise<number> {
     this.ensureInitialized();
     const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const currentAddress = address;
 
-    if (this.connectedAddresses[this.network].receiving.length === 0) {
+    if (this.connectedAddresses.receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
     try {
@@ -1287,9 +1293,9 @@ class Client {
   }> {
     this.ensureInitialized();
     const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const currentAddress = address;
 
-    if (this.connectedAddresses[this.network].receiving.length === 0) {
+    if (this.connectedAddresses.receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
 
@@ -1347,11 +1353,11 @@ class Client {
    */
   async getDelegations(): Promise<DelegationDetails[]> {
     this.ensureInitialized();
-    if (this.connectedAddresses[this.network].receiving.length === 0) {
+    if (this.connectedAddresses.receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
     const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const currentAddress = address;
     try {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
@@ -1383,11 +1389,11 @@ class Client {
    */
   async getTokensOwned(): Promise<string[]> {
     this.ensureInitialized();
-    if (this.connectedAddresses[this.network].receiving.length === 0) {
+    if (this.connectedAddresses.receiving.length === 0) {
       throw new Error('No addresses connected. Call connect first.');
     }
     const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const currentAddress = address;
     try {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
@@ -2088,7 +2094,7 @@ class Client {
     console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
 
     const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const currentAddress = address;
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
     const response = await fetch('https://api.mintini.app' + '/account', {
@@ -3081,7 +3087,7 @@ class Client {
     this.ensureInitialized();
     const allOrders = await this.getAvailableOrders();
     const address = this.connectedAddresses;
-    const currentAddress = address[this.network];
+    const currentAddress = address;
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
     const orders = allOrders.filter((order: OrderData) => {
       return addressList.includes(order.conclude_destination);
@@ -3366,19 +3372,21 @@ class Client {
       token_details = token;
     }
 
-    return this.buildTransaction({
+    const tx = await this.buildTransaction({
       type: 'Htlc',
       params: {
         amount: params.amount,
         token_id: params.token_id,
         token_details: token_details || undefined,
         // @ts-ignore
-        secret_hash: params.secret_hash,
+        secret_hash: params.secret_hash, // should be optional!!
         spend_address: params.spend_address,
+        spend_pubkey: params.spend_pubkey,
         refund_address: params.refund_address,
         refund_timelock: params.refund_timelock,
       },
     });
+    return { ...tx, htlc: { spend_pubkey: params.spend_pubkey } };
   }
 
   /**
@@ -3397,48 +3405,20 @@ class Client {
   async buildRefundHtlc(params: any): Promise<Transaction> {
     this.ensureInitialized();
 
-    const { transaction_id, utxo } = params;
+    const {
+      transaction_json,
+      multisig_challege,
+      witness_input,
+    } = params;
 
-    let useHtlcUtxo: any[] = [];
-
-    if (transaction_id) {
-      const response = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch transaction');
-      }
-      const transaction: TransactionJSONRepresentation = await response.json();
+    // @ts-ignore
+    return {
+      JSONRepresentation: transaction_json,
+      BINRepresentation: {},
+      HEXRepresentation_unsigned: '',
       // @ts-ignore
-      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
-      // @ts-ignore
-      useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
-    }
-
-    let token_details = undefined;
-
-    if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
-      const request = await fetch(`${this.getApiServer()}/token/${useHtlcUtxo[0].utxo.value.token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      token_details = await request.json();
-    }
-
-    return this.buildTransaction({
-      type: 'Transfer',
-      params: {
-        to: useHtlcUtxo[0].utxo.htlc.refund_key,
-        amount: useHtlcUtxo[0].utxo.value.amount.decimal,
-        ...(
-          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
-            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
-            : {}
-        ),
-        token_details
-      },
-      opts: {
-        forceSpendUtxo: useHtlcUtxo,
-      }
-    });
+      htlc: { multisig_challege, witness_input }
+    };
   }
 
   /**

@@ -349,8 +349,9 @@
                     <input type="text" id="create_htlc_amount" placeholder="Amount" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="create_htlc_token_id" placeholder="Token ID (leave empty for ML Coin)" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="create_htlc_spend_address" placeholder="Spend Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="create_htlc_spend_pubkey" placeholder="Spend Public Key" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <input type="text" id="create_htlc_refund_address" placeholder="Refund Address" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-                    <input type="text" id="create_htlc_secret_hash_hex" placeholder="Secret hash hex" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="create_htlc_secret_hash_hex" placeholder="Secret hash hex (optional)" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <select name="create_htlc_lock_type" id="create_htlc_lock_type" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         <option value="">Lock Type</option>
                         <option value="ForBlockCount">ForBlockCount</option>
@@ -365,7 +366,9 @@
             <div id="refundHtlc" class="bg-white p-6 rounded-lg shadow-md hidden">
                 <h3 class="text-lg font-semibold text-gray-700 mb-4">Refund HTLC</h3>
                 <div class="space-y-4">
-                    <input type="text" id="refund_htlc_transaction_id" placeholder="Transaction ID with HTLC" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="refund_htlc_transaction_json" placeholder="Transaction JSON with HTLC" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="refund_htlc_transaction_htlc_multisig_challege" placeholder="Multisig challenge" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                    <input type="text" id="refund_htlc_transaction_htlc_witness_input" placeholder="Witness input" class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
                     <button onclick="refundHTLC()" class="bg-green-500 text-white py-2 px-4 rounded-md shadow hover:bg-green-600 transition w-full">Refund HTLC</button>
                 </div>
             </div>
@@ -984,6 +987,7 @@
   async function createHTLC () {
     const amount = document.getElementById('create_htlc_amount').value;
     const spend_address = document.getElementById('create_htlc_spend_address').value;
+    const spend_pubkey = document.getElementById('create_htlc_spend_pubkey').value;
     const refund_address = document.getElementById('create_htlc_refund_address').value;
     const secret_hash_hex = document.getElementById('create_htlc_secret_hash_hex').value;
     const lock_type = document.getElementById('create_htlc_lock_type').value;
@@ -994,6 +998,7 @@
       const result = await window.mintlayer.createHtlc({
         amount: amount,
         spend_address: spend_address,
+        spend_pubkey: spend_pubkey,
         refund_address: refund_address,
         refund_timelock: {
           type: lock_type,
@@ -1001,7 +1006,7 @@
         },
         token_id: token_id || null, // null for native token
         secret_hash: {
-          hex: secret_hash_hex
+          hex: secret_hash_hex || '0000000000000000000000000000000000000000'
         },
       });
 
@@ -1012,11 +1017,15 @@
   }
 
   async function refundHTLC () {
-    const transaction_id = document.getElementById('refund_htlc_transaction_id').value;
+    const transaction_json = document.getElementById('refund_htlc_transaction_json').value;
+    const transaction_htlc_multisig_challege = document.getElementById('refund_htlc_transaction_htlc_multisig_challege').value;
+    const transaction_htlc_witness_input = document.getElementById('refund_htlc_transaction_htlc_witness_input').value;
 
     try {
       const result = await window.mintlayer.refundHtlc({
-        transaction_id,
+        transaction_json,
+        multisig_challege,
+        witness_input,
       });
 
       displayOutput(`Signature: ${JSON.stringify(result, null, 2)}`);
