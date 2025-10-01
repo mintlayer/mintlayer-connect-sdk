@@ -23,8 +23,6 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true)
   const [userAddress, setUserAddress] = useState<string>('')
   const [client, setClient] = useState<Client | null>(null)
-  const [secretHash, setSecretHash] = useState<any>(null)
-  const [generatingSecret, setGeneratingSecret] = useState(false)
   const [creatingHtlc, setCreatingHtlc] = useState(false)
   const [creatingCounterpartyHtlc, setCreatingCounterpartyHtlc] = useState(false)
   const [claimingHtlc, setClaimingHtlc] = useState(false)
@@ -35,6 +33,17 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   const [creatingBTCHtlc, setCreatingBTCHtlc] = useState(false)
   const [claimingBTCHtlc, setClaimingBTCHtlc] = useState(false)
   const [refundingBTCHtlc, setRefundingBTCHtlc] = useState(false)
+
+  // Refund availability state
+  const [refundInfo, setRefundInfo] = useState<{
+    canRefund: boolean
+    blocksRemaining: number
+    timeRemaining: string
+    htlcTxId: string
+    confirmations?: number
+    timelockBlocks?: number
+  } | null>(null)
+  const [checkingRefund, setCheckingRefund] = useState(false)
 
   useEffect(() => {
     fetchSwap()
@@ -123,46 +132,8 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     }
   }
 
-  const generateSecretHash = async () => {
-    if (!client || !swap) {
-      alert('Please connect your wallet first')
-      return
-    }
-
-    setGeneratingSecret(true)
-    try {
-      const secretHashResponse = await client.requestSecretHash({})
-      setSecretHash(secretHashResponse)
-      console.log('Generated secret hash:', secretHashResponse)
-
-      // Save the secret hash to the database
-      const response = await fetch(`/api/swaps/${swap.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          secretHash: JSON.stringify(secretHashResponse)
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save secret hash')
-      }
-
-      // Refresh swap data to show the updated secret hash
-      fetchSwap()
-
-    } catch (error) {
-      console.error('Error generating secret hash:', error)
-      alert('Failed to generate secret hash. Please try again.')
-    } finally {
-      setGeneratingSecret(false)
-    }
-  }
-
   const createHtlc = async () => {
-    if (!client || !userAddress || !secretHash || !swap?.offer) {
+    if (!client || !userAddress || !swap?.offer) {
       alert('Missing required data for HTLC creation')
       return
     }
@@ -170,10 +141,11 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     setCreatingHtlc(true)
     try {
       // Step 1: Build the HTLC transaction
+      // Note: We pass a placeholder secret hash, and the wallet generates the actual secret hash internally
       const htlcParams = {
         amount: swap.offer.amountA,
         token_id: swap.offer.tokenA === 'ML' ? null : swap.offer.tokenA,
-        secret_hash: { hex: secretHash.secret_hash_hex },
+        secret_hash: { hex: '0000000000000000000000000000000000000000' }, // Placeholder - wallet generates actual secret
         spend_address: swap.takerMLAddress, // Taker can spend with secret
         refund_address: userAddress, // Creator can refund after timelock
         refund_timelock: {
@@ -182,7 +154,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
         }
       }
 
-      // Step 2: Sign the transaction
+      // Step 2: Sign the transaction (wallet generates secret hash internally)
       const signedTxHex = await client.createHtlc(htlcParams)
       console.log('HTLC signed:', signedTxHex)
 
@@ -200,7 +172,6 @@ export default function SwapPage({ params }: { params: { id: string } }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'htlc_created',
-          secretHash: JSON.stringify(secretHash),
           creatorHtlcTxHash: txId,
           creatorHtlcTxHex: signedTxHex
         })
@@ -218,20 +189,46 @@ export default function SwapPage({ params }: { params: { id: string } }) {
   }
 
   const createCounterpartyHtlc = async () => {
-    if (!client || !userAddress || !swap?.offer || !swap.secretHash) {
+    if (!client || !userAddress || !swap?.offer) {
       alert('Missing required data for counterparty HTLC creation')
+      return
+    }
+
+    // Check if creator's HTLC exists to extract secret hash from
+    if (!swap.creatorHtlcTxHash) {
+      alert('Creator HTLC must be created first')
       return
     }
 
     setCreatingCounterpartyHtlc(true)
     try {
-      // Parse the stored secret hash from the creator's HTLC
-      const creatorSecretHash = JSON.parse(swap.secretHash)
+      // Fetch the creator's ML HTLC transaction to extract the secret hash
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const apiServer = network === 'mainnet'
+        ? 'https://api-server.mintlayer.org/api/v2'
+        : 'https://api-server-lovelace.mintlayer.org/api/v2'
+
+      const txResponse = await fetch(`${apiServer}/transaction/${swap.creatorHtlcTxHash}`)
+      if (!txResponse.ok) {
+        throw new Error('Failed to fetch creator HTLC transaction')
+      }
+
+      const txData = await txResponse.json()
+      console.log('Creator HTLC transaction data:', txData)
+
+      // Find the HTLC output and extract the secret hash
+      const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
+      if (!htlcOutput || !htlcOutput.htlc?.secret_hash?.hex) {
+        throw new Error('Could not find secret hash in creator HTLC transaction')
+      }
+
+      const secretHashHex = htlcOutput.htlc.secret_hash.hex
+      console.log('Extracted secret hash from creator HTLC:', secretHashHex)
 
       const htlcParams = {
         amount: swap.offer.amountB, // Taker gives amountB
         token_id: swap.offer.tokenB === 'ML' ? null : swap.offer.tokenB,
-        secret_hash: { hex: creatorSecretHash.secret_hash_hex }, // Use same secret hash
+        secret_hash: { hex: secretHashHex }, // Use same secret hash from creator's HTLC
         spend_address: swap.offer.creatorMLAddress, // Creator can spend with secret
         refund_address: userAddress, // Taker can refund after timelock
         refund_timelock: {
@@ -524,7 +521,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
   // BTC HTLC Functions
   const createBTCHTLC = async () => {
-    if (!client || !userAddress || !swap?.offer || !swap.secretHash) {
+    if (!client || !userAddress || !swap?.offer) {
       alert('Missing required data for BTC HTLC creation')
       return
     }
@@ -534,19 +531,49 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       return
     }
 
+    // Check if ML HTLC exists to extract secret hash from
+    const mlHtlcTxHash = swap.creatorHtlcTxHash || swap.takerHtlcTxHash
+    if (!mlHtlcTxHash) {
+      alert('ML HTLC must be created first to generate the secret hash')
+      return
+    }
+
     setCreatingBTCHtlc(true)
     try {
       validateSwapForBTCHTLC(swap, swap.offer)
+
+      // Fetch the ML HTLC transaction to extract the secret hash
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const apiServer = network === 'mainnet'
+        ? 'https://api-server.mintlayer.org/api/v2'
+        : 'https://api-server-lovelace.mintlayer.org/api/v2'
+
+      const txResponse = await fetch(`${apiServer}/transaction/${mlHtlcTxHash}`)
+      if (!txResponse.ok) {
+        throw new Error('Failed to fetch ML HTLC transaction')
+      }
+
+      const txData = await txResponse.json()
+      console.log('ML HTLC transaction data:', txData)
+
+      // Find the HTLC output and extract the secret hash
+      const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
+      if (!htlcOutput || !htlcOutput.htlc?.secret_hash?.hex) {
+        throw new Error('Could not find secret hash in ML HTLC transaction')
+      }
+
+      const secretHashHex = htlcOutput.htlc.secret_hash.hex
+      console.log('Extracted secret hash from ML HTLC:', secretHashHex)
 
       const isUserCreator = swap.offer.creatorMLAddress === userAddress
       let request;
 
       if (isUserCreator && isCreatorOfferingBTC(swap.offer)) {
         // Creator is offering BTC
-        request = buildCreatorBTCHTLCRequest(swap, swap.offer, swap.secretHash)
+        request = buildCreatorBTCHTLCRequest(swap, swap.offer, secretHashHex)
       } else if (!isUserCreator && !isCreatorOfferingBTC(swap.offer)) {
         // Taker is offering BTC (creator wants BTC)
-        request = buildTakerBTCHTLCRequest(swap, swap.offer, swap.secretHash)
+        request = buildTakerBTCHTLCRequest(swap, swap.offer, secretHashHex)
       } else {
         alert('You are not the one who should create the BTC HTLC')
         return
@@ -556,7 +583,6 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       const response = await (client as any).request({ method: 'signTransaction', params: { chain: 'bitcoin', txData: { JSONRepresentation: request } } })
 
       // Broadcast the transaction using Blockstream API
-      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
       const txId = await broadcastBTCTransaction(response.signedTxHex, network === 'testnet')
 
       // Update swap with BTC HTLC details
@@ -646,6 +672,146 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       alert('Failed to claim BTC HTLC. Please try again.')
     } finally {
       setClaimingBTCHtlc(false)
+    }
+  }
+
+  const checkRefundAvailability = async () => {
+    if (!swap || !userAddress) {
+      alert('Missing required data')
+      return
+    }
+
+    setCheckingRefund(true)
+    try {
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const apiServer = network === 'mainnet'
+        ? 'https://api-server.mintlayer.org/api/v2'
+        : 'https://api-server-lovelace.mintlayer.org/api/v2'
+
+      // Determine which HTLC the user can refund
+      const isUserCreator = swap.offer?.creatorMLAddress === userAddress
+      const isUserTaker = swap.takerMLAddress === userAddress
+
+      let htlcTxId: string | null = null
+
+      if (isUserCreator && swap.creatorHtlcTxHash) {
+        htlcTxId = swap.creatorHtlcTxHash
+      } else if (isUserTaker && swap.takerHtlcTxHash) {
+        htlcTxId = swap.takerHtlcTxHash
+      }
+
+      if (!htlcTxId) {
+        alert('No HTLC found for refund')
+        return
+      }
+
+      // Fetch the HTLC transaction
+      const txResponse = await fetch(`${apiServer}/transaction/${htlcTxId}`)
+      if (!txResponse.ok) {
+        throw new Error('Failed to fetch HTLC transaction')
+      }
+
+      const txData = await txResponse.json()
+      console.log('HTLC transaction data:', txData)
+
+      // Find the HTLC output and extract the timelock
+      const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
+      if (!htlcOutput || !htlcOutput.htlc?.refund_timelock) {
+        throw new Error('Could not find timelock in HTLC transaction')
+      }
+
+      const refundTimelock = htlcOutput.htlc.refund_timelock
+      console.log('Refund timelock:', refundTimelock)
+
+      // Get the confirmations count
+      const confirmations = txData.confirmations || 0
+      console.log('Confirmations:', confirmations)
+
+      // Compare confirmations with timelock content
+      let timelockBlocks: number
+      let canRefund: boolean
+      let blocksRemaining: number
+
+      if (refundTimelock.type === 'ForBlockCount') {
+        timelockBlocks = refundTimelock.content
+        canRefund = confirmations >= timelockBlocks
+        blocksRemaining = Math.max(0, timelockBlocks - confirmations)
+      } else {
+        // For UntilTime, we'd need different logic
+        alert('Time-based timelocks are not yet supported in this UI')
+        return
+      }
+
+      console.log('Timelock blocks:', timelockBlocks)
+      console.log('Can refund:', canRefund)
+      console.log('Blocks remaining:', blocksRemaining)
+
+      // Calculate approximate time remaining (2 minutes per block)
+      const minutesRemaining = blocksRemaining * 2
+      let timeRemaining: string
+
+      if (canRefund) {
+        timeRemaining = 'Available now'
+      } else if (minutesRemaining < 60) {
+        timeRemaining = `~${minutesRemaining} minutes`
+      } else {
+        const hoursRemaining = Math.floor(minutesRemaining / 60)
+        const remainingMinutes = minutesRemaining % 60
+        timeRemaining = `~${hoursRemaining}h ${remainingMinutes}m`
+      }
+
+      setRefundInfo({
+        canRefund,
+        blocksRemaining,
+        timeRemaining,
+        htlcTxId,
+        confirmations,
+        timelockBlocks
+      })
+
+      console.log('Refund info:', { canRefund, blocksRemaining, timeRemaining, htlcTxId, confirmations, timelockBlocks })
+    } catch (error) {
+      console.error('Error checking refund availability:', error)
+      alert('Failed to check refund availability. Please try again.')
+    } finally {
+      setCheckingRefund(false)
+    }
+  }
+
+  const refundMLHTLC = async () => {
+    if (!client || !refundInfo || !refundInfo.canRefund) {
+      alert('Refund is not yet available')
+      return
+    }
+
+    try {
+      // Refund the HTLC
+      const signedTxHex = await client.refundHtlc({
+        transaction_id: refundInfo.htlcTxId
+      })
+      console.log('Refund transaction signed:', signedTxHex)
+
+      // Broadcast the refund transaction
+      const broadcastResult = await client.broadcastTx(signedTxHex)
+      console.log('Refund broadcast result:', broadcastResult)
+
+      const txId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
+
+      // Update swap status
+      await fetch(`/api/swaps/${swap!.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'refunded'
+        })
+      })
+
+      fetchSwap()
+      alert(`HTLC refunded successfully! TX ID: ${txId}`)
+      setRefundInfo(null)
+    } catch (error) {
+      console.error('Error refunding HTLC:', error)
+      alert('Failed to refund HTLC. Please try again.')
     }
   }
 
@@ -940,70 +1106,43 @@ export default function SwapPage({ params }: { params: { id: string } }) {
           <div className="bg-yellow-50 p-4 rounded-md">
             <p className="text-yellow-800 mb-4">
               {isUserCreator
-                ? "You need to create the initial HTLC to start the swap process."
+                ? "You need to create the initial HTLC to start the swap process. The secret will be generated securely within your wallet."
                 : "Waiting for the creator to create the initial HTLC."
               }
             </p>
             {isUserCreator && (
               <div className="space-y-3">
-                {!secretHash ? (
-                  <div>
-                    <p className="text-sm text-yellow-700 mb-2">
-                      Step 1: Generate a secret hash for the HTLC
-                    </p>
+                {/* Show appropriate HTLC creation button based on what creator is offering */}
+                {swap.offer && offerInvolvesBTC(swap.offer) ? (
+                  // BTC is involved - creator creates the HTLC for what they're offering
+                  isCreatorOfferingBTC(swap.offer) ? (
+                    // Creator offers BTC -> create BTC HTLC first
                     <button
-                      onClick={generateSecretHash}
-                      disabled={generatingSecret || !userAddress}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
+                      onClick={createBTCHTLC}
+                      disabled={creatingBTCHtlc || !userAddress}
+                      className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:bg-gray-400"
                     >
-                      {generatingSecret ? 'Generating...' : 'Generate Secret Hash'}
+                      {creatingBTCHtlc ? 'Creating BTC HTLC...' : 'Create BTC HTLC'}
                     </button>
-                  </div>
+                  ) : (
+                    // Creator offers ML -> create ML HTLC first
+                    <button
+                      onClick={createHtlc}
+                      disabled={creatingHtlc}
+                      className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
+                    >
+                      {creatingHtlc ? 'Creating ML HTLC...' : 'Create ML HTLC'}
+                    </button>
+                  )
                 ) : (
-                  <div>
-                    <p className="text-sm text-yellow-700 mb-2">
-                      ✅ Secret hash generated successfully
-                    </p>
-                    <div className="bg-white p-2 rounded border text-xs font-mono break-all mb-3">
-                      {JSON.stringify(secretHash, null, 2)}
-                    </div>
-                    <p className="text-sm text-yellow-700 mb-2">
-                      Step 2: Create the HTLC contract
-                    </p>
-
-                    {/* Show appropriate HTLC creation button based on what creator is offering */}
-                    {swap.offer && offerInvolvesBTC(swap.offer) ? (
-                      // BTC is involved - creator creates the HTLC for what they're offering
-                      isCreatorOfferingBTC(swap.offer) ? (
-                        // Creator offers BTC -> create BTC HTLC first
-                        <button
-                          onClick={createBTCHTLC}
-                          disabled={creatingBTCHtlc || !userAddress}
-                          className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:bg-gray-400"
-                        >
-                          {creatingBTCHtlc ? 'Creating BTC HTLC...' : 'Create BTC HTLC'}
-                        </button>
-                      ) : (
-                        // Creator offers ML -> create ML HTLC first
-                        <button
-                          onClick={createHtlc}
-                          disabled={creatingHtlc}
-                          className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
-                        >
-                          {creatingHtlc ? 'Creating ML HTLC...' : 'Create ML HTLC'}
-                        </button>
-                      )
-                    ) : (
-                      // No BTC involved - standard ML HTLC
-                      <button
-                        onClick={createHtlc}
-                        disabled={creatingHtlc}
-                        className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
-                      >
-                        {creatingHtlc ? 'Creating HTLC...' : 'Create HTLC'}
-                      </button>
-                    )}
-                  </div>
+                  // No BTC involved - standard ML HTLC
+                  <button
+                    onClick={createHtlc}
+                    disabled={creatingHtlc}
+                    className="bg-yellow-600 text-white px-4 py-2 rounded-md hover:bg-yellow-700 disabled:bg-gray-400"
+                  >
+                    {creatingHtlc ? 'Creating HTLC...' : 'Create HTLC'}
+                  </button>
                 )}
               </div>
             )}
@@ -1024,7 +1163,6 @@ export default function SwapPage({ params }: { params: { id: string } }) {
                   <p className="text-sm font-medium text-gray-700 mb-2">Creator's HTLC Details:</p>
                   <div className="text-xs text-gray-600 space-y-1">
                     <div>Amount: {swap.offer?.amountA} {getTokenSymbol(swap.offer?.tokenA || '')}</div>
-                    <div>Secret Hash: {swap.secretHash ? JSON.parse(swap.secretHash).secret_hash_hex.slice(0, 20) + '...' : 'N/A'}</div>
                     {swap.creatorHtlcTxHash && (
                       <div>ML TX ID: {swap.creatorHtlcTxHash.slice(0, 20)}...</div>
                     )}
@@ -1297,7 +1435,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
                 {!isCreatorOfferingBTC(swap.offer) && !isUserCreator && swap.creatorHtlcTxHash && (
                   <button
                     onClick={createBTCHTLC}
-                    disabled={creatingBTCHtlc || !userAddress || !swap.secretHash}
+                    disabled={creatingBTCHtlc || !userAddress}
                     className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:bg-gray-400"
                   >
                     {creatingBTCHtlc ? 'Creating BTC HTLC...' : 'Create BTC HTLC'}
@@ -1309,15 +1447,72 @@ export default function SwapPage({ params }: { params: { id: string } }) {
           )
         )}
 
-        {(swap.status === 'htlc_created' || swap.status === 'in_progress') && (
+        {(swap.status === 'htlc_created' || swap.status === 'in_progress' || swap.status === 'both_htlcs_created') && (
           <div className="bg-orange-50 p-4 rounded-md mt-4">
             <p className="text-orange-800 mb-2">
               <strong>Timelock Protection:</strong> If the swap is not completed within the timelock period,
               you can manually refund your HTLC to recover your tokens.
             </p>
-            <button className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700">
-              Check Refund Availability
-            </button>
+
+            {!refundInfo ? (
+              <button
+                onClick={checkRefundAvailability}
+                disabled={checkingRefund || !userAddress}
+                className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:bg-gray-400"
+              >
+                {checkingRefund ? 'Checking...' : 'Check Refund Availability'}
+              </button>
+            ) : (
+              <div className="mt-3 space-y-3">
+                <div className="bg-white p-3 rounded border">
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <span className={`font-semibold ${refundInfo.canRefund ? 'text-green-600' : 'text-orange-600'}`}>
+                        {refundInfo.canRefund ? '✓ Refund Available' : '⏳ Timelock Active'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Confirmations:</span>
+                      <span className="font-mono">{refundInfo.confirmations || 0} / {refundInfo.timelockBlocks || 0}</span>
+                    </div>
+                    {!refundInfo.canRefund && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Blocks Remaining:</span>
+                          <span className="font-mono">{refundInfo.blocksRemaining}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Time Remaining:</span>
+                          <span className="font-mono">{refundInfo.timeRemaining}</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">HTLC TX:</span>
+                      <span className="font-mono text-xs">{refundInfo.htlcTxId.slice(0, 16)}...</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-2">
+                  <button
+                    onClick={refundMLHTLC}
+                    disabled={!refundInfo.canRefund}
+                    className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:bg-gray-400"
+                  >
+                    {refundInfo.canRefund ? 'Refund ML HTLC' : 'Refund Not Available Yet'}
+                  </button>
+                  <button
+                    onClick={checkRefundAvailability}
+                    disabled={checkingRefund}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 disabled:bg-gray-400"
+                  >
+                    {checkingRefund ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
