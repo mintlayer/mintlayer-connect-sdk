@@ -68,7 +68,7 @@ export default function CreateOfferPage() {
     try {
       if (client) {
         const connect = await client.connect()
-        const address = connect.testnet.receiving[0]
+        const address = connect.address.testnet.receiving[0]
         setUserAddress(address)
       }
     } catch (error) {
