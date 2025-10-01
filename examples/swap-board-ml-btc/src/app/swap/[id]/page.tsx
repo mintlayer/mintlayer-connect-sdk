@@ -103,7 +103,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     try {
       if (client) {
         const connect = await client.connect()
-        const address = connect.testnet.receiving[0]
+        const address = connect.address.testnet.receiving[0]
         setUserAddress(address)
 
         // If swap involves BTC, also get BTC address
