@@ -51,7 +51,10 @@ export default function SwapPage({ params }: { params: { id: string } }) {
     fetchTokens()
 
     // Poll for updates every 10 seconds
-    const interval = setInterval(fetchSwap, 10000)
+    const interval = setInterval(() => {
+      fetchSwap()
+      checkHTLCSpendStatus()
+    }, 10000)
     return () => clearInterval(interval)
   }, [params.id])
 
@@ -105,6 +108,140 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       console.error('Error fetching swap:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const checkHTLCSpendStatus = async () => {
+    if (!swap || !client) return
+
+    try {
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const apiServer = network === 'mainnet'
+        ? 'https://api-server.mintlayer.org/api/v2'
+        : 'https://api-server-lovelace.mintlayer.org/api/v2'
+
+      let needsUpdate = false
+      const updates: any = {}
+      let creatorHtlcSpent = false
+      let takerHtlcSpent = false
+      let creatorHtlcSpendTxId: string | null = null
+      let takerHtlcSpendTxId: string | null = null
+
+      // Check creator's ML HTLC
+      if (swap.creatorHtlcTxHash) {
+        try {
+          const outputResponse = await fetch(`${apiServer}/transaction/${swap.creatorHtlcTxHash}/output/0`)
+          if (outputResponse.ok) {
+            const outputData = await outputResponse.json()
+            creatorHtlcSpent = outputData.spent === true
+            if (creatorHtlcSpent && outputData.spent_by) {
+              creatorHtlcSpendTxId = outputData.spent_by
+              console.log('Creator HTLC has been spent by:', creatorHtlcSpendTxId)
+            }
+          }
+        } catch (error) {
+          console.error('Error checking creator HTLC spend status:', error)
+        }
+      }
+
+      // Check taker's ML HTLC
+      if (swap.takerHtlcTxHash) {
+        try {
+          const outputResponse = await fetch(`${apiServer}/transaction/${swap.takerHtlcTxHash}/output/0`)
+          if (outputResponse.ok) {
+            const outputData = await outputResponse.json()
+            takerHtlcSpent = outputData.spent === true
+            if (takerHtlcSpent && outputData.spent_by) {
+              takerHtlcSpendTxId = outputData.spent_by
+              console.log('Taker HTLC has been spent by:', takerHtlcSpendTxId)
+            }
+          }
+        } catch (error) {
+          console.error('Error checking taker HTLC spend status:', error)
+        }
+      }
+
+      // Determine status based on what's been spent
+      if (creatorHtlcSpent && takerHtlcSpent) {
+        // Both HTLCs spent = fully completed
+        if (swap.status !== 'fully_completed') {
+          needsUpdate = true
+          updates.status = 'fully_completed'
+        }
+      } else if (creatorHtlcSpent || takerHtlcSpent) {
+        // One HTLC spent = first claim completed, need to extract secret
+        if (swap.status === 'fully_completed') {
+          // Downgrade from fully_completed to completed if only one is actually spent
+          needsUpdate = true
+          updates.status = 'completed'
+          console.log('Downgrading status from fully_completed to completed - only one HTLC is spent')
+        } else if (swap.status !== 'completed') {
+          needsUpdate = true
+          updates.status = 'completed'
+        }
+
+        // Try to extract the secret from the claim transaction if we don't have it
+        if (!swap.secret) {
+          try {
+            const spendTxId = creatorHtlcSpent ? creatorHtlcSpendTxId : takerHtlcSpendTxId
+            const htlcTxId = creatorHtlcSpent ? swap.creatorHtlcTxHash : swap.takerHtlcTxHash
+
+            if (spendTxId && htlcTxId) {
+              console.log('Attempting to extract secret from claim transaction:', spendTxId)
+
+              // Fetch the claim transaction to get its hex
+              const claimTxResponse = await fetch(`${apiServer}/transaction/${spendTxId}`)
+              if (claimTxResponse.ok) {
+                const claimTxData = await claimTxResponse.json()
+                const claimTxHex = claimTxData.hex
+
+                if (claimTxHex) {
+                  // Extract the secret using the SDK
+                  const extractedSecret = await client.extractHtlcSecret({
+                    transaction_id: spendTxId,
+                    transaction_hex: claimTxHex,
+                    format: 'hex'
+                  })
+
+                  console.log('Successfully extracted secret:', extractedSecret)
+                  updates.secret = extractedSecret
+                  updates.claimTxHash = spendTxId
+                  updates.claimTxHex = claimTxHex
+                  needsUpdate = true
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error extracting secret from claim transaction:', error)
+            // Continue with status update even if secret extraction fails
+          }
+        }
+      } else {
+        // Neither HTLC is spent - downgrade status if needed
+        if (swap.status === 'completed' || swap.status === 'fully_completed') {
+          needsUpdate = true
+          // Determine appropriate status based on what HTLCs exist
+          if (swap.creatorHtlcTxHash && swap.takerHtlcTxHash) {
+            updates.status = 'in_progress'
+          } else if (swap.creatorHtlcTxHash || swap.takerHtlcTxHash) {
+            updates.status = 'htlc_created'
+          }
+          console.log('Downgrading status - no HTLCs are actually spent on-chain')
+        }
+      }
+
+      // Update swap if needed
+      if (needsUpdate) {
+        console.log('Updating swap status based on spend status:', updates)
+        await fetch(`/api/swaps/${swap.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        })
+        fetchSwap()
+      }
+    } catch (error) {
+      console.error('Error checking HTLC spend status:', error)
     }
   }
 
@@ -889,7 +1026,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       case 'btc_htlc_created': return 'BTC HTLC created, waiting for ML HTLC'
       case 'both_htlcs_created': return 'Both HTLCs created, ready to claim'
       case 'in_progress': return 'Claims in progress'
-      case 'completed': return 'First claim completed, waiting for final claim'
+      case 'completed': return 'First claim completed (secret revealed), waiting for final claim'
       case 'fully_completed': return 'Atomic swap completed successfully'
       case 'refunded': return 'ML HTLC refunded due to timeout'
       case 'btc_refunded': return 'BTC HTLC refunded due to timeout'
@@ -935,7 +1072,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
             </button>
           )}
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 flex-wrap">
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(swap.status)}`}>
             {swap.status.toUpperCase()}
           </span>
@@ -944,6 +1081,15 @@ export default function SwapPage({ params }: { params: { id: string } }) {
             <span className="text-sm text-gray-500">
               Connected: {userAddress.slice(0, 10)}...
             </span>
+          )}
+          {(swap.status === 'in_progress' || swap.status === 'completed' || swap.status === 'both_htlcs_created') && (
+            <button
+              onClick={checkHTLCSpendStatus}
+              className="text-sm bg-gray-200 text-gray-700 px-3 py-1 rounded-md hover:bg-gray-300"
+              title="Check if HTLCs have been claimed on-chain"
+            >
+              🔄 Check Status
+            </button>
           )}
         </div>
       </div>
@@ -1068,7 +1214,7 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
             <div className="flex items-center">
               <div className={`w-4 h-4 rounded-full mr-3 ${
-                (swap.claimTxHash || swap.btcClaimTxId) ? 'bg-green-500' : 'bg-gray-300'
+                (swap.claimTxHash || swap.btcClaimTxId) && swap.secret ? 'bg-green-500' : 'bg-gray-300'
               }`}></div>
               <span className="text-sm">
                 First claim completed (secret revealed)
@@ -1076,13 +1222,6 @@ export default function SwapPage({ params }: { params: { id: string } }) {
                 {swap.claimTxHash && !swap.btcClaimTxId && ' - ML claimed'}
                 {swap.claimTxHash && swap.btcClaimTxId && ' - Both claimed'}
               </span>
-            </div>
-
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-full mr-3 ${
-                swap.secret ? 'bg-green-500' : 'bg-gray-300'
-              }`}></div>
-              <span className="text-sm">Secret extracted</span>
             </div>
 
             <div className="flex items-center">
@@ -1236,74 +1375,84 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
         {(swap.status === 'completed' || swap.status === 'fully_completed') && (
           <div className="bg-green-50 p-4 rounded-md">
-            {(swap.claimTxHash || swap.btcClaimTxId) && (
-              <div className="space-y-3">
-                <p className="text-green-800">
-                  {swap.status === 'fully_completed'
-                    ? "🎉 Atomic swap completed successfully! Both parties have their tokens."
-                    : isUserCreator
-                      ? "You have claimed the taker's HTLC!"
-                      : "The creator has claimed your HTLC!"
+            <div className="space-y-3">
+              <p className="text-green-800 font-semibold">
+                {swap.status === 'fully_completed'
+                  ? "🎉 Atomic swap completed successfully! Both parties have their tokens."
+                  : "✅ First HTLC claimed! Secret has been revealed."
+                }
+              </p>
+              {swap.status === 'completed' && (
+                <p className="text-blue-800 text-sm">
+                  {isUserCreator
+                    ? "You claimed the taker's HTLC. The taker can now use the revealed secret to claim your HTLC."
+                    : "The creator claimed your HTLC and revealed the secret. You can now claim the creator's HTLC!"
                   }
                 </p>
+              )}
 
-                {/* Show ML claim transaction if it exists */}
-                {swap.claimTxHash && (
-                  <p className="text-sm text-green-700">
-                    ML Claim Transaction: {swap.claimTxHash}
-                  </p>
-                )}
+              {/* Show ML claim transaction if it exists */}
+              {swap.claimTxHash && (
+                <p className="text-sm text-green-700">
+                  ML Claim Transaction: {swap.claimTxHash}
+                </p>
+              )}
 
-                {/* Show BTC claim transaction if it exists */}
-                {swap.btcClaimTxId && (
-                  <p className="text-sm text-green-700">
-                    BTC Claim Transaction: {swap.btcClaimTxId}
-                  </p>
-                )}
+              {/* Show BTC claim transaction if it exists */}
+              {swap.btcClaimTxId && (
+                <p className="text-sm text-green-700">
+                  BTC Claim Transaction: {swap.btcClaimTxId}
+                </p>
+              )}
 
-                {swap.secret ? (
-                  <div>
-                    <div className="bg-white p-2 rounded border mb-3">
-                      <p className="text-xs font-medium text-gray-700">Revealed Secret:</p>
-                      <p className="text-xs font-mono text-gray-600 break-all">{swap.secret}</p>
-                    </div>
+              {swap.secret ? (
+                <div>
+                  <div className="bg-yellow-50 p-3 rounded border mb-3">
+                    <p className="text-sm font-semibold text-gray-800 mb-2">🔑 Revealed Secret:</p>
+                    <p className="text-sm font-mono text-gray-900 break-all bg-white p-2 rounded border border-yellow-200">{swap.secret}</p>
+                  </div>
 
-                    {isUserTaker && (
-                      <div className="space-y-2">
-                        <p className="text-blue-800 text-sm">
-                          Now you can claim the creator's HTLC using this secret:
-                        </p>
-                        <button
-                          onClick={claimWithExtractedSecret}
-                          disabled={claimingHtlc}
-                          className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400"
-                        >
-                          {claimingHtlc ? 'Claiming Creator HTLC...' : 'Claim Creator HTLC'}
-                        </button>
-                      </div>
-                    )}
-
-                    {isUserCreator && (
-                      <p className="text-green-700 text-sm">
-                        ✅ Atomic swap completed! Both parties have their tokens.
+                  {isUserTaker && swap.status === 'completed' && (
+                    <div className="space-y-2">
+                      <p className="text-blue-800 text-sm font-medium">
+                        👉 Now you can claim the creator's HTLC using this secret:
                       </p>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-blue-800 text-sm mb-2">
-                      {isUserTaker ? "Extract the secret to claim the creator's HTLC:" : "The taker needs to extract the secret:"}
+                      <button
+                        onClick={claimWithExtractedSecret}
+                        disabled={claimingHtlc}
+                        className="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 disabled:bg-gray-400 font-medium"
+                      >
+                        {claimingHtlc ? 'Claiming Creator HTLC...' : '🎯 Claim Creator HTLC'}
+                      </button>
+                    </div>
+                  )}
+
+                  {isUserCreator && swap.status === 'completed' && (
+                    <p className="text-green-700 text-sm">
+                      ⏳ Waiting for taker to claim your HTLC using the revealed secret...
                     </p>
-                    <button
-                      onClick={extractSecretFromClaim}
-                      className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
-                    >
-                      Extract Secret from Claim
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+
+                  {swap.status === 'fully_completed' && (
+                    <p className="text-green-700 text-sm font-medium">
+                      ✅ Atomic swap completed! Both parties have their tokens.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <p className="text-orange-800 text-sm mb-2 font-medium">
+                    ⚠️ Secret not yet extracted. Click below to extract it from the claim transaction:
+                  </p>
+                  <button
+                    onClick={extractSecretFromClaim}
+                    className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 font-medium"
+                  >
+                    🔍 Extract Secret from Claim
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
