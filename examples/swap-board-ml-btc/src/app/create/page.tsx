@@ -19,6 +19,8 @@ export default function CreateOfferPage() {
   })
   const [loading, setLoading] = useState(false)
   const [userAddress, setUserAddress] = useState<string>('')
+  const [userBTCAddress, setUserBTCAddress] = useState<string>('')
+  const [userBTCPublicKey, setUserBTCPublicKey] = useState<string>('')
   const [client, setClient] = useState<Client | null>(null)
   const [tokens, setTokens] = useState<Token[]>([])
   const [loadingTokens, setLoadingTokens] = useState(true)
@@ -70,6 +72,15 @@ export default function CreateOfferPage() {
         const connect = await client.connect()
         const address = connect.address.testnet.receiving[0]
         setUserAddress(address)
+
+        // Get BTC address and public key from wallet connection
+        if (connect.addressesByChain?.bitcoin) {
+          const btcAddress = connect.addressesByChain.bitcoin.receiving?.[0]
+          const btcPublicKey = connect.addressesByChain.bitcoin.publicKeys?.receiving?.[0]
+
+          if (btcAddress) setUserBTCAddress(btcAddress)
+          if (btcPublicKey) setUserBTCPublicKey(btcPublicKey)
+        }
       }
     } catch (error) {
       console.error('Error connecting wallet:', error)
@@ -125,24 +136,15 @@ export default function CreateOfferPage() {
     try {
       let creatorBTCAddress, creatorBTCPublicKey;
 
-      // If offering BTC or requesting BTC, get BTC credentials
+      // If offering BTC or requesting BTC, use BTC credentials from wallet connection
       if (formData.tokenA === 'BTC' || formData.tokenB === 'BTC') {
-        if (!client) {
-          alert('Wallet client not initialized')
+        if (!userBTCAddress || !userBTCPublicKey) {
+          alert('BTC credentials not available. Please reconnect your wallet.')
           return
         }
 
-        try {
-          // Get BTC credentials from wallet
-          const BTCData = await (client as any).request({ method: 'getData', params: { items: ['btcAddress', 'btcPublicKey']} })
-
-          creatorBTCAddress = BTCData.btcAddress
-          creatorBTCPublicKey = BTCData.btcPublicKey
-        } catch (error) {
-          console.error('Error getting BTC credentials:', error)
-          alert('Failed to get BTC credentials from wallet. Please make sure your wallet supports BTC.')
-          return
-        }
+        creatorBTCAddress = userBTCAddress
+        creatorBTCPublicKey = userBTCPublicKey
       }
 
       const response = await fetch('/api/offers', {
