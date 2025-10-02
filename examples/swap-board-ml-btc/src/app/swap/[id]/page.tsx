@@ -301,17 +301,49 @@ export default function SwapPage({ params }: { params: { id: string } }) {
 
       const txId = broadcastResult.tx_id || broadcastResult.transaction_id || broadcastResult.id
 
-      // Step 4: Update swap status with transaction ID and hex
+      // Step 4: Extract secret hash from the broadcasted transaction
+      const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
+      const apiServer = network === 'mainnet'
+        ? 'https://api-server.mintlayer.org/api/v2'
+        : 'https://api-server-lovelace.mintlayer.org/api/v2'
+
+      let secretHashHex: string | undefined
+
+      try {
+        // Wait a moment for transaction to be indexed
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        const txResponse = await fetch(`${apiServer}/transaction/${txId}`)
+        if (txResponse.ok) {
+          const txData = await txResponse.json()
+          const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
+          if (htlcOutput?.htlc?.secret_hash?.hex) {
+            secretHashHex = htlcOutput.htlc.secret_hash.hex
+            console.log('Extracted secret hash from ML HTLC:', secretHashHex)
+          }
+        }
+      } catch (error) {
+        console.error('Error extracting secret hash from ML HTLC:', error)
+        // Continue without secret hash - it can be extracted later if needed
+      }
+
+      // Step 5: Update swap status with transaction ID, hex, and secret hash
       // Note: We save the signed transaction hex because it's needed later
       // to extract the secret when someone claims the HTLC using extractHtlcSecret()
+      const updateData: any = {
+        status: 'htlc_created',
+        creatorHtlcTxHash: txId,
+        creatorHtlcTxHex: signedTxHex
+      }
+
+      if (secretHashHex) {
+        updateData.secretHash = secretHashHex
+      }
+
       await fetch(`/api/swaps/${swap.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: 'htlc_created',
-          creatorHtlcTxHash: txId,
-          creatorHtlcTxHex: signedTxHex
-        })
+        body: JSON.stringify(updateData)
       })
 
       // Refresh swap data
@@ -331,36 +363,50 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       return
     }
 
-    // Check if creator's HTLC exists to extract secret hash from
-    if (!swap.creatorHtlcTxHash) {
+    // Check if creator's HTLC exists (could be ML or BTC)
+    const creatorMLHTLCExists = !!swap.creatorHtlcTxHash
+    const creatorBTCHTLCExists = !!swap.btcHtlcTxId
+
+    if (!creatorMLHTLCExists && !creatorBTCHTLCExists) {
       alert('Creator HTLC must be created first')
       return
     }
 
     setCreatingCounterpartyHtlc(true)
     try {
-      // Fetch the creator's ML HTLC transaction to extract the secret hash
       const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
       const apiServer = network === 'mainnet'
         ? 'https://api-server.mintlayer.org/api/v2'
         : 'https://api-server-lovelace.mintlayer.org/api/v2'
 
-      const txResponse = await fetch(`${apiServer}/transaction/${swap.creatorHtlcTxHash}`)
-      if (!txResponse.ok) {
-        throw new Error('Failed to fetch creator HTLC transaction')
+      let secretHashHex: string
+
+      // Try to use saved secret hash first (faster, no API call needed)
+      if (swap.secretHash) {
+        secretHashHex = swap.secretHash
+        console.log('Using saved secret hash:', secretHashHex)
+      } else if (creatorMLHTLCExists) {
+        // Fallback: Extract from creator's ML HTLC transaction on blockchain
+        console.log('Secret hash not saved, fetching from ML HTLC blockchain...')
+        const txResponse = await fetch(`${apiServer}/transaction/${swap.creatorHtlcTxHash}`)
+        if (!txResponse.ok) {
+          throw new Error('Failed to fetch creator ML HTLC transaction')
+        }
+
+        const txData = await txResponse.json()
+        console.log('Creator ML HTLC transaction data:', txData)
+
+        const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
+        if (!htlcOutput || !htlcOutput.htlc?.secret_hash?.hex) {
+          throw new Error('Could not find secret hash in creator ML HTLC transaction')
+        }
+
+        secretHashHex = htlcOutput.htlc.secret_hash.hex
+        console.log('Extracted secret hash from creator ML HTLC:', secretHashHex)
+      } else {
+        // Creator created BTC HTLC first, but secret hash not saved
+        throw new Error('Secret hash not found. Creator must have created BTC HTLC with secret hash saved.')
       }
-
-      const txData = await txResponse.json()
-      console.log('Creator HTLC transaction data:', txData)
-
-      // Find the HTLC output and extract the secret hash
-      const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
-      if (!htlcOutput || !htlcOutput.htlc?.secret_hash?.hex) {
-        throw new Error('Could not find secret hash in creator HTLC transaction')
-      }
-
-      const secretHashHex = htlcOutput.htlc.secret_hash.hex
-      console.log('Extracted secret hash from creator HTLC:', secretHashHex)
 
       const htlcParams = {
         amount: swap.offer.amountB, // Taker gives amountB
@@ -668,49 +714,72 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       return
     }
 
-    // Check if ML HTLC exists to extract secret hash from
-    const mlHtlcTxHash = swap.creatorHtlcTxHash || swap.takerHtlcTxHash
-    if (!mlHtlcTxHash) {
-      alert('ML HTLC must be created first to generate the secret hash')
-      return
-    }
-
     setCreatingBTCHtlc(true)
     try {
       validateSwapForBTCHTLC(swap, swap.offer)
 
-      // Fetch the ML HTLC transaction to extract the secret hash
       const network = (process.env.NEXT_PUBLIC_MINTLAYER_NETWORK as 'testnet' | 'mainnet') || 'testnet'
       const apiServer = network === 'mainnet'
         ? 'https://api-server.mintlayer.org/api/v2'
         : 'https://api-server-lovelace.mintlayer.org/api/v2'
 
-      const txResponse = await fetch(`${apiServer}/transaction/${mlHtlcTxHash}`)
-      if (!txResponse.ok) {
-        throw new Error('Failed to fetch ML HTLC transaction')
-      }
-
-      const txData = await txResponse.json()
-      console.log('ML HTLC transaction data:', txData)
-
-      // Find the HTLC output and extract the secret hash
-      const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
-      if (!htlcOutput || !htlcOutput.htlc?.secret_hash?.hex) {
-        throw new Error('Could not find secret hash in ML HTLC transaction')
-      }
-
-      const secretHashHex = htlcOutput.htlc.secret_hash.hex
-      console.log('Extracted secret hash from ML HTLC:', secretHashHex)
-
+      // Determine if BTC HTLC is first or second in the swap
       const isUserCreator = swap.offer.creatorMLAddress === userAddress
-      let request;
+      const creatorOfferedBTC = isCreatorOfferingBTC(swap.offer)
 
-      if (isUserCreator && isCreatorOfferingBTC(swap.offer)) {
-        // Creator is offering BTC
+      // BTC is FIRST HTLC if creator offers BTC and user is creator
+      const isBTCFirstHTLC = isUserCreator && creatorOfferedBTC
+
+      // BTC is SECOND HTLC if taker offers BTC (creator wants BTC)
+      const isBTCSecondHTLC = !isUserCreator && !creatorOfferedBTC
+
+      let secretHashHex: string
+      let request: any
+
+      if (isBTCFirstHTLC) {
+        // BTC is the FIRST HTLC - wallet will generate secret hash
+        console.log('Creating BTC HTLC as FIRST HTLC (creator offers BTC)')
+
+        // Use placeholder - wallet will generate actual secret hash
+        secretHashHex = '0000000000000000000000000000000000000000'
         request = buildCreatorBTCHTLCRequest(swap, swap.offer, secretHashHex)
-      } else if (!isUserCreator && !isCreatorOfferingBTC(swap.offer)) {
-        // Taker is offering BTC (creator wants BTC)
+
+      } else if (isBTCSecondHTLC) {
+        // BTC is the SECOND HTLC - extract secret hash from existing ML HTLC
+        console.log('Creating BTC HTLC as SECOND HTLC (taker offers BTC)')
+
+        const mlHtlcTxHash = swap.creatorHtlcTxHash
+        if (!mlHtlcTxHash) {
+          alert('Creator must create ML HTLC first')
+          return
+        }
+
+        // Try to use saved secret hash first (faster)
+        if (swap.secretHash) {
+          secretHashHex = swap.secretHash
+          console.log('Using saved secret hash:', secretHashHex)
+        } else {
+          // Fallback: Extract from blockchain
+          console.log('Secret hash not saved, fetching from blockchain...')
+          const txResponse = await fetch(`${apiServer}/transaction/${mlHtlcTxHash}`)
+          if (!txResponse.ok) {
+            throw new Error('Failed to fetch ML HTLC transaction')
+          }
+
+          const txData = await txResponse.json()
+          console.log('ML HTLC transaction data:', txData)
+
+          const htlcOutput = txData.outputs?.find((output: any) => output.type === 'Htlc')
+          if (!htlcOutput || !htlcOutput.htlc?.secret_hash?.hex) {
+            throw new Error('Could not find secret hash in ML HTLC transaction')
+          }
+
+          secretHashHex = htlcOutput.htlc.secret_hash.hex
+          console.log('Extracted secret hash from ML HTLC:', secretHashHex)
+        }
+
         request = buildTakerBTCHTLCRequest(swap, swap.offer, secretHashHex)
+
       } else {
         alert('You are not the one who should create the BTC HTLC')
         return
@@ -722,17 +791,28 @@ export default function SwapPage({ params }: { params: { id: string } }) {
       // Broadcast the transaction using Blockstream API
       const txId = await broadcastBTCTransaction(response.signedTxHex, network === 'testnet')
 
+      // Determine status based on whether this is first or second HTLC
+      const newStatus = isBTCFirstHTLC ? 'btc_htlc_created' : 'both_htlcs_created'
+
       // Update swap with BTC HTLC details
+      const updateData: any = {
+        btcHtlcAddress: response.htlcAddress,
+        btcHtlcTxId: txId,
+        btcHtlcTxHex: response.signedTxHex,
+        btcRedeemScript: response.redeemScript,
+        status: newStatus
+      }
+
+      // If BTC is first HTLC, save the secret hash returned by wallet
+      if (isBTCFirstHTLC && response.secretHashHex) {
+        updateData.secretHash = response.secretHashHex
+        console.log('Saved secret hash from BTC wallet:', response.secretHashHex)
+      }
+
       await fetch(`/api/swaps/${swap.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          btcHtlcAddress: response.htlcAddress,
-          btcHtlcTxId: txId,
-          btcHtlcTxHex: response.signedTxHex,
-          btcRedeemScript: response.redeemScript,
-          status: swap.creatorHtlcTxHash || swap.takerHtlcTxHash ? 'both_htlcs_created' : 'btc_htlc_created'
-        })
+        body: JSON.stringify(updateData)
       })
 
       fetchSwap()
