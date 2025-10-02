@@ -188,12 +188,13 @@ export function getBTCTimeoutBlocks(isCreator: boolean): number {
 
 /**
  * Validate swap has required BTC data for HTLC creation
+ * Note: secretHash is NOT required for first HTLC creation - wallet will generate it
  */
 export function validateSwapForBTCHTLC(swap: Swap, offer: Offer): void {
   if (!offerInvolvesBTC(offer)) {
     throw new Error('Offer does not involve BTC')
   }
-  
+
   if (isCreatorOfferingBTC(offer)) {
     if (!offer.creatorBTCAddress || !offer.creatorBTCPublicKey) {
       throw new Error('Missing creator BTC credentials')
@@ -209,10 +210,10 @@ export function validateSwapForBTCHTLC(swap: Swap, offer: Offer): void {
       throw new Error('Missing taker BTC credentials')
     }
   }
-  
-  if (!swap.secretHash) {
-    throw new Error('Missing secret hash')
-  }
+
+  // Note: We don't validate secretHash here because:
+  // - For FIRST BTC HTLC: wallet generates the secret hash
+  // - For SECOND BTC HTLC: secret hash is validated in the calling function
 }
 
 /**
