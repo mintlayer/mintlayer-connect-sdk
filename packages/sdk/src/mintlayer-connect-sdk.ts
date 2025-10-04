@@ -3410,20 +3410,48 @@ class Client {
   async buildRefundHtlc(params: any): Promise<Transaction> {
     this.ensureInitialized();
 
-    const {
-      transaction_json,
-      multisig_challege,
-      witness_input,
-    } = params;
+    const { transaction_id, utxo } = params;
 
-    // @ts-ignore
-    return {
-      JSONRepresentation: transaction_json,
-      BINRepresentation: {},
-      HEXRepresentation_unsigned: '',
+    let useHtlcUtxo: any[] = [];
+
+    if (transaction_id) {
+      const response = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch transaction');
+      }
+      const transaction: TransactionJSONRepresentation = await response.json();
       // @ts-ignore
-      htlc: { multisig_challege, witness_input }
-    };
+      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
+      // @ts-ignore
+      useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
+    }
+
+    let token_details = undefined;
+
+    if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
+      const request = await fetch(`${this.getApiServer()}/token/${useHtlcUtxo[0].utxo.value.token_id}`);
+      if (!request.ok) {
+        throw new Error('Failed to fetch token');
+      }
+      token_details = await request.json();
+    }
+
+    return this.buildTransaction({
+      type: 'Transfer',
+      params: {
+        to: useHtlcUtxo[0].utxo.htlc.refund_key,
+        amount: useHtlcUtxo[0].utxo.value.amount.decimal,
+        ...(
+          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
+            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
+            : {}
+        ),
+        token_details,
+      },
+      opts: {
+        forceSpendUtxo: useHtlcUtxo,
+      }
+    });
   }
 
   /**
