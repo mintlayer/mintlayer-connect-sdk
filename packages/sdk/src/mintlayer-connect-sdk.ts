@@ -46,6 +46,7 @@ import initWasm, {
   SignatureHashType,
   encode_output_htlc,
   extract_htlc_secret,
+  verify_challenge,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -872,6 +873,12 @@ export type SignChallengeArgs = {
 };
 
 export type SignChallengeResponse = {
+  message: string;
+  address: string;
+  signature: string;
+};
+
+export type VerifyChallengeArgs = {
   message: string;
   address: string;
   signature: string;
@@ -3603,6 +3610,25 @@ class Client {
         address: args.address,
       },
     });
+  }
+
+  /**
+   * Verifies a signed challenge message.
+   * Used to verify that a signature was produced by the private key corresponding to the given address.
+   *
+   * Note: The provided address must be a 'pubkeyhash' address.
+   *
+   * @param args - Object containing message, address, and signature
+   * @returns Promise that resolves to true if the signature is valid, throws an error otherwise
+   */
+  async verifyChallenge(args: VerifyChallengeArgs): Promise<boolean> {
+    this.ensureInitialized();
+
+    const messageBytes = stringToUint8Array(args.message);
+    const signatureBytes = hexToUint8Array(args.signature);
+    const network = this.getMLNetwork();
+
+    return verify_challenge(args.address, network, signatureBytes, messageBytes);
   }
 
   /**
