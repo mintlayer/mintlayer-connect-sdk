@@ -217,6 +217,11 @@ type Value = Coin | Token;
 
 type SignedTransaction = string;
 
+type SignedIntentTransaction = {
+  transactionHex: string;
+  intentEncode: string;
+}
+
 interface Outpoint {
   id: string;
   index: number;
@@ -3162,9 +3167,9 @@ class Client {
    * @param intent - The bridge intent information
    * @returns Promise that resolves to a signed transaction
    */
-  async bridgeRequest({ destination, amount, token_id, intent }: BridgeRequestArgs): Promise<SignedTransaction> {
+  async bridgeRequest({ destination, amount, token_id, intent }: BridgeRequestArgs): Promise<SignedIntentTransaction> {
     const tx = await this.buildBridgeRequest({ destination, amount, token_id, intent });
-    return this.signTransaction(tx);
+    return this.signIntentTransaction(tx);
   }
 
   /**
@@ -3589,6 +3594,14 @@ class Client {
    * @returns Promise that resolves to the signed transaction hex
    */
   async signTransaction(tx: Transaction): Promise<SignedTransaction> {
+    this.ensureInitialized();
+    return this.request({
+      method: 'signTransaction',
+      params: { txData: tx },
+    });
+  }
+
+  async signIntentTransaction(tx: Transaction): Promise<SignedIntentTransaction> {
     this.ensureInitialized();
     return this.request({
       method: 'signTransaction',
