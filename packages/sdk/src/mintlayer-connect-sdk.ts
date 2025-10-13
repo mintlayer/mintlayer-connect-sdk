@@ -2246,7 +2246,7 @@ class Client {
         id: 'to_be_filled_in'
       };
 
-      const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, 1);
+      const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, this.network === 'mainnet' ? 0 : 1);
 
       const transaction_size_in_bytes = BigInt(Math.ceil(BINRepresentation.transactionsize));
       const fee_amount_per_kb = BigInt('100000000000'); // TODO: Get the current feerate from the network
