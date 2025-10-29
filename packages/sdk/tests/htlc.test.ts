@@ -2,7 +2,7 @@ import { Client } from '../src/mintlayer-connect-sdk';
 import fetchMock from 'jest-fetch-mock';
 import { createHash } from 'crypto'
 
-import { addresses, utxos } from './__mocks__/accounts/account_01'
+import { addresses, utxos } from './__mocks__/accounts/account_02'
 
 beforeEach(() => {
   fetchMock.resetMocks();

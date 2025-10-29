@@ -1,10 +1,11 @@
 export const seed_phrase = process.env.TEST_SEED_PHRASE || 'test';
 
 export const addresses: any = {
-  mainnet: {},
-  testnet: {
-    receiving: ['tmt1qycauu4rc92v80vpjrtkqjv2utr7jl5ygve28sdt'],
-    change: ['tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6'],
+  addressesByChain: {
+    mintlayer: {
+      receiving: ['tmt1qycauu4rc92v80vpjrtkqjv2utr7jl5ygve28sdt'],
+      change: ['tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6'],
+    },
   },
 };
 

@@ -7,19 +7,21 @@ beforeEach(() => {
 
   (window as any).mojito = {
     isExtension: true,
-    connect: jest.fn().mockResolvedValue(
-      {
-        testnet: {
+    connect: jest.fn().mockResolvedValue({
+      addressesByChain: {
+        mintlayer: {
           receiving: ['taddr1receiving'],
-          change: ['taddr1change']
-        }
-      }
-    ),
+          change: ['taddr1change'],
+        },
+      },
+    }),
     restore: jest.fn().mockResolvedValue({
-      testnet: {
-        receiving: ['taddr1receiving'],
-        change: ['taddr1change']
-      }
+      addressesByChain: {
+        mintlayer: {
+          receiving: ['taddr1receiving'],
+          change: ['taddr1change'],
+        },
+      },
     }),
     disconnect: jest.fn().mockResolvedValue(undefined),
     request: jest.fn().mockResolvedValue('signed-transaction'),
