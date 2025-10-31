@@ -252,3 +252,39 @@ test('buildTransaction for transfer, decimal test 4', async () => {
 
   expect(result).toMatchSnapshot();
 });
+
+test('buildTransaction for transfer, decimal test 5', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 0.0000001,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  expect(result).toMatchSnapshot();
+});
+
+test('buildTransaction for transfer, decimal test 6', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+
+  const spy = jest.spyOn(Client.prototype as any, 'buildTransaction');
+
+  await client.connect();
+
+  await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 0.00000000003,
+  });
+
+  const result = await spy.mock.results[0]?.value;
+
+  console.log('result', JSON.stringify(result.JSONRepresentation.outputs[0], null, 2));
+
+  expect(result).toMatchSnapshot();
+});
