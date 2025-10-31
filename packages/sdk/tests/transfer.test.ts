@@ -284,5 +284,7 @@ test('buildTransaction for transfer, decimal test 6', async () => {
 
   const result = await spy.mock.results[0]?.value;
 
+  console.log('result', JSON.stringify(result.JSONRepresentation.outputs[0], null, 2));
+
   expect(result).toMatchSnapshot();
 });

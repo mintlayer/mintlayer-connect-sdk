@@ -110,10 +110,19 @@ export function atomsToDecimal(atoms: string | number, decimals: number): string
 }
 
 export function decimalsToAtoms(value: string | number, decimals: number): bigint {
-  const [intPart, fracPart = ""] = value.toString().split(".");
+  const v = Number(value);
+  const [intPart, fracPart = ""] = v.toFixed(decimals).split(".");
   const paddedFrac = (fracPart + "0".repeat(decimals)).slice(0, decimals);
   const full = intPart + paddedFrac;
   return BigInt(full);
+}
+
+export function decimals(value: string | number, decimals: number): string {
+  const v = Number(value);
+  if (isNaN(v)) return '0';
+  return v
+    .toFixed(decimals)
+    .replace(/\.?0+$/, '');
 }
 
 type Address = {
@@ -1547,13 +1556,13 @@ class Client {
           ...(token_details
             ? {
                 amount: {
-                  decimal: params.amount!.toString(),
+                  decimal: decimals(params.amount, token_details.number_of_decimals).toString(),
                   atoms: decimalsToAtoms(params.amount!, token_details.number_of_decimals).toString(),
                 },
               }
             : {
                 amount: {
-                  decimal: params.amount!.toString(),
+                  decimal: decimals(params.amount, 11).toString(),
                   atoms: decimalsToAtoms(params.amount!, 11).toString(),
                 },
               }),
@@ -1584,7 +1593,7 @@ class Client {
                 token_id,
               }),
           amount: {
-            decimal: params.amount!.toString(),
+            decimal: decimals(params.amount, 11).toString(),
             atoms: decimalsToAtoms(params.amount!, 11).toString(),
           },
         },
@@ -1603,7 +1612,7 @@ class Client {
           type: 'Fixed',
           amount: {
             atoms: decimalsToAtoms(params.supply_amount!, params.number_of_decimals!).toString(),
-            decimal: params.supply_amount!.toString(),
+            decimal: decimals(params.supply_amount!, params.number_of_decimals!).toString(),
           },
         };
       } else {
@@ -1669,7 +1678,7 @@ class Client {
     if (type === 'MintToken') {
       const amount = {
         atoms: decimalsToAtoms(params.amount!, params.token_details!.number_of_decimals).toString(),
-        decimal: params.amount!.toString(),
+        decimal: decimals(params.amount!, params.token_details!.number_of_decimals).toString(),
       };
 
       inputs.push({
