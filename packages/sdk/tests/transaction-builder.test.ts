@@ -6,6 +6,7 @@ test('single transfer output', () => {
   const transaction = new Transaction({ client: undefined });
 
   transaction.addOutput(transaction.transfer('tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc', '10'));
+  transaction.setChangeAddress('tmt1qycauu4rc92v80vpjrtkqjv2utr7jl5ygve28sdt');
   transaction.withUTXO({
     outpoint: {
       index: 0,
