@@ -134,6 +134,114 @@ type Address = {
 
 type MojitoRequest = any; // TODO expand
 
+export interface ApiProvider {
+  getChainTip(): Promise<any>;
+  getAddress(addr: string): Promise<any>;
+  getAddressDelegations(addr: string): Promise<any>;
+  getAddressTokenAuthority(addr: string): Promise<any>;
+  getToken(token_id: string): Promise<any>;
+  getNft(token_id: string): Promise<any>;
+  getOrder(order_id: string): Promise<any>;
+  getOrders(): Promise<any>;
+  getPoolDelegations(pool_id: string): Promise<any>;
+  getDelegation(delegation_id: string): Promise<any>;
+  getTransaction(transaction_id: string): Promise<any>;
+  broadcastTransaction(tx: string | { hex: string; json: any }): Promise<any>;
+  getAccountUtxos(addresses: string[], network: number): Promise<any>;
+}
+
+export class MintlayerApiProvider implements ApiProvider {
+  private readonly baseUrl: string;
+  private readonly utxoUrl: string;
+
+  constructor(
+    baseUrl: string,
+    utxoUrl: string = 'https://api.mintini.app',
+  ) {
+    this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.utxoUrl = utxoUrl.replace(/\/$/, '');
+  }
+
+  private async get(path: string): Promise<any> {
+    const response = await fetch(`${this.baseUrl}${path}`);
+    if (!response.ok) {
+      throw new Error(`API error ${response.status}: ${path}`);
+    }
+    return response.json();
+  }
+
+  async getChainTip(): Promise<any> {
+    return this.get('/chain/tip');
+  }
+
+  async getAddress(addr: string): Promise<any> {
+    return this.get(`/address/${addr}`);
+  }
+
+  async getAddressDelegations(addr: string): Promise<any> {
+    return this.get(`/address/${addr}/delegations`);
+  }
+
+  async getAddressTokenAuthority(addr: string): Promise<any> {
+    return this.get(`/address/${addr}/token-authority`);
+  }
+
+  async getToken(token_id: string): Promise<any> {
+    return this.get(`/token/${token_id}`);
+  }
+
+  async getNft(token_id: string): Promise<any> {
+    return this.get(`/nft/${token_id}`);
+  }
+
+  async getOrder(order_id: string): Promise<any> {
+    return this.get(`/order/${order_id}`);
+  }
+
+  async getOrders(): Promise<any> {
+    return this.get('/order');
+  }
+
+  async getPoolDelegations(pool_id: string): Promise<any> {
+    return this.get(`/pool/${pool_id}/delegations`);
+  }
+
+  async getDelegation(delegation_id: string): Promise<any> {
+    return this.get(`/delegation/${delegation_id}`);
+  }
+
+  async getTransaction(transaction_id: string): Promise<any> {
+    return this.get(`/transaction/${transaction_id}`);
+  }
+
+  async broadcastTransaction(tx: string | { hex: string; json: any }): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/transaction`, {
+      method: 'POST',
+      headers:
+        typeof tx === 'string'
+          ? { 'Content-Type': 'text/plain' }
+          : { 'Content-Type': 'application/json' },
+      body: typeof tx === 'string' ? tx : JSON.stringify({ transaction: tx.hex, json: tx.json }),
+    });
+    if (!response.ok) {
+      throw new Error(`Broadcast error ${response.status}`);
+    }
+    return response.json();
+  }
+
+  async getAccountUtxos(addresses: string[], network: number): Promise<any> {
+    const response = await fetch(`${this.utxoUrl}/account`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addresses, network }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch utxos: ${response.status}`);
+    }
+    return response.json();
+  }
+}
+
 export interface AccountProvider {
   connect(): Promise<Address>;
   restore(): Promise<Address>;
@@ -762,6 +870,7 @@ interface ClientOptions {
   network?: 'testnet' | 'mainnet';
   autoRestore?: boolean;
   accountProvider?: AccountProvider;
+  apiProvider?: ApiProvider;
 }
 
 /**
@@ -910,6 +1019,7 @@ class Client {
   };
   private isInitialized: boolean;
   private accountProvider: AccountProvider;
+  private apiProvider: ApiProvider;
 
   /**
    * Creates a new Client instance.
@@ -921,6 +1031,7 @@ class Client {
     this.publicKeys = { receiving: [], change: [] };
     this.isInitialized = false;
     this.accountProvider = options.accountProvider || new MojitoAccountProvider();
+    this.apiProvider = options.apiProvider || new MintlayerApiProvider(this.getDefaultApiServer());
   }
 
   /**
@@ -1021,10 +1132,10 @@ class Client {
   }
 
   /**
-   * Returns the API server URL based on the network.
+   * Returns the default API server URL based on the network.
    * @private
    */
-  private getApiServer(): string {
+  private getDefaultApiServer(): string {
     return this.network === 'testnet'
       ? 'https://api-server-lovelace.mintlayer.org/api/v2'
       : 'https://api-server.mintlayer.org/api/v2';
@@ -1049,10 +1160,7 @@ class Client {
       }
       console.log(`[Mintlayer Connect SDK] Network set to: ${this.network}`);
 
-      const response = await fetch(this.getApiServer() + '/chain/tip');
-      if (!response.ok) {
-        throw new Error('Failed to connect to API server');
-      }
+      await this.apiProvider.getChainTip();
       console.log('[Mintlayer Connect SDK] API server is reachable');
 
       this.isInitialized = true;
@@ -1289,16 +1397,16 @@ class Client {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
       const balancePromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}`);
-        if (!response.ok) {
-          if (response.status === 404) {
+        try {
+          const data = await this.apiProvider.getAddress(addr);
+          return data.coin_balance.decimal;
+        } catch (e: any) {
+          if (e.message?.includes('404')) {
             console.warn(`Address ${addr} not found`);
             return 0;
           }
-          throw new Error('Failed to fetch balance');
+          throw e;
         }
-        const data = await response.json();
-        return data.coin_balance.decimal;
       });
       const balances = await Promise.all(balancePromises);
       const totalBalance = balances.reduce((acc: number, balance: string) => {
@@ -1330,16 +1438,15 @@ class Client {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
       const balancePromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}`);
-        if (!response.ok) {
-          if (response.status === 404) {
+        try {
+          return await this.apiProvider.getAddress(addr);
+        } catch (e: any) {
+          if (e.message?.includes('404')) {
             console.warn(`Address ${addr} not found`);
             return null;
           }
-          throw new Error('Failed to fetch balance');
+          throw e;
         }
-        const data = await response.json();
-        return data;
       });
 
       const results = await Promise.all(balancePromises);
@@ -1389,16 +1496,15 @@ class Client {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
       const delegationPromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}/delegations`);
-        if (!response.ok) {
-          if (response.status === 404) {
+        try {
+          return await this.apiProvider.getAddressDelegations(addr);
+        } catch (e: any) {
+          if (e.message?.includes('404')) {
             console.warn(`Address ${addr} not found`);
             return {};
           }
-          throw new Error('Failed to fetch delegations');
+          throw e;
         }
-        const data = await response.json();
-        return data;
       });
       const delegations: DelegationDetails[] = await Promise.all(delegationPromises);
       const totalDelegations = delegations.reduce((acc: DelegationDetails[], item: DelegationDetails) => {
@@ -1425,16 +1531,15 @@ class Client {
       const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
       const authorityPromises = addressList.map(async (addr: string) => {
-        const response = await fetch(`${this.getApiServer()}/address/${addr}/token-authority`);
-        if (!response.ok) {
-          if (response.status === 404) {
+        try {
+          return await this.apiProvider.getAddressTokenAuthority(addr);
+        } catch (e: any) {
+          if (e.message?.includes('404')) {
             console.warn(`Address ${addr} not found`);
             return {};
           }
-          throw new Error('Failed to fetch delegations');
+          throw e;
         }
-        const data = await response.json();
-        return data;
       });
       const authority = await Promise.all(authorityPromises);
       const totalAuthority = authority.reduce((acc: string[], item: string) => {
@@ -2123,19 +2228,10 @@ class Client {
     const currentAddress = address;
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
-    const response = await fetch('https://api.mintini.app' + '/account', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ addresses: addressList, network: this.network === 'mainnet' ? 0 : 1 }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch utxos');
-    }
-
-    const data = await response.json();
+    const data = await this.apiProvider.getAccountUtxos(
+      addressList,
+      this.network === 'mainnet' ? 0 : 1,
+    );
 
     // @ts-ignore
     const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo ? arg?.opts?.forceSpendUtxo.map((item: UtxoEntry) => ({
@@ -2627,11 +2723,7 @@ class Client {
   async buildTransfer({ to, amount, token_id }: TransferArgs): Promise<Transaction> {
     this.ensureInitialized();
     if (token_id) {
-      const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      const token = await request.json();
+      const token = await this.apiProvider.getToken(token_id);
       const token_details: TokenDetails = token;
       return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
     } else {
@@ -2667,11 +2759,7 @@ class Client {
     }
 
     const amount = 1;
-    const request = await fetch(`${this.getApiServer()}/nft/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getNft(token_id);
     const token_details: TokenDetails = token;
     token_details.number_of_decimals = 0; // that's NFT
     return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
@@ -2795,11 +2883,7 @@ class Client {
    */
   async buildMintToken({ destination, amount, token_id }: MintTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
     return this.buildTransaction({
@@ -2825,11 +2909,7 @@ class Client {
    */
   async buildUnmintToken({ amount, token_id }: UnmintTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
     return this.buildTransaction({ type: 'UnmintToken', params: { amount, token_id, token_details } });
@@ -2851,11 +2931,7 @@ class Client {
    */
   async buildLockTokenSupply({ token_id }: LockTokenSupplyArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
     return this.buildTransaction({ type: 'LockTokenSupply', params: { token_id, token_details } });
@@ -2876,11 +2952,7 @@ class Client {
    */
   async buildChangeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
     return this.buildTransaction({
@@ -2905,11 +2977,7 @@ class Client {
    */
   async buildChangeMetadataUri({ token_id, new_metadata_uri }: ChangeMetadataUriArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
     return this.buildTransaction({
@@ -2934,11 +3002,7 @@ class Client {
    */
   async buildFreezeToken({ token_id, is_unfreezable }: FreezeTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
     return this.buildTransaction({
@@ -2963,11 +3027,7 @@ class Client {
    */
   async buildUnfreezeToken({ token_id }: UnfreezeTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token = await request.json();
+    const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
     return this.buildTransaction({ type: 'UnfreezeToken', params: { token_id, token_details } });
@@ -2999,19 +3059,11 @@ class Client {
     let give_token_details = null;
 
     if (ask_token !== 'Coin') {
-      const request = await fetch(`${this.getApiServer()}/token/${ask_token}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch ask token');
-      }
-      ask_token_details = await request.json();
+      ask_token_details = await this.apiProvider.getToken(ask_token);
     }
 
     if (give_token !== 'Coin') {
-      const request = await fetch(`${this.getApiServer()}/token/${give_token}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch give token');
-      }
-      give_token_details = await request.json();
+      give_token_details = await this.apiProvider.getToken(give_token);
     }
 
     return this.buildTransaction({
@@ -3059,11 +3111,7 @@ class Client {
    */
   async buildFillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch order');
-    }
-    const data = await response.json();
+    const data = await this.apiProvider.getOrder(order_id);
     const order_details: OrderData = data;
 
     const { ask_currency, give_currency } = order_details;
@@ -3072,19 +3120,11 @@ class Client {
     let give_token_details = null;
 
     if (ask_currency.type !== 'Coin') {
-      const request = await fetch(`${this.getApiServer()}/token/${ask_currency.token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch ask token');
-      }
-      ask_token_details = await request.json();
+      ask_token_details = await this.apiProvider.getToken(ask_currency.token_id);
     }
 
     if (give_currency.type !== 'Coin') {
-      const request = await fetch(`${this.getApiServer()}/token/${give_currency.token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch give token');
-      }
-      give_token_details = await request.json();
+      give_token_details = await this.apiProvider.getToken(give_currency.token_id);
     }
 
     return this.buildTransaction({
@@ -3126,11 +3166,7 @@ class Client {
    */
   async buildConcludeOrder({ order_id }: ConcludeOrderArgs): Promise<Transaction> {
     this.ensureInitialized();
-    const response = await fetch(`${this.getApiServer()}/order/${order_id}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch order');
-    }
-    const order: OrderData = await response.json();
+    const order: OrderData = await this.apiProvider.getOrder(order_id);
 
     return this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
   }
@@ -3155,11 +3191,7 @@ class Client {
       throw new Error('Token is mandatory');
     }
 
-    const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-    if (!request.ok) {
-      throw new Error('Failed to fetch token');
-    }
-    const token_details = await request.json();
+    const token_details = await this.apiProvider.getToken(token_id);
 
     const tx = await this.buildTransaction({
       type: 'Transfer',
@@ -3189,11 +3221,7 @@ class Client {
     let token_details: TokenDetails | undefined = undefined;
 
     if (token_id !== 'Coin' && token_id !== null) {
-      const request = await fetch(`${this.getApiServer()}/token/${token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      token_details = await request.json();
+      token_details = await this.apiProvider.getToken(token_id);
     }
 
     return this.buildTransaction({ type: 'BurnToken', params: { token_id, amount, token_details } });
@@ -3264,12 +3292,9 @@ class Client {
     if (delegation_id) {
       return this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id, amount } });
     } else if (pool_id) {
-      const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
-      const data: DelegationDetails[] = await response.json();
-
-      if (!response.ok) {
+      const data: DelegationDetails[] = await this.apiProvider.getPoolDelegations(pool_id).catch(() => {
         throw new Error('Failed to fetch delegation id');
-      }
+      });
 
       const delegationIdMap = data.reduce((acc: { [key: string]: string }, item: DelegationDetails) => {
         acc[item.spend_destination] = item.delegation_id;
@@ -3324,24 +3349,14 @@ class Client {
     }
 
     if (delegation_id) {
-      const response = await fetch(`${this.getApiServer()}/delegation/${delegation_id}`);
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error('Failed to fetch delegation id');
-      }
-      const delegation_details: DelegationDetails = data;
+      const delegation_details: DelegationDetails = await this.apiProvider.getDelegation(delegation_id);
 
       return this.buildTransaction({
         type: 'DelegationWithdraw',
         params: { delegation_id, amount, delegation_details },
       });
     } else if (pool_id) {
-      const response = await fetch(`${this.getApiServer()}/pool/${pool_id}/delegations`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch delegation id');
-      }
+      const data = await this.apiProvider.getPoolDelegations(pool_id);
 
       const delegationIdMap: Record<string, DelegationDetails> = data.reduce(
         (acc: { [key: string]: DelegationDetails }, item: DelegationDetails) => {
@@ -3390,11 +3405,7 @@ class Client {
     let token_details: TokenDetails | undefined = undefined;
 
     if(params.token_id){
-      const request = await fetch(`${this.getApiServer()}/token/${params.token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      const token = await request.json();
+      const token = await this.apiProvider.getToken(params.token_id);
       token_details = token;
     }
 
@@ -3436,11 +3447,7 @@ class Client {
     let useHtlcUtxo: any[] = [];
 
     if (transaction_id) {
-      const response = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch transaction');
-      }
-      const transaction: TransactionJSONRepresentation = await response.json();
+      const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
       // @ts-ignore
       const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
       // @ts-ignore
@@ -3450,11 +3457,7 @@ class Client {
     let token_details = undefined;
 
     if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
-      const request = await fetch(`${this.getApiServer()}/token/${useHtlcUtxo[0].utxo.value.token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      token_details = await request.json();
+      token_details = await this.apiProvider.getToken(useHtlcUtxo[0].utxo.value.token_id);
     }
 
     return this.buildTransaction({
@@ -3496,11 +3499,7 @@ class Client {
     let useHtlcUtxo: any[] = [];
 
     if (transaction_id) {
-      const response = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch transaction');
-      }
-      const transaction: TransactionJSONRepresentation = await response.json();
+      const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
       // @ts-ignore
       const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
       // @ts-ignore
@@ -3510,11 +3509,7 @@ class Client {
     let token_details = undefined;
 
     if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
-      const request = await fetch(`${this.getApiServer()}/token/${useHtlcUtxo[0].utxo.value.token_id}`);
-      if (!request.ok) {
-        throw new Error('Failed to fetch token');
-      }
-      token_details = await request.json();
+      token_details = await this.apiProvider.getToken(useHtlcUtxo[0].utxo.value.token_id);
     }
 
     return this.buildTransaction({
@@ -3560,11 +3555,7 @@ class Client {
       format = 'Uint8Array', // 'bytes' or 'hex'
     } = arg;
 
-    const res = await fetch(`${this.getApiServer()}/transaction/${transaction_id}`);
-    if (!res.ok) {
-      throw new Error('Failed to fetch transaction');
-    }
-    const transaction: TransactionJSONRepresentation = await res.json();
+    const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
 
     const transaction_signed = hexToUint8Array(transaction_hex);
 
@@ -3828,25 +3819,7 @@ class Client {
    */
   async broadcastTx(tx: string | { hex: string, json: TransactionJSONRepresentation }): Promise<any> {
     this.ensureInitialized();
-    const response = await fetch(`${this.getApiServer()}/transaction`, {
-      method: 'POST',
-      headers: typeof tx === 'string' ? {
-        'Content-Type': 'text/plain',
-      } : {
-        'Content-Type': 'application/json',
-      },
-      body: typeof tx === 'string' ? tx : JSON.stringify({ transaction: tx.hex, json: tx.json }),
-    });
-
-    if (!response.ok) {
-      const error_json = await response.json();
-      const match = error_json.error.match(/message: "(.*?)"/);
-      const errorMessage = match ? match[1] : null;
-
-      throw new Error('Failed to broadcast transaction: ' + errorMessage);
-    }
-    const data = await response.json();
-    return data;
+    return this.apiProvider.broadcastTransaction(tx);
   }
 
   /**
@@ -3869,12 +3842,7 @@ class Client {
    */
   async getAvailableOrders(): Promise<OrderData[]> {
     this.ensureInitialized();
-    const response = await fetch(`${this.getApiServer()}/order`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch orders');
-    }
-    const data = await response.json();
-    return data;
+    return this.apiProvider.getOrders();
   }
 }
 

@@ -2,3 +2,5 @@ dist
 .vercel
 .DS_Store
 node_modules
+CLAUDE.md
+.claude
