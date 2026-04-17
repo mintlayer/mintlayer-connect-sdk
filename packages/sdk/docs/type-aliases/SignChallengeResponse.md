@@ -4,7 +4,7 @@
 
 > **SignChallengeResponse** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:854](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L854)
+Defined in: [mintlayer-connect-sdk.ts:1189](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1189)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:854](https://github.com/mintlayer/mintlaye
 
 > **address**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:856](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L856)
+Defined in: [mintlayer-connect-sdk.ts:1191](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1191)
 
 ***
 
@@ -20,7 +20,7 @@ Defined in: [mintlayer-connect-sdk.ts:856](https://github.com/mintlayer/mintlaye
 
 > **message**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:855](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L855)
+Defined in: [mintlayer-connect-sdk.ts:1190](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1190)
 
 ***
 
@@ -28,4 +28,4 @@ Defined in: [mintlayer-connect-sdk.ts:855](https://github.com/mintlayer/mintlaye
 
 > **signature**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:857](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L857)
+Defined in: [mintlayer-connect-sdk.ts:1192](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1192)

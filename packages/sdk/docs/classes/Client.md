@@ -2,7 +2,7 @@
 
 ***
 
-Defined in: [mintlayer-connect-sdk.ts:860](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L860)
+Defined in: [mintlayer-connect-sdk.ts:1201](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1201)
 
 ## Constructors
 
@@ -10,7 +10,7 @@ Defined in: [mintlayer-connect-sdk.ts:860](https://github.com/mintlayer/mintlaye
 
 > **new Client**(`options`): `Client`
 
-Defined in: [mintlayer-connect-sdk.ts:875](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L875)
+Defined in: [mintlayer-connect-sdk.ts:1219](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1219)
 
 Creates a new Client instance.
 
@@ -30,7 +30,7 @@ Creates a new Client instance.
 
 > `readonly` **isMintlayer**: `boolean` = `true`
 
-Defined in: [mintlayer-connect-sdk.ts:1132](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1132)
+Defined in: [mintlayer-connect-sdk.ts:1475](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1475)
 
 Returns the transaction ID.
 
@@ -38,9 +38,9 @@ Returns the transaction ID.
 
 ### bridgeRequest()
 
-> **bridgeRequest**(`__namedParameters`): `Promise`\<`string`\>
+> **bridgeRequest**(`__namedParameters`): `Promise`\<`SignedIntentTransaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3131](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3131)
+Defined in: [mintlayer-connect-sdk.ts:3402](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3402)
 
 Creates a bridge request transaction and signs it.
 
@@ -52,7 +52,7 @@ Creates a bridge request transaction and signs it.
 
 #### Returns
 
-`Promise`\<`string`\>
+`Promise`\<`SignedIntentTransaction`\>
 
 Promise that resolves to a signed transaction
 
@@ -62,7 +62,7 @@ Promise that resolves to a signed transaction
 
 > **broadcastTx**(`tx`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3720](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3720)
+Defined in: [mintlayer-connect-sdk.ts:4011](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L4011)
 
 Broadcasts a signed transaction to the network.
 
@@ -86,7 +86,7 @@ Promise that resolves to the broadcast response
 
 > **buildBridgeRequest**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3103](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3103)
+Defined in: [mintlayer-connect-sdk.ts:3378](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3378)
 
 Builds a bridge request transaction without signing it.
 
@@ -106,7 +106,7 @@ Builds a bridge request transaction without signing it.
 
 > **buildBurn**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3139](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3139)
+Defined in: [mintlayer-connect-sdk.ts:3410](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3410)
 
 Builds a burn transaction without signing it.
 
@@ -126,7 +126,7 @@ Builds a burn transaction without signing it.
 
 > **buildChangeMetadataUri**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2858](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2858)
+Defined in: [mintlayer-connect-sdk.ts:3169](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3169)
 
 Builds a token metadata URI change transaction without signing it.
 
@@ -146,7 +146,7 @@ Builds a token metadata URI change transaction without signing it.
 
 > **buildChangeTokenAuthority**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2829](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2829)
+Defined in: [mintlayer-connect-sdk.ts:3144](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3144)
 
 Builds a token authority change transaction without signing it.
 
@@ -166,7 +166,7 @@ Builds a token authority change transaction without signing it.
 
 > **buildConcludeOrder**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3079](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3079)
+Defined in: [mintlayer-connect-sdk.ts:3358](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3358)
 
 Builds an order conclusion transaction without signing it.
 
@@ -186,7 +186,7 @@ Builds an order conclusion transaction without signing it.
 
 > **buildCreateHtlc**(`params`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3339](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3339)
+Defined in: [mintlayer-connect-sdk.ts:3593](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3593)
 
 Builds an HTLC creation transaction without signing it.
 
@@ -194,7 +194,7 @@ Builds an HTLC creation transaction without signing it.
 
 ##### params
 
-`any`
+`CreateHtlcArgs`
 
 #### Returns
 
@@ -206,7 +206,7 @@ Builds an HTLC creation transaction without signing it.
 
 > **buildCreateOrder**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2941](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2941)
+Defined in: [mintlayer-connect-sdk.ts:3240](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3240)
 
 Builds an order creation transaction without signing it.
 
@@ -226,7 +226,7 @@ Builds an order creation transaction without signing it.
 
 > **buildDataDeposit**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3168](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3168)
+Defined in: [mintlayer-connect-sdk.ts:3435](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3435)
 
 Builds a data deposit transaction without signing it.
 
@@ -246,7 +246,7 @@ Builds a data deposit transaction without signing it.
 
 > **buildDelegate**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2647](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2647)
+Defined in: [mintlayer-connect-sdk.ts:2974](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2974)
 
 Builds a delegation creation transaction without signing it.
 
@@ -272,7 +272,7 @@ Builds a delegation creation transaction without signing it.
 
 > **buildDelegationCreate**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3186](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3186)
+Defined in: [mintlayer-connect-sdk.ts:3453](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3453)
 
 Builds a delegation creation transaction without signing it.
 
@@ -292,7 +292,7 @@ Builds a delegation creation transaction without signing it.
 
 > **buildDelegationStake**(`params`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3205](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3205)
+Defined in: [mintlayer-connect-sdk.ts:3472](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3472)
 
 Builds a delegation staking transaction without signing it.
 
@@ -312,7 +312,7 @@ Builds a delegation staking transaction without signing it.
 
 > **buildDelegationWithdraw**(`params`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3268](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3268)
+Defined in: [mintlayer-connect-sdk.ts:3532](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3532)
 
 Builds a delegation withdrawal transaction without signing it.
 
@@ -332,7 +332,7 @@ Builds a delegation withdrawal transaction without signing it.
 
 > **buildFillOrder**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3012](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3012)
+Defined in: [mintlayer-connect-sdk.ts:3303](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3303)
 
 Builds an order fill transaction without signing it.
 
@@ -352,7 +352,7 @@ Builds an order fill transaction without signing it.
 
 > **buildFreezeToken**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2887](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2887)
+Defined in: [mintlayer-connect-sdk.ts:3194](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3194)
 
 Builds a token freezing transaction without signing it.
 
@@ -372,7 +372,7 @@ Builds a token freezing transaction without signing it.
 
 > **buildIssueNft**(`tokenData`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2666](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2666)
+Defined in: [mintlayer-connect-sdk.ts:2993](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2993)
 
 Builds an NFT issuance transaction without signing it.
 
@@ -392,7 +392,7 @@ Builds an NFT issuance transaction without signing it.
 
 > **buildIssueToken**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2697](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2697)
+Defined in: [mintlayer-connect-sdk.ts:3024](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3024)
 
 Builds a fungible token issuance transaction without signing it.
 
@@ -412,7 +412,7 @@ Builds a fungible token issuance transaction without signing it.
 
 > **buildLockTokenSupply**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2804](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2804)
+Defined in: [mintlayer-connect-sdk.ts:3123](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3123)
 
 Builds a token supply locking transaction without signing it.
 
@@ -432,7 +432,7 @@ Builds a token supply locking transaction without signing it.
 
 > **buildMintToken**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2748](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2748)
+Defined in: [mintlayer-connect-sdk.ts:3075](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3075)
 
 Builds a token minting transaction without signing it.
 
@@ -452,7 +452,7 @@ Builds a token minting transaction without signing it.
 
 > **buildRefundHtlc**(`params`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3381](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3381)
+Defined in: [mintlayer-connect-sdk.ts:3633](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3633)
 
 Builds an HTLC refund transaction without signing it.
 
@@ -472,7 +472,7 @@ Builds an HTLC refund transaction without signing it.
 
 > **buildSpendHtlc**(`params`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3425](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3425)
+Defined in: [mintlayer-connect-sdk.ts:3685](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3685)
 
 Builds an HTLC spend transaction without signing it.
 
@@ -492,7 +492,7 @@ Builds an HTLC spend transaction without signing it.
 
 > **buildTransaction**(`arg`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2073](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2073)
+Defined in: [mintlayer-connect-sdk.ts:2410](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2410)
 
 Builds a transaction based on the provided parameters.
 @param{BuildTransactionParams} arg
@@ -513,7 +513,7 @@ Builds a transaction based on the provided parameters.
 
 > **buildTransfer**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2579](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2579)
+Defined in: [mintlayer-connect-sdk.ts:2914](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2914)
 
 Builds a transfer transaction without signing it.
 If a token_id is provided, token will be transferred instead of base coin.
@@ -536,7 +536,7 @@ A transaction ready to be signed
 
 > **buildTransferNft**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2614](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2614)
+Defined in: [mintlayer-connect-sdk.ts:2945](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2945)
 
 Builds an NFT transfer transaction without signing it.
 
@@ -558,7 +558,7 @@ A transaction ready to be signed
 
 > **buildUnfreezeToken**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2916](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2916)
+Defined in: [mintlayer-connect-sdk.ts:3219](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3219)
 
 Builds a token unfreezing transaction without signing it.
 
@@ -578,7 +578,7 @@ Builds a token unfreezing transaction without signing it.
 
 > **buildUnmintToken**(`__namedParameters`): `Promise`\<`Transaction`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2778](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2778)
+Defined in: [mintlayer-connect-sdk.ts:3101](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3101)
 
 Builds a token unminting transaction without signing it.
 
@@ -598,7 +598,7 @@ Builds a token unminting transaction without signing it.
 
 > **burn**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3160](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3160)
+Defined in: [mintlayer-connect-sdk.ts:3427](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3427)
 
 Burns tokens or coins and signs the transaction.
 
@@ -620,7 +620,7 @@ Promise that resolves to a signed transaction
 
 > **changeMetadataUri**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2879](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2879)
+Defined in: [mintlayer-connect-sdk.ts:3186](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3186)
 
 Changes the metadata URI of a token and signs the transaction.
 
@@ -642,7 +642,7 @@ Promise that resolves to a signed transaction
 
 > **changeTokenAuthority**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2850](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2850)
+Defined in: [mintlayer-connect-sdk.ts:3161](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3161)
 
 Changes the authority of a token and signs the transaction.
 
@@ -664,7 +664,7 @@ Promise that resolves to a signed transaction
 
 > **concludeOrder**(`order_id`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3095](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3095)
+Defined in: [mintlayer-connect-sdk.ts:3370](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3370)
 
 Concludes a trading order and signs the transaction.
 
@@ -688,7 +688,7 @@ Promise that resolves to a signed transaction
 
 > **connect**(): `Promise`\<`Address`\>
 
-Defined in: [mintlayer-connect-sdk.ts:1166](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1166)
+Defined in: [mintlayer-connect-sdk.ts:1509](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1509)
 
 Connects to the wallet and retrieves the connected addresses.
 
@@ -702,7 +702,7 @@ Connects to the wallet and retrieves the connected addresses.
 
 > **createHtlc**(`params`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3373](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3373)
+Defined in: [mintlayer-connect-sdk.ts:3625](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3625)
 
 Creates a Hash Time Locked Contract (HTLC) and signs the transaction.
 
@@ -710,7 +710,7 @@ Creates a Hash Time Locked Contract (HTLC) and signs the transaction.
 
 ##### params
 
-`any`
+`CreateHtlcArgs`
 
 The HTLC parameters including amount, addresses, and timelock
 
@@ -726,7 +726,7 @@ Promise that resolves to a signed transaction
 
 > **createOrder**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2992](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2992)
+Defined in: [mintlayer-connect-sdk.ts:3283](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3283)
 
 Creates a trading order and signs the transaction.
 
@@ -748,7 +748,7 @@ Promise that resolves to a signed transaction
 
 > **dataDeposit**(`data`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3178](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3178)
+Defined in: [mintlayer-connect-sdk.ts:3445](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3445)
 
 Creates a data deposit transaction and signs it.
 
@@ -772,7 +772,7 @@ Promise that resolves to a signed transaction
 
 > **decorateWithUtxoFetch**\<`T`\>(`func`): `Promise`\<\{ `result`: `T`; `utxo`: \{ `created`: `any`; `spent`: `any`; \}; \}\>
 
-Defined in: [mintlayer-connect-sdk.ts:3666](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3666)
+Defined in: [mintlayer-connect-sdk.ts:3957](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3957)
 
 Decorates a function with UTXO fetching logic.
 ⚠️ Not thread-safe.
@@ -805,7 +805,7 @@ A promise that resolves to an object containing the result of the function **and
 
 > **delegate**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2658](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2658)
+Defined in: [mintlayer-connect-sdk.ts:2985](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2985)
 
 Creates a delegation and signs the transaction.
 
@@ -833,7 +833,7 @@ Promise that resolves to a signed transaction
 
 > **delegationCreate**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3197](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3197)
+Defined in: [mintlayer-connect-sdk.ts:3464](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3464)
 
 Creates a delegation ID and signs the transaction.
 
@@ -855,7 +855,7 @@ Promise that resolves to a signed transaction
 
 > **delegationStake**(`params`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3260](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3260)
+Defined in: [mintlayer-connect-sdk.ts:3524](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3524)
 
 Stakes tokens to a delegation and signs the transaction.
 
@@ -879,7 +879,7 @@ Promise that resolves to a signed transaction
 
 > **delegationWithdraw**(`params`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3331](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3331)
+Defined in: [mintlayer-connect-sdk.ts:3585](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3585)
 
 Withdraws tokens from a delegation and signs the transaction.
 
@@ -903,7 +903,7 @@ Promise that resolves to a signed transaction
 
 > **disconnect**(): `Promise`\<`void`\>
 
-Defined in: [mintlayer-connect-sdk.ts:1176](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1176)
+Defined in: [mintlayer-connect-sdk.ts:1520](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1520)
 
 Disconnects from the wallet and clears the connected addresses.
 
@@ -917,7 +917,7 @@ Disconnects from the wallet and clears the connected addresses.
 
 > **extractHtlcSecret**(`arg`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3474](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3474)
+Defined in: [mintlayer-connect-sdk.ts:3742](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3742)
 
 Extracts the secret from an HTLC spend transaction.
 
@@ -941,7 +941,7 @@ Promise that resolves to the extracted secret
 
 > **fillOrder**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3055](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3055)
+Defined in: [mintlayer-connect-sdk.ts:3334](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3334)
 
 Fills an existing trading order and signs the transaction.
 
@@ -963,7 +963,7 @@ Promise that resolves to a signed transaction
 
 > **freezeToken**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2908](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2908)
+Defined in: [mintlayer-connect-sdk.ts:3211](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3211)
 
 Freezes a token to prevent transfers and signs the transaction.
 
@@ -985,7 +985,7 @@ Promise that resolves to a signed transaction
 
 > **getAccountOrders**(): `Promise`\<`OrderData`[]\>
 
-Defined in: [mintlayer-connect-sdk.ts:3064](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3064)
+Defined in: [mintlayer-connect-sdk.ts:3343](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3343)
 
 Gets all orders created by the connected account.
 
@@ -1001,7 +1001,7 @@ Promise that resolves to an array of order data
 
 > **getAddresses**(): `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1223](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1223)
+Defined in: [mintlayer-connect-sdk.ts:1567](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1567)
 
 Returns the connected addresses.
 
@@ -1023,7 +1023,7 @@ Returns the connected addresses.
 
 > **getAvailableOrders**(): `Promise`\<`OrderData`[]\>
 
-Defined in: [mintlayer-connect-sdk.ts:3761](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3761)
+Defined in: [mintlayer-connect-sdk.ts:4034](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L4034)
 
 Gets all available trading orders from the network.
 
@@ -1039,7 +1039,7 @@ Promise that resolves to an array of order data
 
 > **getBalance**(): `Promise`\<`number`\>
 
-Defined in: [mintlayer-connect-sdk.ts:1235](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1235)
+Defined in: [mintlayer-connect-sdk.ts:1579](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1579)
 
 Returns the connected address for the current network.
 
@@ -1055,7 +1055,7 @@ Balance.
 
 > **getBalances**(): `Promise`\<\{ `coin`: `number`; `token`: `Record`\<`string`, `number`\>; \}\>
 
-Defined in: [mintlayer-connect-sdk.ts:1272](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1272)
+Defined in: [mintlayer-connect-sdk.ts:1616](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1616)
 
 Returns the balances for coin and all tokens of the connected addresses.
 
@@ -1069,7 +1069,7 @@ Returns the balances for coin and all tokens of the connected addresses.
 
 > **getDelegations**(): `Promise`\<`DelegationDetails`[]\>
 
-Defined in: [mintlayer-connect-sdk.ts:1336](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1336)
+Defined in: [mintlayer-connect-sdk.ts:1679](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1679)
 
 Returns the delegations for the connected addresses.
 
@@ -1083,7 +1083,7 @@ Returns the delegations for the connected addresses.
 
 > **getDelegationsTotal**(): `Promise`\<`number`\>
 
-Defined in: [mintlayer-connect-sdk.ts:1408](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1408)
+Defined in: [mintlayer-connect-sdk.ts:1749](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1749)
 
 Returns the total amount of delegations for the connected addresses.
 
@@ -1097,7 +1097,7 @@ Returns the total amount of delegations for the connected addresses.
 
 > **getFeeForType**(`type`): `bigint`
 
-Defined in: [mintlayer-connect-sdk.ts:1422](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1422)
+Defined in: [mintlayer-connect-sdk.ts:1763](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1763)
 
 Returns the fee for a specific transaction type.
 
@@ -1117,15 +1117,15 @@ Fee in atoms.
 
 ### getNetwork()
 
-> **getNetwork**(): `"testnet"` \| `"mainnet"`
+> **getNetwork**(): `"mainnet"` \| `"testnet"`
 
-Defined in: [mintlayer-connect-sdk.ts:1150](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1150)
+Defined in: [mintlayer-connect-sdk.ts:1493](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1493)
 
 Returns the current network.
 
 #### Returns
 
-`"testnet"` \| `"mainnet"`
+`"mainnet"` \| `"testnet"`
 
 The current network.
 
@@ -1135,7 +1135,7 @@ The current network.
 
 > **getTokensOwned**(): `Promise`\<`string`[]\>
 
-Defined in: [mintlayer-connect-sdk.ts:1372](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1372)
+Defined in: [mintlayer-connect-sdk.ts:1714](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1714)
 
 Returns the tokens owned by the connected addresses.
 
@@ -1149,7 +1149,7 @@ Returns the tokens owned by the connected addresses.
 
 > **getTransactionBINrepresentation**(`transactionJSONrepresentation`, `_network`): `object`
 
-Defined in: [mintlayer-connect-sdk.ts:2266](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2266)
+Defined in: [mintlayer-connect-sdk.ts:2601](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2601)
 
 Returns the transaction binary representation.
 
@@ -1185,7 +1185,7 @@ Returns the transaction binary representation.
 
 > **getXPub**(): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3709](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3709)
+Defined in: [mintlayer-connect-sdk.ts:4000](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L4000)
 
 Gets the extended public key (xpub) from the connected wallet.
 
@@ -1205,7 +1205,7 @@ Sharing xPub exposes all derived addresses. Use with caution.
 
 > **isConnected**(): `boolean`
 
-Defined in: [mintlayer-connect-sdk.ts:1158](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1158)
+Defined in: [mintlayer-connect-sdk.ts:1501](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1501)
 
 Checks if the client is connected to the wallet.
 
@@ -1221,7 +1221,7 @@ True if connected, false otherwise.
 
 > **issueNft**(`tokenData`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2689](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2689)
+Defined in: [mintlayer-connect-sdk.ts:3016](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3016)
 
 Issues an NFT and signs the transaction.
 
@@ -1245,7 +1245,7 @@ Promise that resolves to a signed transaction
 
 > **issueToken**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2724](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2724)
+Defined in: [mintlayer-connect-sdk.ts:3051](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3051)
 
 Issues a fungible token and signs the transaction.
 
@@ -1267,7 +1267,7 @@ Promise that resolves to a signed transaction
 
 > **lockTokenSupply**(`token_id`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2821](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2821)
+Defined in: [mintlayer-connect-sdk.ts:3136](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3136)
 
 Locks the token supply to prevent further minting and signs the transaction.
 
@@ -1291,7 +1291,7 @@ Promise that resolves to a signed transaction
 
 > **mintToken**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2770](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2770)
+Defined in: [mintlayer-connect-sdk.ts:3093](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3093)
 
 Mints tokens to a specified destination and signs the transaction.
 
@@ -1313,7 +1313,7 @@ Promise that resolves to a signed transaction
 
 > **on**(`eventName`, `callback`): `void`
 
-Defined in: [mintlayer-connect-sdk.ts:3748](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3748)
+Defined in: [mintlayer-connect-sdk.ts:4021](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L4021)
 
 Registers an event listener for wallet events.
 
@@ -1341,7 +1341,7 @@ The callback function to execute when the event occurs
 
 > **previewUtxoChange**(`tx`): `object`
 
-Defined in: [mintlayer-connect-sdk.ts:3571](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3571)
+Defined in: [mintlayer-connect-sdk.ts:3862](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3862)
 
 Returns a preview of UTXO changes (spent/created) for a built transaction.
 
@@ -1378,7 +1378,7 @@ An object containing arrays of spent and created UTXOs.
 
 > **refundHtlc**(`params`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3417](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3417)
+Defined in: [mintlayer-connect-sdk.ts:3677](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3677)
 
 Refunds an HTLC after the timelock expires and signs the transaction.
 
@@ -1402,7 +1402,7 @@ Promise that resolves to a signed transaction
 
 > **request**(`__namedParameters`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:1210](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1210)
+Defined in: [mintlayer-connect-sdk.ts:1554](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1554)
 
 Requests a method from the wallet.
 
@@ -1428,7 +1428,7 @@ Requests a method from the wallet.
 
 > **requestSecretHash**(`args`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3552](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3552)
+Defined in: [mintlayer-connect-sdk.ts:3843](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3843)
 
 Requests a secret hash from the wallet for HTLC operations.
 
@@ -1452,7 +1452,7 @@ Promise that resolves to the secret hash
 
 > **restore**(): `Promise`\<`boolean`\>
 
-Defined in: [mintlayer-connect-sdk.ts:1184](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1184)
+Defined in: [mintlayer-connect-sdk.ts:1528](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1528)
 
 Restores the session from the wallet.
 
@@ -1466,7 +1466,7 @@ Restores the session from the wallet.
 
 > **setNetwork**(`net`): `void`
 
-Defined in: [mintlayer-connect-sdk.ts:1138](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L1138)
+Defined in: [mintlayer-connect-sdk.ts:1481](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1481)
 
 Sets the network for the client.
 
@@ -1474,7 +1474,7 @@ Sets the network for the client.
 
 ##### net
 
-`"testnet"` | `"mainnet"`
+`"mainnet"` | `"testnet"`
 
 #### Returns
 
@@ -1486,7 +1486,7 @@ Sets the network for the client.
 
 > **signChallenge**(`args`): `Promise`\<[`SignChallengeResponse`](../type-aliases/SignChallengeResponse.md)\>
 
-Defined in: [mintlayer-connect-sdk.ts:3536](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3536)
+Defined in: [mintlayer-connect-sdk.ts:3808](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3808)
 
 Signs a challenge message with the given address.
 Used to prove ownership of the address.
@@ -1503,11 +1503,29 @@ Used to prove ownership of the address.
 
 ***
 
+### signIntentTransaction()
+
+> **signIntentTransaction**(`tx`): `Promise`\<`SignedIntentTransaction`\>
+
+Defined in: [mintlayer-connect-sdk.ts:3795](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3795)
+
+#### Parameters
+
+##### tx
+
+`Transaction`
+
+#### Returns
+
+`Promise`\<`SignedIntentTransaction`\>
+
+***
+
 ### signTransaction()
 
 > **signTransaction**(`tx`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3523](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3523)
+Defined in: [mintlayer-connect-sdk.ts:3787](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3787)
 
 Signs a transaction using the connected wallet.
 
@@ -1531,7 +1549,7 @@ Promise that resolves to the signed transaction hex
 
 > **spendHtlc**(`params`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:3461](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L3461)
+Defined in: [mintlayer-connect-sdk.ts:3729](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3729)
 
 Spends an HTLC by providing the secret and signs the transaction.
 
@@ -1555,7 +1573,7 @@ Promise that resolves to a signed transaction
 
 > **transfer**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2603](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2603)
+Defined in: [mintlayer-connect-sdk.ts:2934](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2934)
 
 Transfers coins or tokens to a specified address.
 If a token_id is provided, token will be transferred instead of base coin.
@@ -1578,7 +1596,7 @@ A signed transaction
 
 > **transferNft**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2638](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2638)
+Defined in: [mintlayer-connect-sdk.ts:2965](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L2965)
 
 Transfers NFT to a given address.
 
@@ -1600,7 +1618,7 @@ A signed transaction
 
 > **unfreezeToken**(`token_id`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2933](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2933)
+Defined in: [mintlayer-connect-sdk.ts:3232](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3232)
 
 Unfreezes a previously frozen token and signs the transaction.
 
@@ -1624,7 +1642,7 @@ Promise that resolves to a signed transaction
 
 > **unmintToken**(`__namedParameters`): `Promise`\<`string`\>
 
-Defined in: [mintlayer-connect-sdk.ts:2796](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L2796)
+Defined in: [mintlayer-connect-sdk.ts:3115](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3115)
 
 Unmints (burns) tokens from circulation and signs the transaction.
 
@@ -1642,11 +1660,38 @@ Promise that resolves to a signed transaction
 
 ***
 
+### verifyChallenge()
+
+> **verifyChallenge**(`args`): `Promise`\<`boolean`\>
+
+Defined in: [mintlayer-connect-sdk.ts:3828](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L3828)
+
+Verifies a signed challenge message.
+Used to verify that a signature was produced by the private key corresponding to the given address.
+
+Note: The provided address must be a 'pubkeyhash' address.
+
+#### Parameters
+
+##### args
+
+[`VerifyChallengeArgs`](../type-aliases/VerifyChallengeArgs.md)
+
+Object containing message, address, and signature
+
+#### Returns
+
+`Promise`\<`boolean`\>
+
+Promise that resolves to true if the signature is valid, throws an error otherwise
+
+***
+
 ### create()
 
 > `static` **create**(`options`): `Promise`\<`Client`\>
 
-Defined in: [mintlayer-connect-sdk.ts:930](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L930)
+Defined in: [mintlayer-connect-sdk.ts:1276](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1276)
 
 Creates a new Client instance and initializes it.
 

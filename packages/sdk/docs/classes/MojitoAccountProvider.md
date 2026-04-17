@@ -2,7 +2,7 @@
 
 ***
 
-Defined in: [mintlayer-connect-sdk.ts:134](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L134)
+Defined in: [mintlayer-connect-sdk.ts:261](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L261)
 
 ## Implements
 
@@ -24,7 +24,7 @@ Defined in: [mintlayer-connect-sdk.ts:134](https://github.com/mintlayer/mintlaye
 
 > **connect**(): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:139](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L139)
+Defined in: [mintlayer-connect-sdk.ts:266](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L266)
 
 Connects to the Mojito wallet extension.
 
@@ -44,7 +44,7 @@ Promise that resolves to the connected addresses
 
 > **disconnect**(): `Promise`\<`void`\>
 
-Defined in: [mintlayer-connect-sdk.ts:163](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L163)
+Defined in: [mintlayer-connect-sdk.ts:290](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L290)
 
 Disconnects from the Mojito wallet extension.
 
@@ -64,7 +64,7 @@ Promise that resolves when disconnection is complete
 
 > **request**(`method`, `params`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:177](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L177)
+Defined in: [mintlayer-connect-sdk.ts:304](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L304)
 
 Makes a request to the Mojito wallet extension.
 
@@ -98,7 +98,7 @@ Promise that resolves to the response from the wallet
 
 > **restore**(): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:151](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L151)
+Defined in: [mintlayer-connect-sdk.ts:278](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L278)
 
 Restores the session from the Mojito wallet extension.
 

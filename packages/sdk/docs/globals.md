@@ -5,12 +5,17 @@
 ## Classes
 
 - [Client](classes/Client.md)
+- [MintlayerApiProvider](classes/MintlayerApiProvider.md)
+- [MnemonicAccountProvider](classes/MnemonicAccountProvider.md)
 - [MojitoAccountProvider](classes/MojitoAccountProvider.md)
+- [PrivateKeyAccountProvider](classes/PrivateKeyAccountProvider.md)
 - [Signer](classes/Signer.md)
 
 ## Interfaces
 
 - [AccountProvider](interfaces/AccountProvider.md)
+- [ApiProvider](interfaces/ApiProvider.md)
+- [MnemonicAccountProviderOptions](interfaces/MnemonicAccountProviderOptions.md)
 - [TransactionJSONRepresentation](interfaces/TransactionJSONRepresentation.md)
 
 ## Type Aliases
@@ -37,8 +42,10 @@
 - [TransferNftArgs](type-aliases/TransferNftArgs.md)
 - [UnfreezeTokenArgs](type-aliases/UnfreezeTokenArgs.md)
 - [UnmintTokenArgs](type-aliases/UnmintTokenArgs.md)
+- [VerifyChallengeArgs](type-aliases/VerifyChallengeArgs.md)
 
 ## Functions
 
 - [atomsToDecimal](functions/atomsToDecimal.md)
+- [decimals](functions/decimals.md)
 - [decimalsToAtoms](functions/decimalsToAtoms.md)

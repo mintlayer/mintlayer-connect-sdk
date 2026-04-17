@@ -47,6 +47,12 @@ import initWasm, {
   encode_output_htlc,
   extract_htlc_secret,
   verify_challenge,
+  make_default_account_privkey,
+  make_receiving_address,
+  make_change_address,
+  public_key_from_private_key,
+  pubkey_to_pubkeyhash_address,
+  sign_challenge,
 } from '@mintlayer/wasm-lib';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -126,11 +132,14 @@ export function decimals(value: string | number, decimals: number): string {
 }
 
 type Address = {
-  [key: string]: {
-    receiving: string[];
-    change: string[];
+  addressesByChain: {
+    [chain: string]: {
+      receiving: string[];
+      change: string[];
+      publicKeys?: string[];
+    };
   };
-}; // TODO expand
+};
 
 type MojitoRequest = any; // TODO expand
 
@@ -298,6 +307,188 @@ export class MojitoAccountProvider implements AccountProvider {
     } else {
       throw new Error('Mojito extension not available');
     }
+  }
+}
+
+/**
+ * A standalone account provider backed by explicit addresses and private keys.
+ *
+ * Suitable for Node.js scripts, tests, and faucets where the wallet extension
+ * is not available. Signing is performed locally using the {@link Signer} class.
+ *
+ * @example
+ * ```typescript
+ * const provider = new PrivateKeyAccountProvider(
+ *   {
+ *     receiving: ['tmt1q...'],
+ *     change:    ['tmt1q...'],
+ *   },
+ *   {
+ *     'tmt1q...': new Uint8Array([...]),
+ *   },
+ *   'testnet',
+ * );
+ *
+ * const client = await Client.create({ network: 'testnet', accountProvider: provider });
+ * ```
+ */
+class PrivateKeyAccountProvider implements AccountProvider {
+  private readonly addresses: Address;
+  private readonly privateKeys: Record<string, Uint8Array>;
+  private readonly network: Network;
+
+  constructor(
+    addresses: { receiving: string[]; change: string[] },
+    privateKeys: Record<string, Uint8Array>,
+    network: 'mainnet' | 'testnet' = 'testnet',
+  ) {
+    this.addresses = {
+      addressesByChain: {
+        mintlayer: addresses,
+      },
+    };
+    this.privateKeys = privateKeys;
+    this.network = network === 'mainnet' ? Network.Mainnet : Network.Testnet;
+  }
+
+  async connect(): Promise<Address> {
+    return this.addresses;
+  }
+
+  async restore(): Promise<Address> {
+    return this.addresses;
+  }
+
+  async disconnect(): Promise<void> {}
+
+  async request(method: string, params: any): Promise<any> {
+    if (method === 'signTransaction') {
+      const signer = new Signer(this.privateKeys, this.network);
+      return signer.sign(params.txData);
+    }
+
+    if (method === 'signChallenge') {
+      const { message, address } = params;
+      const privateKey = this.privateKeys[address];
+      if (!privateKey) {
+        throw new Error(`Private key not found for address: ${address}`);
+      }
+      const messageBytes = new TextEncoder().encode(message);
+      const signatureBytes = sign_challenge(privateKey, messageBytes);
+      const signature = Array.from(signatureBytes)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      return { message, address, signature };
+    }
+
+    throw new Error(`Method not supported: ${method}`);
+  }
+}
+
+/**
+ * Options for {@link MnemonicAccountProvider}.
+ */
+interface MnemonicAccountProviderOptions {
+  /** Number of receiving addresses to derive (default: 1). */
+  receivingAddressCount?: number;
+  /** Number of change addresses to derive (default: 1). */
+  changeAddressCount?: number;
+}
+
+/**
+ * A standalone account provider that derives addresses and private keys from a
+ * BIP39 mnemonic seed phrase.
+ *
+ * Derivation path: `44'/mintlayer_coin_type'/0'/0/<index>` for receiving and
+ * `44'/mintlayer_coin_type'/0'/1/<index>` for change addresses.
+ *
+ * Suitable for Node.js scripts, tests, and faucets where the wallet extension
+ * is not available.
+ *
+ * @example
+ * ```typescript
+ * const provider = new MnemonicAccountProvider(
+ *   'word1 word2 ... word12',
+ *   'testnet',
+ *   { receivingAddressCount: 5, changeAddressCount: 2 },
+ * );
+ *
+ * const client = await Client.create({ network: 'testnet', accountProvider: provider });
+ * ```
+ */
+class MnemonicAccountProvider implements AccountProvider {
+  private readonly addresses: Address;
+  private readonly privateKeys: Record<string, Uint8Array>;
+  private readonly network: Network;
+
+  constructor(
+    mnemonic: string,
+    network: 'mainnet' | 'testnet' = 'testnet',
+    options: MnemonicAccountProviderOptions = {},
+  ) {
+    const { receivingAddressCount = 1, changeAddressCount = 1 } = options;
+    this.network = network === 'mainnet' ? Network.Mainnet : Network.Testnet;
+
+    const accountPrivKey = make_default_account_privkey(mnemonic, this.network);
+
+    const receiving: string[] = [];
+    const change: string[] = [];
+    this.privateKeys = {};
+
+    for (let i = 0; i < receivingAddressCount; i++) {
+      const privKey = make_receiving_address(accountPrivKey, i);
+      const pubKey = public_key_from_private_key(privKey);
+      const address = pubkey_to_pubkeyhash_address(pubKey, this.network);
+      receiving.push(address);
+      this.privateKeys[address] = privKey;
+    }
+
+    for (let i = 0; i < changeAddressCount; i++) {
+      const privKey = make_change_address(accountPrivKey, i);
+      const pubKey = public_key_from_private_key(privKey);
+      const address = pubkey_to_pubkeyhash_address(pubKey, this.network);
+      change.push(address);
+      this.privateKeys[address] = privKey;
+    }
+
+    this.addresses = {
+      addressesByChain: {
+        mintlayer: { receiving, change },
+      },
+    };
+  }
+
+  async connect(): Promise<Address> {
+    return this.addresses;
+  }
+
+  async restore(): Promise<Address> {
+    return this.addresses;
+  }
+
+  async disconnect(): Promise<void> {}
+
+  async request(method: string, params: any): Promise<any> {
+    if (method === 'signTransaction') {
+      const signer = new Signer(this.privateKeys, this.network);
+      return signer.sign(params.txData);
+    }
+
+    if (method === 'signChallenge') {
+      const { message, address } = params;
+      const privateKey = this.privateKeys[address];
+      if (!privateKey) {
+        throw new Error(`Private key not found for address: ${address}`);
+      }
+      const messageBytes = new TextEncoder().encode(message);
+      const signatureBytes = sign_challenge(privateKey, messageBytes);
+      const signature = Array.from(signatureBytes)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      return { message, address, signature };
+    }
+
+    throw new Error(`Method not supported: ${method}`);
   }
 }
 
@@ -1340,9 +1531,9 @@ class Client {
     try {
       const addressData = await this.accountProvider.restore();
 
-      if (addressData?.[this.network]?.receiving?.length) {
-        // @ts-ignore
-        this.connectedAddresses = addressData[this.network].receiving;
+      if (addressData?.addressesByChain?.mintlayer?.receiving?.length) {
+        this.connectedAddresses = addressData.addressesByChain.mintlayer;
+        this.publicKeys = { receiving: [], change: [] };
         console.log('[Mintlayer SDK] Session restored');
         return true;
       }
@@ -3848,9 +4039,11 @@ class Client {
 
 class Signer {
   private keys: Record<string, Uint8Array>;
+  private network: Network;
 
-  constructor(privateKeys: Record<string, Uint8Array>) {
+  constructor(privateKeys: Record<string, Uint8Array>, network: Network = Network.Testnet) {
     this.keys = privateKeys;
+    this.network = network;
   }
 
   private getPrivateKey(address: string): Uint8Array | undefined {
@@ -3858,7 +4051,7 @@ class Signer {
   }
 
   private createSignature(tx: Transaction) {
-    const network = Network.Testnet; // TODO: make network configurable
+    const network = this.network;
     const optUtxos_ = tx.JSONRepresentation.inputs.map((input) => {
       if (input.input.input_type !== 'UTXO') {
         return 0
@@ -3982,6 +4175,12 @@ class Signer {
   }
 }
 
-export { Client, Signer };
+export {
+  Client,
+  Signer,
+  PrivateKeyAccountProvider,
+  MnemonicAccountProvider,
+  MnemonicAccountProviderOptions,
+};
 
 console.log('[Mintlayer Connect SDK] Loaded');

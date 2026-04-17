@@ -4,7 +4,7 @@
 
 > **TransferNftArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:741](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L741)
+Defined in: [mintlayer-connect-sdk.ts:1076](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1076)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:741](https://github.com/mintlayer/mintlaye
 
 > **to**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:742](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L742)
+Defined in: [mintlayer-connect-sdk.ts:1077](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1077)
 
 ***
 
@@ -20,4 +20,4 @@ Defined in: [mintlayer-connect-sdk.ts:742](https://github.com/mintlayer/mintlaye
 
 > **token\_id**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:743](https://github.com/mintlayer/mintlayer-connect-sdk/blob/18f92ef844c9ea3c1db66b69d7478d674343954b/packages/sdk/src/mintlayer-connect-sdk.ts#L743)
+Defined in: [mintlayer-connect-sdk.ts:1078](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1078)
