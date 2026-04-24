@@ -65,23 +65,31 @@ export class Transaction {
   private utxos: Utxo[]
   private transactionId: string
   private hexRepresentation: string
-  private binRepresentation: Uint8Array
+  private binRepresentation: { inputs: Uint8Array[]; outputs: Uint8Array[]; transactionsize: number } | null
   private jsonRepresentation: TransactionJSONRepresentation
   private currentBlockHeight: number
   private client: Client
   private network: 'mainnet' | 'testnet'
   private changeAddress: string
 
-  constructor({ client }: { client?: Client }) {
+  constructor({
+    client,
+    network,
+    currentBlockHeight,
+  }: {
+    client?: Client;
+    network?: 'mainnet' | 'testnet';
+    currentBlockHeight?: number | string | bigint;
+  } = {}) {
     this.inputs = [];
     this.outputs = [];
     this.utxos = [];
     this.transactionId = '';
     this.hexRepresentation = '';
-    this.binRepresentation = new Uint8Array([]);
-    this.currentBlockHeight = 0;
+    this.binRepresentation = null;
+    this.currentBlockHeight = currentBlockHeight !== undefined ? Number(currentBlockHeight) : 0;
     this.jsonRepresentation = {};
-    this.network = 'testnet';
+    this.network = network ?? 'testnet';
     this.fee = BigInt(0);
     this.changeAddress = '';
 
@@ -92,6 +100,16 @@ export class Transaction {
 
   setChangeAddress(address: string) {
     this.changeAddress = address;
+    return this;
+  }
+
+  setNetwork(network: 'mainnet' | 'testnet') {
+    this.network = network;
+    return this;
+  }
+
+  setCurrentBlockHeight(height: number | string | bigint) {
+    this.currentBlockHeight = Number(height);
     return this;
   }
 
@@ -122,67 +140,129 @@ export class Transaction {
     return this.transactionId;
   }
 
+  // Signer-compatibility getters (match the shape used by Signer.sign())
+  get JSONRepresentation(): TransactionJSONRepresentation {
+    return this.jsonRepresentation;
+  }
+  get BINRepresentation() {
+    return this.binRepresentation;
+  }
+  get HEXRepresentation_unsigned(): string {
+    return this.hexRepresentation;
+  }
+  get transaction_id(): string {
+    return this.transactionId;
+  }
+
   build() {
-    if(!this.client && !this.utxos.length) {
+    if (!this.client && !this.utxos.length) {
       throw new Error('Client or UTXOs are required to build transaction');
     }
-    if(!this.client && !this.changeAddress) {
+    if (!this.client && !this.changeAddress) {
       throw new Error('Client or Change Address are required to build transaction');
     }
 
-    const input_amount_coin_req = this.outputs.reduce((acc, item) => {
-      if (item.value.type === 'Coin') {
-        return acc + BigInt(item.value.amount.atoms);
+    const declaredOutputs: Output[] = [...this.outputs];
+
+    // Sum coin and per-token requirements from user-declared outputs.
+    let input_amount_coin_req = 0n;
+    const token_reqs = new Map<string, bigint>();
+    for (const out of declaredOutputs) {
+      const val = (out as any)?.value;
+      if (!val) continue;
+      if (val.type === 'Coin') {
+        input_amount_coin_req += BigInt(val.amount.atoms);
+      } else if (val.type === 'TokenV1') {
+        token_reqs.set(
+          val.token_id,
+          (token_reqs.get(val.token_id) ?? 0n) + BigInt(val.amount.atoms),
+        );
       }
-      return acc;
-    }, 0n);
+    }
 
-    let preciseFee = BigInt(0);
-    let previousFee = BigInt(-1);
+    const networkId = this.network === 'mainnet' ? 0 : 1;
+
+    let preciseFee = 0n;
+    let previousFee = -1n;
     const MAX_ATTEMPTS = 10;
-    let attempts = 0;
 
-    while (attempts < MAX_ATTEMPTS) {
-      attempts++;
-
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       const totalFee = preciseFee;
-      const input_amount_coin_req_w_fee = input_amount_coin_req + totalFee;
+      const coin_req_w_fee = input_amount_coin_req + totalFee;
 
-      this.inputs = this.selectUTXOs(this.utxos, input_amount_coin_req_w_fee, null);
+      const coinInputs = this.selectUTXOs(this.utxos, coin_req_w_fee, null);
+      const totalCoinIn = coinInputs.reduce(
+        (acc, item) => acc + BigInt(item.utxo!.value.amount.atoms),
+        0n,
+      );
+      if (totalCoinIn < coin_req_w_fee) {
+        throw new Error('Not enough coin UTXOs');
+      }
 
-      const totalInputValueCoin = this.inputs.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.decimal), 0n);
+      const tokenInputsAll: UtxoInput[] = [];
+      const tokenChanges: Array<{ token_id: string; amount: bigint }> = [];
+      for (const [token_id, req] of token_reqs.entries()) {
+        const tInputs = this.selectUTXOs(this.utxos, req, token_id);
+        const totalIn = tInputs.reduce(
+          (acc, item) => acc + BigInt(item.utxo!.value.amount.atoms),
+          0n,
+        );
+        if (totalIn < req) {
+          throw new Error(`Not enough token UTXOs for ${token_id}`);
+        }
+        tokenInputsAll.push(...tInputs);
+        if (totalIn > req) {
+          tokenChanges.push({ token_id, amount: totalIn - req });
+        }
+      }
 
-      const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
-
-      if (changeAmountCoin > 0n) {
-        this.outputs.push({
+      const finalOutputs: Output[] = [...declaredOutputs];
+      const changeCoin = totalCoinIn - coin_req_w_fee;
+      if (changeCoin > 0n) {
+        finalOutputs.push({
           type: 'Transfer',
           value: {
             type: 'Coin',
             amount: {
-              atoms: changeAmountCoin.toString(),
-              decimal: atomsToDecimal(changeAmountCoin.toString(), 11).toString(),
+              atoms: changeCoin.toString(),
+              decimal: atomsToDecimal(changeCoin.toString(), 11).toString(),
+            },
+          },
+          destination: this.changeAddress,
+        });
+      }
+      for (const c of tokenChanges) {
+        finalOutputs.push({
+          type: 'Transfer',
+          value: {
+            type: 'TokenV1',
+            token_id: c.token_id,
+            amount: {
+              atoms: c.amount.toString(),
+              decimal: c.amount.toString(),
             },
           },
           destination: this.changeAddress,
         });
       }
 
+      const finalInputs: Input[] = [...coinInputs, ...tokenInputsAll];
+
       const JSONRepresentation: TransactionJSONRepresentation = {
-        inputs: this.inputs,
-        outputs: this.outputs,
+        inputs: finalInputs,
+        outputs: finalOutputs,
         fee: {
           atoms: totalFee.toString(),
           decimal: atomsToDecimal(totalFee.toString(), 11).toString(),
         },
-        id: 'to_be_filled_in'
+        id: 'to_be_filled_in',
       };
 
-      const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, this.network === 'mainnet' ? 0 : 1);
+      const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, networkId);
 
-      const transaction_size_in_bytes = BigInt(Math.ceil(BINRepresentation.transactionsize));
-      const fee_amount_per_kb = BigInt('100000000000'); // TODO: Get the current feerate from the network
-      const nextPreciseFee = (fee_amount_per_kb * transaction_size_in_bytes + BigInt(999)) / BigInt(1000);
+      const tx_size = BigInt(Math.ceil(BINRepresentation.transactionsize));
+      const fee_per_kb = 100_000_000_000n; // TODO: fetch live feerate
+      const nextPreciseFee = (fee_per_kb * tx_size + 999n) / 1000n;
 
       if (nextPreciseFee === preciseFee || nextPreciseFee === previousFee) {
         const transaction = encode_transaction(
@@ -190,60 +270,38 @@ export class Transaction {
           mergeUint8Arrays(BINRepresentation.outputs),
           BigInt(0),
         );
-
         const transaction_id = get_transaction_id(transaction, true);
-        this.transactionId = transaction_id;
 
-      //   if (finalOutputs.some((output) => output.type === 'IssueNft')) {
-      //     const token_id = get_token_id(
-      //       mergeUint8Arrays(BINRepresentation.inputs),
-      //       this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
-      //     );
-      //     const index = finalOutputs.findIndex((output) => output.type === 'IssueNft');
-      //     const output = finalOutputs[index] as IssueNftOutput;
-      //     finalOutputs[index] = {
-      //       ...output,
-      //       token_id,
-      //     };
-      //   }
-      //
-      //   const HEXRepresentation_unsigned = transaction.reduce(
-      //     (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
-      //     '',
-      //   );
-      //
-      //   return {
-      //     JSONRepresentation: {
-      //       ...JSONRepresentation,
-      //       id: transaction_id,
-      //     },
-      //     BINRepresentation,
-      //     HEXRepresentation_unsigned,
-      //     transaction_id,
-      //   };
+        this.fee = totalFee;
+        this.transactionId = transaction_id;
+        this.binRepresentation = BINRepresentation;
+        this.hexRepresentation = transaction.reduce(
+          (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
+          '',
+        );
+        this.jsonRepresentation = { ...JSONRepresentation, id: transaction_id };
+        return this;
       }
 
       previousFee = preciseFee;
       preciseFee = nextPreciseFee;
-      this.fee = preciseFee;
     }
 
-    return this;
+    throw new Error('Failed to build transaction after maximum attempts');
   }
 
   hex() {
     return this.hexRepresentation;
   }
 
-  json() {
+  json(): TransactionJSONRepresentation {
+    return this.jsonRepresentation;
+  }
+
+  getFee() {
     return {
-      inputs: this.inputs,
-      outputs: this.outputs,
-      fee: {
-        atoms: this.fee.toString(),
-        decimal: atomsToDecimal(this.fee.toString(), 11).toString(),
-      },
-      id: this.transactionId,
+      atoms: this.fee.toString(),
+      decimal: atomsToDecimal(this.fee.toString(), 11).toString(),
     };
   }
 
@@ -492,7 +550,10 @@ export class Transaction {
 
         const { destination: address, token_id } = output;
 
-        const chainTip = '200000'; // TODO unhardcode
+        if (!this.currentBlockHeight) {
+          throw new Error('currentBlockHeight is required for IssueNft — call setCurrentBlockHeight(...)');
+        }
+        const chainTip = this.currentBlockHeight;
 
         return encode_output_issue_nft(
           token_id as string,
@@ -512,7 +573,10 @@ export class Transaction {
       if (output.type === 'IssueFungibleToken') {
         const { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, total_supply } = output;
 
-        const chainTip = '200000'; // TODO: unhardcode height
+        if (!this.currentBlockHeight) {
+          throw new Error('currentBlockHeight is required for IssueFungibleToken — call setCurrentBlockHeight(...)');
+        }
+        const chainTip = this.currentBlockHeight;
 
         const is_token_freezable = is_freezable ? FreezableToken.Yes : FreezableToken.No;
 
@@ -649,6 +713,25 @@ export class Transaction {
         },
       },
     }
+  }
+
+  transferToken(destination: string, amount: string, token_id: string): Output {
+    return {
+      type: 'Transfer',
+      destination,
+      value: {
+        type: 'TokenV1',
+        token_id,
+        amount: {
+          atoms: amount,
+          decimal: amount,
+        },
+      },
+    };
+  }
+
+  transferNft(destination: string, token_id: string): Output {
+    return this.transferToken(destination, '1', token_id);
   }
 
   // actions

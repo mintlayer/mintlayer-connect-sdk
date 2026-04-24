@@ -4190,6 +4190,8 @@ class Signer {
   }
 }
 
+export { Transaction } from './transaction';
+
 export {
   Client,
   Signer,
