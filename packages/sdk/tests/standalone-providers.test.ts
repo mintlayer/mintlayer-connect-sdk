@@ -35,7 +35,7 @@ function setupFetchMock() {
   fetchMock.doMock();
   fetchMock.mockResponse(async (req) => {
     if (req.url.endsWith('/chain/tip')) return JSON.stringify({ height: 200000 });
-    if (req.url.endsWith('/account')) return JSON.stringify({ utxos: UTXOS });
+    if (req.url.endsWith('/batch')) return JSON.stringify({ results: [UTXOS] });
     return JSON.stringify({});
   });
 }

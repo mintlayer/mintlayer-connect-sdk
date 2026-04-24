@@ -161,14 +161,14 @@ export interface ApiProvider {
 
 export class MintlayerApiProvider implements ApiProvider {
   private readonly baseUrl: string;
-  private readonly utxoUrl: string;
+  private readonly batchUrl: string;
 
   constructor(
     baseUrl: string,
-    utxoUrl: string = 'https://api.mintini.app',
+    batchUrl: string,
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.utxoUrl = utxoUrl.replace(/\/$/, '');
+    this.batchUrl = batchUrl.replace(/\/$/, '');
   }
 
   private async get(path: string): Promise<any> {
@@ -239,15 +239,20 @@ export class MintlayerApiProvider implements ApiProvider {
   }
 
   async getAccountUtxos(addresses: string[], network: number): Promise<any> {
-    const response = await fetch(`${this.utxoUrl}/account`, {
+    const response = await fetch(this.batchUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ addresses, network }),
+      body: JSON.stringify({
+        ids: addresses,
+        type: '/address/:address/spendable-utxos',
+        network,
+      }),
     });
     if (!response.ok) {
       throw new Error(`Failed to fetch utxos: ${response.status}`);
     }
-    return response.json();
+    const data = await response.json();
+    return (data.results ?? []).flat();
   }
 }
 
@@ -1222,7 +1227,7 @@ class Client {
     this.publicKeys = { receiving: [], change: [] };
     this.isInitialized = false;
     this.accountProvider = options.accountProvider || new MojitoAccountProvider();
-    this.apiProvider = options.apiProvider || new MintlayerApiProvider(this.getDefaultApiServer());
+    this.apiProvider = options.apiProvider || new MintlayerApiProvider(this.getDefaultApiServer(), this.getDefaultBatchServer());
   }
 
   /**
@@ -1330,6 +1335,16 @@ class Client {
     return this.network === 'testnet'
       ? 'https://api-server-lovelace.mintlayer.org/api/v2'
       : 'https://api-server.mintlayer.org/api/v2';
+  }
+
+  /**
+   * Returns the default batch server URL based on the network.
+   * @private
+   */
+  private getDefaultBatchServer(): string {
+    return this.network === 'testnet'
+      ? 'https://mojito-api.mintlayer.org/mintlayer/testnet/batch'
+      : 'https://mojito-api.mintlayer.org/mintlayer/mainnet/batch';
   }
 
   /**
@@ -2419,7 +2434,7 @@ class Client {
     const currentAddress = address;
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
-    const data = await this.apiProvider.getAccountUtxos(
+    const data_utxos = await this.apiProvider.getAccountUtxos(
       addressList,
       this.network === 'mainnet' ? 0 : 1,
     );
@@ -2433,7 +2448,7 @@ class Client {
       utxo: item.utxo,
     })) : [];
 
-    const utxos: UtxoEntry[] = data.utxos.filter((item: UtxoEntry) => {
+    const utxos: UtxoEntry[] = data_utxos.filter((item: UtxoEntry) => {
       // filter out UTXO with type htlc, they have to be added manually
       if (item.utxo.type === 'Htlc') {
         return false;

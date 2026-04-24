@@ -142,10 +142,10 @@ beforeEach(() => {
       }
     }
 
-    if(url.endsWith('/account')) {
+    if(url.endsWith('/batch')) {
       return {
         body: JSON.stringify({
-          utxos: utxos,
+          results: [utxos],
         }),
       };
     }

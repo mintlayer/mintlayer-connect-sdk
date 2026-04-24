@@ -85,10 +85,10 @@ beforeEach(() => {
       return JSON.stringify({ a: 'b' });
     }
 
-    if(url.endsWith('/account')) {
+    if(url.endsWith('/batch')) {
       return {
         body: JSON.stringify({
-          utxos: utxos,
+          results: [utxos],
         }),
       };
     }
@@ -149,9 +149,9 @@ test('buildTransaction called with correct params', async () => {
 });
 
 test('fails transfer if not enough utxo', async () => {
-  fetchMock.mockIf('https://api.mintini.app/account', async () => {
+  fetchMock.mockIf('https://mojito-api.mintlayer.org/mintlayer/testnet/batch', async () => {
     return {
-      body: JSON.stringify({ utxos: [] }), // no utxos
+      body: JSON.stringify({ results: [[]] }), // no utxos
     };
   });
 
