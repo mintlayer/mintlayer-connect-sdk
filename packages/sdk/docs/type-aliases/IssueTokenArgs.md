@@ -4,7 +4,7 @@
 
 > **IssueTokenArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1098](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1098)
+Defined in: [mintlayer-connect-sdk.ts:1103](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1103)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:1098](https://github.com/mintlayer/mintlay
 
 > **authority**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1099](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1099)
+Defined in: [mintlayer-connect-sdk.ts:1104](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1104)
 
 ***
 
@@ -20,7 +20,7 @@ Defined in: [mintlayer-connect-sdk.ts:1099](https://github.com/mintlayer/mintlay
 
 > **is\_freezable**: `boolean`
 
-Defined in: [mintlayer-connect-sdk.ts:1100](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1100)
+Defined in: [mintlayer-connect-sdk.ts:1105](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1105)
 
 ***
 
@@ -28,7 +28,7 @@ Defined in: [mintlayer-connect-sdk.ts:1100](https://github.com/mintlayer/mintlay
 
 > **metadata\_uri**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1101](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1101)
+Defined in: [mintlayer-connect-sdk.ts:1106](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1106)
 
 ***
 
@@ -36,7 +36,7 @@ Defined in: [mintlayer-connect-sdk.ts:1101](https://github.com/mintlayer/mintlay
 
 > **number\_of\_decimals**: `number`
 
-Defined in: [mintlayer-connect-sdk.ts:1102](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1102)
+Defined in: [mintlayer-connect-sdk.ts:1107](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1107)
 
 ***
 
@@ -44,7 +44,7 @@ Defined in: [mintlayer-connect-sdk.ts:1102](https://github.com/mintlayer/mintlay
 
 > `optional` **supply\_amount**: `number`
 
-Defined in: [mintlayer-connect-sdk.ts:1105](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1105)
+Defined in: [mintlayer-connect-sdk.ts:1110](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1110)
 
 ***
 
@@ -52,7 +52,7 @@ Defined in: [mintlayer-connect-sdk.ts:1105](https://github.com/mintlayer/mintlay
 
 > **supply\_type**: `"Unlimited"` \| `"Lockable"` \| `"Fixed"`
 
-Defined in: [mintlayer-connect-sdk.ts:1104](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1104)
+Defined in: [mintlayer-connect-sdk.ts:1109](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1109)
 
 ***
 
@@ -60,4 +60,4 @@ Defined in: [mintlayer-connect-sdk.ts:1104](https://github.com/mintlayer/mintlay
 
 > **token\_ticker**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1103](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1103)
+Defined in: [mintlayer-connect-sdk.ts:1108](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1108)

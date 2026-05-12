@@ -4,7 +4,7 @@
 
 > **FreezeTokenArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1133](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1133)
+Defined in: [mintlayer-connect-sdk.ts:1138](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1138)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:1133](https://github.com/mintlayer/mintlay
 
 > **is\_unfreezable**: `boolean`
 
-Defined in: [mintlayer-connect-sdk.ts:1135](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1135)
+Defined in: [mintlayer-connect-sdk.ts:1140](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1140)
 
 ***
 
@@ -20,4 +20,4 @@ Defined in: [mintlayer-connect-sdk.ts:1135](https://github.com/mintlayer/mintlay
 
 > **token\_id**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1134](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1134)
+Defined in: [mintlayer-connect-sdk.ts:1139](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1139)

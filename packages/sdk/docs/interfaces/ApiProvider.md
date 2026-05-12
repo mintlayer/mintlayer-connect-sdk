@@ -2,7 +2,7 @@
 
 ***
 
-Defined in: [mintlayer-connect-sdk.ts:146](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L146)
+Defined in: [mintlayer-connect-sdk.ts:146](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L146)
 
 ## Methods
 
@@ -10,7 +10,7 @@ Defined in: [mintlayer-connect-sdk.ts:146](https://github.com/mintlayer/mintlaye
 
 > **broadcastTransaction**(`tx`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:158](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L158)
+Defined in: [mintlayer-connect-sdk.ts:158](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L158)
 
 #### Parameters
 
@@ -28,7 +28,7 @@ Defined in: [mintlayer-connect-sdk.ts:158](https://github.com/mintlayer/mintlaye
 
 > **getAccountUtxos**(`addresses`, `network`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:159](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L159)
+Defined in: [mintlayer-connect-sdk.ts:159](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L159)
 
 #### Parameters
 
@@ -50,7 +50,7 @@ Defined in: [mintlayer-connect-sdk.ts:159](https://github.com/mintlayer/mintlaye
 
 > **getAddress**(`addr`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:148](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L148)
+Defined in: [mintlayer-connect-sdk.ts:148](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L148)
 
 #### Parameters
 
@@ -68,7 +68,7 @@ Defined in: [mintlayer-connect-sdk.ts:148](https://github.com/mintlayer/mintlaye
 
 > **getAddressDelegations**(`addr`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:149](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L149)
+Defined in: [mintlayer-connect-sdk.ts:149](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L149)
 
 #### Parameters
 
@@ -86,7 +86,7 @@ Defined in: [mintlayer-connect-sdk.ts:149](https://github.com/mintlayer/mintlaye
 
 > **getAddressTokenAuthority**(`addr`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:150](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L150)
+Defined in: [mintlayer-connect-sdk.ts:150](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L150)
 
 #### Parameters
 
@@ -104,7 +104,7 @@ Defined in: [mintlayer-connect-sdk.ts:150](https://github.com/mintlayer/mintlaye
 
 > **getChainTip**(): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:147](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L147)
+Defined in: [mintlayer-connect-sdk.ts:147](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L147)
 
 #### Returns
 
@@ -116,7 +116,7 @@ Defined in: [mintlayer-connect-sdk.ts:147](https://github.com/mintlayer/mintlaye
 
 > **getDelegation**(`delegation_id`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:156](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L156)
+Defined in: [mintlayer-connect-sdk.ts:156](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L156)
 
 #### Parameters
 
@@ -134,7 +134,7 @@ Defined in: [mintlayer-connect-sdk.ts:156](https://github.com/mintlayer/mintlaye
 
 > **getNft**(`token_id`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:152](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L152)
+Defined in: [mintlayer-connect-sdk.ts:152](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L152)
 
 #### Parameters
 
@@ -152,7 +152,7 @@ Defined in: [mintlayer-connect-sdk.ts:152](https://github.com/mintlayer/mintlaye
 
 > **getOrder**(`order_id`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:153](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L153)
+Defined in: [mintlayer-connect-sdk.ts:153](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L153)
 
 #### Parameters
 
@@ -170,7 +170,7 @@ Defined in: [mintlayer-connect-sdk.ts:153](https://github.com/mintlayer/mintlaye
 
 > **getOrders**(): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:154](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L154)
+Defined in: [mintlayer-connect-sdk.ts:154](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L154)
 
 #### Returns
 
@@ -182,7 +182,7 @@ Defined in: [mintlayer-connect-sdk.ts:154](https://github.com/mintlayer/mintlaye
 
 > **getPoolDelegations**(`pool_id`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:155](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L155)
+Defined in: [mintlayer-connect-sdk.ts:155](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L155)
 
 #### Parameters
 
@@ -200,7 +200,7 @@ Defined in: [mintlayer-connect-sdk.ts:155](https://github.com/mintlayer/mintlaye
 
 > **getToken**(`token_id`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:151](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L151)
+Defined in: [mintlayer-connect-sdk.ts:151](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L151)
 
 #### Parameters
 
@@ -218,7 +218,7 @@ Defined in: [mintlayer-connect-sdk.ts:151](https://github.com/mintlayer/mintlaye
 
 > **getTransaction**(`transaction_id`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:157](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L157)
+Defined in: [mintlayer-connect-sdk.ts:157](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L157)
 
 #### Parameters
 

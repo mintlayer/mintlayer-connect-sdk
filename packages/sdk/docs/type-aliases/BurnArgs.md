@@ -4,7 +4,7 @@
 
 > **BurnArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1081](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1081)
+Defined in: [mintlayer-connect-sdk.ts:1086](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1086)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:1081](https://github.com/mintlayer/mintlay
 
 > **amount**: `number`
 
-Defined in: [mintlayer-connect-sdk.ts:1083](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1083)
+Defined in: [mintlayer-connect-sdk.ts:1088](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1088)
 
 ***
 
@@ -20,4 +20,4 @@ Defined in: [mintlayer-connect-sdk.ts:1083](https://github.com/mintlayer/mintlay
 
 > **token\_id**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1082](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1082)
+Defined in: [mintlayer-connect-sdk.ts:1087](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1087)

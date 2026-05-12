@@ -2,7 +2,7 @@
 
 ***
 
-Defined in: [mintlayer-connect-sdk.ts:335](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L335)
+Defined in: [mintlayer-connect-sdk.ts:340](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L340)
 
 A standalone account provider backed by explicit addresses and private keys.
 
@@ -36,7 +36,7 @@ const client = await Client.create({ network: 'testnet', accountProvider: provid
 
 > **new PrivateKeyAccountProvider**(`addresses`, `privateKeys`, `network`): `PrivateKeyAccountProvider`
 
-Defined in: [mintlayer-connect-sdk.ts:340](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L340)
+Defined in: [mintlayer-connect-sdk.ts:345](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L345)
 
 #### Parameters
 
@@ -68,7 +68,7 @@ Defined in: [mintlayer-connect-sdk.ts:340](https://github.com/mintlayer/mintlaye
 
 > **connect**(): `Promise`\<`Address`\>
 
-Defined in: [mintlayer-connect-sdk.ts:354](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L354)
+Defined in: [mintlayer-connect-sdk.ts:359](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L359)
 
 #### Returns
 
@@ -84,7 +84,7 @@ Defined in: [mintlayer-connect-sdk.ts:354](https://github.com/mintlayer/mintlaye
 
 > **disconnect**(): `Promise`\<`void`\>
 
-Defined in: [mintlayer-connect-sdk.ts:362](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L362)
+Defined in: [mintlayer-connect-sdk.ts:367](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L367)
 
 #### Returns
 
@@ -100,7 +100,7 @@ Defined in: [mintlayer-connect-sdk.ts:362](https://github.com/mintlayer/mintlaye
 
 > **request**(`method`, `params`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:364](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L364)
+Defined in: [mintlayer-connect-sdk.ts:369](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L369)
 
 #### Parameters
 
@@ -126,7 +126,7 @@ Defined in: [mintlayer-connect-sdk.ts:364](https://github.com/mintlayer/mintlaye
 
 > **restore**(): `Promise`\<`Address`\>
 
-Defined in: [mintlayer-connect-sdk.ts:358](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L358)
+Defined in: [mintlayer-connect-sdk.ts:363](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L363)
 
 #### Returns
 

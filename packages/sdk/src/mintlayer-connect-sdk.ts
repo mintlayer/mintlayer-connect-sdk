@@ -4191,6 +4191,7 @@ class Signer {
 }
 
 export { Transaction } from './transaction';
+export * from './wallet-state';
 
 export {
   Client,

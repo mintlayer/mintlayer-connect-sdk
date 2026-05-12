@@ -4,7 +4,7 @@
 
 > **BridgeRequestArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1177](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1177)
+Defined in: [mintlayer-connect-sdk.ts:1182](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1182)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:1177](https://github.com/mintlayer/mintlay
 
 > **amount**: `number`
 
-Defined in: [mintlayer-connect-sdk.ts:1179](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1179)
+Defined in: [mintlayer-connect-sdk.ts:1184](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1184)
 
 ***
 
@@ -20,7 +20,7 @@ Defined in: [mintlayer-connect-sdk.ts:1179](https://github.com/mintlayer/mintlay
 
 > **destination**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1178](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1178)
+Defined in: [mintlayer-connect-sdk.ts:1183](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1183)
 
 ***
 
@@ -28,7 +28,7 @@ Defined in: [mintlayer-connect-sdk.ts:1178](https://github.com/mintlayer/mintlay
 
 > **intent**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1181](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1181)
+Defined in: [mintlayer-connect-sdk.ts:1186](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1186)
 
 ***
 
@@ -36,4 +36,4 @@ Defined in: [mintlayer-connect-sdk.ts:1181](https://github.com/mintlayer/mintlay
 
 > **token\_id**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1180](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1180)
+Defined in: [mintlayer-connect-sdk.ts:1185](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1185)
