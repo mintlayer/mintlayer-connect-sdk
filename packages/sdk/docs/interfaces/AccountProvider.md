@@ -2,7 +2,7 @@
 
 ***
 
-Defined in: [mintlayer-connect-sdk.ts:254](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L254)
+Defined in: [mintlayer-connect-sdk.ts:259](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L259)
 
 ## Methods
 
@@ -10,7 +10,7 @@ Defined in: [mintlayer-connect-sdk.ts:254](https://github.com/mintlayer/mintlaye
 
 > **connect**(): `Promise`\<`Address`\>
 
-Defined in: [mintlayer-connect-sdk.ts:255](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L255)
+Defined in: [mintlayer-connect-sdk.ts:260](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L260)
 
 #### Returns
 
@@ -22,7 +22,7 @@ Defined in: [mintlayer-connect-sdk.ts:255](https://github.com/mintlayer/mintlaye
 
 > **disconnect**(): `Promise`\<`void`\>
 
-Defined in: [mintlayer-connect-sdk.ts:257](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L257)
+Defined in: [mintlayer-connect-sdk.ts:262](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L262)
 
 #### Returns
 
@@ -34,7 +34,7 @@ Defined in: [mintlayer-connect-sdk.ts:257](https://github.com/mintlayer/mintlaye
 
 > **request**(`method`, `params`): `Promise`\<`any`\>
 
-Defined in: [mintlayer-connect-sdk.ts:258](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L258)
+Defined in: [mintlayer-connect-sdk.ts:263](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L263)
 
 #### Parameters
 
@@ -56,7 +56,7 @@ Defined in: [mintlayer-connect-sdk.ts:258](https://github.com/mintlayer/mintlaye
 
 > **restore**(): `Promise`\<`Address`\>
 
-Defined in: [mintlayer-connect-sdk.ts:256](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L256)
+Defined in: [mintlayer-connect-sdk.ts:261](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L261)
 
 #### Returns
 

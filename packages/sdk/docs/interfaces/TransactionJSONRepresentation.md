@@ -2,7 +2,7 @@
 
 ***
 
-Defined in: [mintlayer-connect-sdk.ts:835](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L835)
+Defined in: [mintlayer-connect-sdk.ts:840](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L840)
 
 ## Properties
 
@@ -10,7 +10,7 @@ Defined in: [mintlayer-connect-sdk.ts:835](https://github.com/mintlayer/mintlaye
 
 > `optional` **fee**: `AmountFields`
 
-Defined in: [mintlayer-connect-sdk.ts:838](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L838)
+Defined in: [mintlayer-connect-sdk.ts:843](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L843)
 
 ***
 
@@ -18,7 +18,7 @@ Defined in: [mintlayer-connect-sdk.ts:838](https://github.com/mintlayer/mintlaye
 
 > **id**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:839](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L839)
+Defined in: [mintlayer-connect-sdk.ts:844](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L844)
 
 ***
 
@@ -26,7 +26,7 @@ Defined in: [mintlayer-connect-sdk.ts:839](https://github.com/mintlayer/mintlaye
 
 > **inputs**: `Input`[]
 
-Defined in: [mintlayer-connect-sdk.ts:836](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L836)
+Defined in: [mintlayer-connect-sdk.ts:841](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L841)
 
 ***
 
@@ -34,4 +34,4 @@ Defined in: [mintlayer-connect-sdk.ts:836](https://github.com/mintlayer/mintlaye
 
 > **outputs**: `Output`[]
 
-Defined in: [mintlayer-connect-sdk.ts:837](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L837)
+Defined in: [mintlayer-connect-sdk.ts:842](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L842)

@@ -4,7 +4,7 @@
 
 > **CreateOrderArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1159](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1159)
+Defined in: [mintlayer-connect-sdk.ts:1164](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1164)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:1159](https://github.com/mintlayer/mintlay
 
 > **ask\_amount**: `number`
 
-Defined in: [mintlayer-connect-sdk.ts:1162](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1162)
+Defined in: [mintlayer-connect-sdk.ts:1167](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1167)
 
 ***
 
@@ -20,7 +20,7 @@ Defined in: [mintlayer-connect-sdk.ts:1162](https://github.com/mintlayer/mintlay
 
 > **ask\_token**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1161](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1161)
+Defined in: [mintlayer-connect-sdk.ts:1166](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1166)
 
 ***
 
@@ -28,7 +28,7 @@ Defined in: [mintlayer-connect-sdk.ts:1161](https://github.com/mintlayer/mintlay
 
 > **conclude\_destination**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1160](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1160)
+Defined in: [mintlayer-connect-sdk.ts:1165](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1165)
 
 ***
 
@@ -36,7 +36,7 @@ Defined in: [mintlayer-connect-sdk.ts:1160](https://github.com/mintlayer/mintlay
 
 > **give\_amount**: `number`
 
-Defined in: [mintlayer-connect-sdk.ts:1164](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1164)
+Defined in: [mintlayer-connect-sdk.ts:1169](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1169)
 
 ***
 
@@ -44,4 +44,4 @@ Defined in: [mintlayer-connect-sdk.ts:1164](https://github.com/mintlayer/mintlay
 
 > **give\_token**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1163](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1163)
+Defined in: [mintlayer-connect-sdk.ts:1168](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1168)

@@ -2,7 +2,7 @@
 
 ***
 
-Defined in: [mintlayer-connect-sdk.ts:4040](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L4040)
+Defined in: [mintlayer-connect-sdk.ts:4055](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L4055)
 
 ## Constructors
 
@@ -10,7 +10,7 @@ Defined in: [mintlayer-connect-sdk.ts:4040](https://github.com/mintlayer/mintlay
 
 > **new Signer**(`privateKeys`, `network`): `Signer`
 
-Defined in: [mintlayer-connect-sdk.ts:4044](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L4044)
+Defined in: [mintlayer-connect-sdk.ts:4059](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L4059)
 
 #### Parameters
 
@@ -32,7 +32,7 @@ Defined in: [mintlayer-connect-sdk.ts:4044](https://github.com/mintlayer/mintlay
 
 > **sign**(`tx`): `string`
 
-Defined in: [mintlayer-connect-sdk.ts:4172](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L4172)
+Defined in: [mintlayer-connect-sdk.ts:4187](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L4187)
 
 #### Parameters
 

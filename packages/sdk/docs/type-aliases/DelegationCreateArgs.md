@@ -4,7 +4,7 @@
 
 > **DelegationCreateArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1146](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1146)
+Defined in: [mintlayer-connect-sdk.ts:1151](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1151)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:1146](https://github.com/mintlayer/mintlay
 
 > **destination**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1148](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1148)
+Defined in: [mintlayer-connect-sdk.ts:1153](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1153)
 
 ***
 
@@ -20,4 +20,4 @@ Defined in: [mintlayer-connect-sdk.ts:1148](https://github.com/mintlayer/mintlay
 
 > **pool\_id**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1147](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1147)
+Defined in: [mintlayer-connect-sdk.ts:1152](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1152)

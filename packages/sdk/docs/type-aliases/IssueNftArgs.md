@@ -4,7 +4,7 @@
 
 > **IssueNftArgs** = `object`
 
-Defined in: [mintlayer-connect-sdk.ts:1086](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1086)
+Defined in: [mintlayer-connect-sdk.ts:1091](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1091)
 
 ## Properties
 
@@ -12,7 +12,7 @@ Defined in: [mintlayer-connect-sdk.ts:1086](https://github.com/mintlayer/mintlay
 
 > **additional\_metadata\_uri**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1089](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1089)
+Defined in: [mintlayer-connect-sdk.ts:1094](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1094)
 
 ***
 
@@ -20,7 +20,7 @@ Defined in: [mintlayer-connect-sdk.ts:1089](https://github.com/mintlayer/mintlay
 
 > `optional` **creator**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1088](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1088)
+Defined in: [mintlayer-connect-sdk.ts:1093](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1093)
 
 ***
 
@@ -28,7 +28,7 @@ Defined in: [mintlayer-connect-sdk.ts:1088](https://github.com/mintlayer/mintlay
 
 > **description**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1090](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1090)
+Defined in: [mintlayer-connect-sdk.ts:1095](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1095)
 
 ***
 
@@ -36,7 +36,7 @@ Defined in: [mintlayer-connect-sdk.ts:1090](https://github.com/mintlayer/mintlay
 
 > **destination**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1087](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1087)
+Defined in: [mintlayer-connect-sdk.ts:1092](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1092)
 
 ***
 
@@ -44,7 +44,7 @@ Defined in: [mintlayer-connect-sdk.ts:1087](https://github.com/mintlayer/mintlay
 
 > **icon\_uri**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1091](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1091)
+Defined in: [mintlayer-connect-sdk.ts:1096](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1096)
 
 ***
 
@@ -52,7 +52,7 @@ Defined in: [mintlayer-connect-sdk.ts:1091](https://github.com/mintlayer/mintlay
 
 > **media\_hash**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1092](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1092)
+Defined in: [mintlayer-connect-sdk.ts:1097](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1097)
 
 ***
 
@@ -60,7 +60,7 @@ Defined in: [mintlayer-connect-sdk.ts:1092](https://github.com/mintlayer/mintlay
 
 > **media\_uri**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1093](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1093)
+Defined in: [mintlayer-connect-sdk.ts:1098](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1098)
 
 ***
 
@@ -68,7 +68,7 @@ Defined in: [mintlayer-connect-sdk.ts:1093](https://github.com/mintlayer/mintlay
 
 > **name**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1094](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1094)
+Defined in: [mintlayer-connect-sdk.ts:1099](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1099)
 
 ***
 
@@ -76,4 +76,4 @@ Defined in: [mintlayer-connect-sdk.ts:1094](https://github.com/mintlayer/mintlay
 
 > **ticker**: `string`
 
-Defined in: [mintlayer-connect-sdk.ts:1095](https://github.com/mintlayer/mintlayer-connect-sdk/blob/c2e3af8c362a53736f94c0d91571f12868b57f86/packages/sdk/src/mintlayer-connect-sdk.ts#L1095)
+Defined in: [mintlayer-connect-sdk.ts:1100](https://github.com/mintlayer/mintlayer-connect-sdk/blob/e5da6dd553558de82047535da674569c83acf075/packages/sdk/src/mintlayer-connect-sdk.ts#L1100)
