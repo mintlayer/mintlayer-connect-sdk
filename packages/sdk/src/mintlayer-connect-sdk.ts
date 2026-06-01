@@ -2871,35 +2871,29 @@ class Client {
         }
       }).flat();
 
-    // @ts-ignore
-    if (transactionJSONrepresentation.inputs[0].input.account_type === 'DelegationBalance') {
-      // @ts-ignore
-      inputAddresses.push(transactionJSONrepresentation.outputs[0].destination);
+    const firstInput = transactionJSONrepresentation.inputs[0]?.input as any;
+
+    if (firstInput?.account_type === 'DelegationBalance') {
+      inputAddresses.push((transactionJSONrepresentation.outputs[0] as any).destination);
     }
-    // @ts-ignore
-    if (transactionJSONrepresentation.inputs[0].input.input_type === 'AccountCommand') {
-      // @ts-ignore
-      if (transactionJSONrepresentation.inputs[0].input.destination) {
-        // @ts-ignore
-        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.destination);
+
+    if (firstInput?.input_type === 'AccountCommand') {
+      if (firstInput.destination) {
+        inputAddresses.push(firstInput.destination);
       }
-      // @ts-ignore
-      if (transactionJSONrepresentation.inputs[0].input.authority) {
-        // @ts-ignore
-        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.authority);
+
+      if (firstInput.authority) {
+        inputAddresses.push(firstInput.authority);
       }
     }
-    // @ts-ignore
-    if (transactionJSONrepresentation.inputs[0].input.input_type === 'Account') {
-      // @ts-ignore
-      if (transactionJSONrepresentation.inputs[0].input.destination) {
-        // @ts-ignore
-        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.destination);
+
+    if (firstInput?.input_type === 'Account') {
+      if (firstInput.destination) {
+        inputAddresses.push(firstInput.destination);
       }
-      // @ts-ignore
-      if (transactionJSONrepresentation.inputs[0].input.authority) {
-        // @ts-ignore
-        inputAddresses.push(transactionJSONrepresentation.inputs[0].input.authority);
+
+      if (firstInput.authority) {
+        inputAddresses.push(firstInput.authority);
       }
     }
 

@@ -46,13 +46,13 @@ test('create delegation uses a single coin UTXO to calculate the fee', async () 
     destination: 'tmt1q9874wgx6enm2mzfu0yxhzleu84pp00l95l7er5z',
   });
 
-  expect(tx.inputs).toHaveLength(1);
-  expect(tx.inputs[0]).toMatchObject({
+  expect(tx.JSONRepresentation.inputs).toHaveLength(1);
+  expect(tx.JSONRepresentation.inputs[0]).toMatchObject({
     input: {
       input_type: 'UTXO',
     },
   });
-  expect(tx.outputs).toEqual(
+  expect(tx.JSONRepresentation.outputs).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         type: 'CreateDelegationId',
