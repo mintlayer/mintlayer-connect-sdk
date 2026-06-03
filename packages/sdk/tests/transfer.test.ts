@@ -164,6 +164,40 @@ test('fails transfer if not enough utxo', async () => {
   })).rejects.toThrow('Not enough coin UTXOs');
 });
 
+test('transfer ignores account entries without utxo', async () => {
+  fetchMock.mockIf('https://mojito-api.mintlayer.org/mintlayer/testnet/batch', async () => {
+    return {
+      body: JSON.stringify({
+        results: [[
+          {
+            input: {
+              input_type: 'Account',
+              account_type: 'DelegationBalance',
+              amount: {
+                atoms: '100000000000',
+                decimal: '1',
+              },
+              delegation_id: 'tde1q9gndm5e2d6w33xtm26gppaj29qh52gnxwucnqlq',
+              nonce: 1,
+            },
+          },
+          ...utxos,
+        ]],
+      }),
+    };
+  });
+
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  const result = await client.transfer({
+    to: 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc',
+    amount: 10,
+  });
+
+  expect(result).toBe('signed-transaction');
+});
+
 test('transfer transfer fee precise', async () => {
   const client = await Client.create({ network: 'testnet', autoRestore: false });
 

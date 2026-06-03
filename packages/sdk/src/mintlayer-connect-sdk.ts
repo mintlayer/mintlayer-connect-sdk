@@ -2449,6 +2449,10 @@ class Client {
     })) : [];
 
     const utxos: UtxoEntry[] = data_utxos.filter((item: UtxoEntry) => {
+      if (!item.utxo) {
+        return false;
+      }
+
       // filter out UTXO with type htlc, they have to be added manually
       if (item.utxo.type === 'Htlc') {
         return false;
