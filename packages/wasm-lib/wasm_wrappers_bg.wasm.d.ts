@@ -4,6 +4,7 @@ export const memory: WebAssembly.Memory;
 export const data_deposit_fee: (a: bigint, b: number) => number;
 export const decode_partially_signed_transaction_to_js: (a: number, b: number, c: number) => [number, number, number];
 export const decode_signed_transaction_to_js: (a: number, b: number, c: number) => [number, number, number];
+export const decode_transaction_to_js: (a: number, b: number, c: number) => [number, number, number];
 export const effective_pool_balance: (a: number, b: number, c: number) => [number, number, number];
 export const encode_destination: (a: number, b: number, c: number) => [number, number, number, number];
 export const encode_lock_for_block_count: (a: bigint) => [number, number];

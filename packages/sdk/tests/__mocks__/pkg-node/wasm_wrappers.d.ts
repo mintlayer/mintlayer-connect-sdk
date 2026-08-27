@@ -138,6 +138,11 @@ export function decode_partially_signed_transaction_to_js(transaction: Uint8Arra
 export function decode_signed_transaction_to_js(transaction: Uint8Array, network: Network): any;
 
 /**
+ * Decodes an unsigned transaction from its binary encoding into a JavaScript object.
+ */
+export function decode_transaction_to_js(transaction: Uint8Array, network: Network): any;
+
+/**
  * Calculate the "effective balance" of a pool, given the total pool balance and pledge by the pool owner/staker.
  * The effective balance is how the influence of a pool is calculated due to its balance.
  */

@@ -243,7 +243,7 @@ test('fromHex restores a coin transfer transaction', () => {
 
   const hex = transaction.hex();
 
-  const restored = Transaction.fromHEX(hex);
+  const restored = Transaction.fromHEX(hex).enrichUtxo(COIN_UTXO);
 
   expect(restored).toBeDefined();
   expect(restored.hex()).toBe(hex);
@@ -254,7 +254,7 @@ test('fromHex restores a coin transfer transaction', () => {
   expect(restoredJson.id).toBe(originalJson.id);
   expect(restoredJson.inputs).toEqual(originalJson.inputs);
   expect(restoredJson.outputs).toEqual(originalJson.outputs);
-  expect(restoredJson.fee).toEqual(originalJson.fee);
+  expect(restored.getFee()).toEqual(originalJson.fee);
 });
 
 test('fromHex rejects invalid hex', () => {

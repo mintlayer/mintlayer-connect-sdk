@@ -107,6 +107,46 @@ export class Transaction {
     return this;
   }
 
+  enrichUtxo(knownUtxo: any): this {
+    const input = this.jsonRepresentation.inputs.find(
+      ({ input }: any) =>
+        input.index === knownUtxo.outpoint.index &&
+        input.input_type === knownUtxo.outpoint.input_type &&
+        input.source_id === knownUtxo.outpoint.source_id &&
+        input.source_type === knownUtxo.outpoint.source_type,
+    );
+
+    if (!input) {
+      throw new Error(`UTXO input not found: ${knownUtxo.outpoint.source_id}:${knownUtxo.outpoint.index}`);
+    }
+
+    input.utxo = knownUtxo.utxo;
+
+    this.updateFee();
+
+    return this;
+  }
+
+  private updateFee(): void {
+    const inputAtoms = this.jsonRepresentation.inputs.reduce((total: any, item: any) => {
+      const atoms = item.utxo?.value?.amount?.atoms;
+
+      return atoms === undefined ? total : total + BigInt(atoms);
+    }, 0n);
+
+    const outputAtoms = this.jsonRepresentation.outputs.reduce((total: any, output: any) => {
+      return total + BigInt(output.value.amount.atoms);
+    }, 0n);
+
+    const feeAtoms = inputAtoms - outputAtoms;
+
+    if (feeAtoms < 0n) {
+      throw new Error('Transaction fee cannot be negative');
+    }
+
+    this.fee = BigInt(feeAtoms);
+  }
+
   setNetwork(network: 'mainnet' | 'testnet') {
     this.network = network;
     return this;
@@ -157,10 +197,11 @@ export class Transaction {
 
     const network = this.network === 'mainnet' ? 0 : 1;
 
-    const decoded = wasmLib.decode_signed_transaction_to_js(bytes, network);
+    const decoded = wasmLib.decode_transaction_to_js(bytes, network);
 
     this.hexRepresentation = hex;
-    this.jsonRepresentation = decoded;
+    this.jsonRepresentation = decoded_to_json_representation(decoded);
+    this.jsonRepresentation.id = get_transaction_id(bytes, false);
     this.transactionId = get_transaction_id(bytes, false);
 
     return this;
@@ -750,10 +791,10 @@ export class Transaction {
         type: 'Coin',
         amount: {
           atoms: amount,
-          decimal: amount,
+          decimal: atomsToDecimal(amount, 11),
         },
       },
-    }
+    };
   }
 
   transferToken(destination: string, amount: string, token_id: string): Output {
@@ -783,7 +824,57 @@ export class Transaction {
         delegation_id: '',
         amount: 0,
       },
-    }
+    };
   }
-
 }
+
+const decoded_to_json_representation = (decoded: any) => {
+  const tx = decoded.V1;
+
+  return {
+    inputs: tx.inputs.map((input: any, index: any) => {
+      if (input.Utxo) {
+        return {
+          input: {
+            index,
+            input_type: 'UTXO',
+            source_id: input.Utxo.id.Transaction,
+            source_type: 'Transaction',
+          },
+        };
+      }
+
+      if (input.Account) {
+        return {
+          input: {
+            index,
+            input_type: 'ACCOUNT',
+            // TODO: map account input fields if needed
+          },
+        };
+      }
+
+      throw new Error(`Unsupported input type at index ${index}`);
+    }),
+
+    outputs: tx.outputs.map((output: any) => {
+      if (output.Transfer) {
+        const [value, destination] = output.Transfer;
+
+        return {
+          type: 'Transfer',
+          destination,
+          value: {
+            type: Object.keys(value)[0],
+            amount: {
+              atoms: value[Object.keys(value)[0]].atoms,
+              decimal: atomsToDecimal(value[Object.keys(value)[0]].atoms, 11),
+            },
+          },
+        };
+      }
+
+      throw new Error(`Unsupported output type: ${Object.keys(output)[0]}`);
+    }),
+  };
+};

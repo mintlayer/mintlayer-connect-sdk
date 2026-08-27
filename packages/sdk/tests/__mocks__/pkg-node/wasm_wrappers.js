@@ -175,6 +175,23 @@ function decode_signed_transaction_to_js(transaction, network) {
 exports.decode_signed_transaction_to_js = decode_signed_transaction_to_js;
 
 /**
+ * Decodes an unsigned transaction from its binary encoding into a JavaScript object.
+ * @param {Uint8Array} transaction
+ * @param {Network} network
+ * @returns {any}
+ */
+function decode_transaction_to_js(transaction, network) {
+    const ptr0 = passArray8ToWasm0(transaction, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.decode_transaction_to_js(ptr0, len0, network);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+exports.decode_transaction_to_js = decode_transaction_to_js;
+
+/**
  * Calculate the "effective balance" of a pool, given the total pool balance and pledge by the pool owner/staker.
  * The effective balance is how the influence of a pool is calculated due to its balance.
  * @param {Network} network

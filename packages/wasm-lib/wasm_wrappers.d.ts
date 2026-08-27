@@ -55,7 +55,6 @@ export interface SimpleTokenAmount {
 export class Amount {
     private constructor();
     free(): void;
-    // @ts-ignore
     [Symbol.dispose](): void;
     atoms(): string;
     static from_atoms(atoms: string): Amount;
@@ -137,6 +136,11 @@ export function decode_partially_signed_transaction_to_js(transaction: Uint8Arra
  * Decodes a signed transaction from its binary encoding into a JavaScript object.
  */
 export function decode_signed_transaction_to_js(transaction: Uint8Array, network: Network): any;
+
+/**
+ * Decodes an unsigned transaction from its binary encoding into a JavaScript object.
+ */
+export function decode_transaction_to_js(transaction: Uint8Array, network: Network): any;
 
 /**
  * Calculate the "effective balance" of a pool, given the total pool balance and pledge by the pool owner/staker.
@@ -706,6 +710,7 @@ export interface InitOutput {
     readonly data_deposit_fee: (a: bigint, b: number) => number;
     readonly decode_partially_signed_transaction_to_js: (a: number, b: number, c: number) => [number, number, number];
     readonly decode_signed_transaction_to_js: (a: number, b: number, c: number) => [number, number, number];
+    readonly decode_transaction_to_js: (a: number, b: number, c: number) => [number, number, number];
     readonly effective_pool_balance: (a: number, b: number, c: number) => [number, number, number];
     readonly encode_destination: (a: number, b: number, c: number) => [number, number, number, number];
     readonly encode_lock_for_block_count: (a: bigint) => [number, number];
