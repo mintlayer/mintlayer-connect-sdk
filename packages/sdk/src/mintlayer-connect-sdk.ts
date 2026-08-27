@@ -882,11 +882,16 @@ type TransferParams =
       token_details?: undefined;
     };
 
+type TransactionOpts = {
+  withUTXO?: UtxoEntry[];
+  forceSpendUtxo?: UtxoEntry[];
+};
+
 type BuildTransactionParams =
   | {
       type: 'Transfer';
       params: TransferParams;
-      opts?: any; // TODO: define options type
+      opts?: TransactionOpts;
     }
   | {
       type: 'BurnToken';
@@ -895,6 +900,7 @@ type BuildTransactionParams =
         token_id: string;
         token_details?: TokenDetails;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'IssueFungibleToken';
@@ -907,6 +913,7 @@ type BuildTransactionParams =
         supply_type: 'Unlimited' | 'Lockable' | 'Fixed';
         supply_amount?: number;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'IssueNft';
@@ -921,6 +928,7 @@ type BuildTransactionParams =
         name: string;
         ticker: string;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'MintToken';
@@ -930,6 +938,7 @@ type BuildTransactionParams =
         token_id: string;
         token_details: TokenDetails;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'UnmintToken';
@@ -938,6 +947,7 @@ type BuildTransactionParams =
         token_id: string;
         token_details: TokenDetails;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'FreezeToken';
@@ -946,6 +956,7 @@ type BuildTransactionParams =
         token_details: TokenDetails;
         is_unfreezable: boolean;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'LockTokenSupply';
@@ -954,6 +965,7 @@ type BuildTransactionParams =
         token_details: TokenDetails;
         is_unfreezable?: boolean;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'UnfreezeToken';
@@ -961,6 +973,7 @@ type BuildTransactionParams =
         token_id: string;
         token_details: TokenDetails;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'ChangeMetadataUri';
@@ -969,6 +982,7 @@ type BuildTransactionParams =
         token_details: TokenDetails;
         new_metadata_uri: string;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'ChangeTokenAuthority';
@@ -977,12 +991,14 @@ type BuildTransactionParams =
         token_details: TokenDetails;
         new_authority: string;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'DataDeposit';
       params: {
         data: string;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'CreateDelegationId';
@@ -990,6 +1006,7 @@ type BuildTransactionParams =
         destination: string;
         pool_id: string;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'DelegateStaking';
@@ -997,6 +1014,7 @@ type BuildTransactionParams =
         delegation_id: string;
         amount: number;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'DelegationWithdraw';
@@ -1005,6 +1023,7 @@ type BuildTransactionParams =
         amount: number;
         delegation_details: DelegationDetails;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'CreateOrder';
@@ -1017,12 +1036,14 @@ type BuildTransactionParams =
         ask_token_details?: TokenDetails;
         give_token_details?: TokenDetails;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'ConcludeOrder';
       params: {
         order: OrderData;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'FillOrder';
@@ -1034,6 +1055,7 @@ type BuildTransactionParams =
         ask_token_details: TokenDetails;
         give_token_details: TokenDetails;
       };
+      opts?: TransactionOpts;
     }
   | {
       type: 'Htlc';
@@ -1048,6 +1070,7 @@ type BuildTransactionParams =
         refund_address: string;
         refund_timelock: Timelock;
       };
+      opts?: TransactionOpts;
     };
 
 interface OrderData {
@@ -2434,19 +2457,23 @@ class Client {
     const currentAddress = address;
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
-    const data_utxos = await this.apiProvider.getAccountUtxos(
-      addressList,
-      this.network === 'mainnet' ? 0 : 1,
-    );
+    let data_utxos: UtxoEntry[];
 
-    // @ts-ignore
-    const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo ? arg?.opts?.forceSpendUtxo.map((item: UtxoEntry) => ({
-      input: {
-        ...item.outpoint,
-        input_type: 'UTXO',
-      },
-      utxo: item.utxo,
-    })) : [];
+    if (arg?.opts?.withUTXO) {
+      data_utxos = arg?.opts?.withUTXO;
+    } else {
+      data_utxos = await this.apiProvider.getAccountUtxos(addressList, this.network === 'mainnet' ? 0 : 1);
+    }
+
+    const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo
+      ? arg?.opts?.forceSpendUtxo.map((item: UtxoEntry) => ({
+          outpoint: {
+            ...item.outpoint,
+            input_type: 'UTXO',
+          },
+          utxo: item.utxo,
+        }))
+      : [];
 
     const utxos: UtxoEntry[] = data_utxos.filter((item: UtxoEntry) => {
       if (!item.utxo) {
@@ -2481,9 +2508,11 @@ class Client {
         ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
         : [];
 
-      if(forceSpendUtxo) {
-        const forceCoinUtxos = forceSpendUtxo.filter(utxo => utxo.utxo.value.type === 'Coin');
-        const forceTokenUtxos = forceSpendUtxo.filter(utxo => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === send_token?.token_id);
+      if (forceSpendUtxo) {
+        const forceCoinUtxos = forceSpendUtxo.filter((utxo) => utxo.utxo.value.type === 'Coin');
+        const forceTokenUtxos = forceSpendUtxo.filter(
+          (utxo) => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === send_token?.token_id,
+        );
 
         if (forceCoinUtxos.length > 0) {
           // @ts-ignore
@@ -2494,7 +2523,6 @@ class Client {
           inputObjToken.unshift(...forceTokenUtxos);
         }
       }
-
 
       const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
       const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
@@ -2558,10 +2586,13 @@ class Client {
           atoms: totalFee.toString(),
           decimal: atomsToDecimal(totalFee.toString(), 11).toString(),
         },
-        id: 'to_be_filled_in'
+        id: 'to_be_filled_in',
       };
 
-      const BINRepresentation = this.getTransactionBINrepresentation(JSONRepresentation, this.network === 'mainnet' ? 0 : 1);
+      const BINRepresentation = this.getTransactionBINrepresentation(
+        JSONRepresentation,
+        this.network === 'mainnet' ? 0 : 1,
+      );
 
       const transaction_size_in_bytes = BigInt(Math.ceil(BINRepresentation.transactionsize));
       const fee_amount_per_kb = BigInt('100000000000'); // TODO: Get the current feerate from the network
@@ -3617,6 +3648,7 @@ class Client {
       type: 'Htlc',
       params: {
         amount: params.amount,
+        // @ts-ignore
         token_id: params.token_id,
         token_details: token_details || undefined,
         // @ts-ignore
