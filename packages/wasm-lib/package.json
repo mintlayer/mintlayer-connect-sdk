@@ -1,6 +1,6 @@
 {
   "name": "@mintlayer/wasm-lib",
-  "version": "0.1.0",
+  "version": "1.4.0",
   "description": "A WebAssembly library compiled from Rust for browser and Node.js",
   "license": "MIT",
   "main": "wasm_wrappers.js",

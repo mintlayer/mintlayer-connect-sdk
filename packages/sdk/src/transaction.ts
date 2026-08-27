@@ -36,7 +36,11 @@ import {
   Network,
   TokenUnfreezable,
   TotalSupply,
+  decode_signed_transaction_to_js,
 } from '@mintlayer/wasm-lib';
+
+import * as wasmLib from '@mintlayer/wasm-lib';
+
 import { mergeUint8Arrays, atomsToDecimal, stringToUint8Array } from './utils';
 import { UtxoEntry, UtxoInput } from './types/transaction';
 
@@ -148,6 +152,16 @@ export class Transaction {
     if (hex.length % 2 !== 0) {
       throw new Error('Transaction hex must have an even number of characters');
     }
+
+    const bytes = new Uint8Array(hex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
+
+    const network = this.network === 'mainnet' ? 0 : 1;
+
+    const decoded = wasmLib.decode_signed_transaction_to_js(bytes, network);
+
+    this.hexRepresentation = hex;
+    this.jsonRepresentation = decoded;
+    this.transactionId = get_transaction_id(bytes, false);
 
     return this;
   }
@@ -444,7 +458,12 @@ export class Transaction {
       .filter(({ input }) => input.input_type === 'AccountCommand' || input.input_type === 'Account')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
-          return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), network);
+          return encode_input_for_conclude_order(
+            input.order_id,
+            BigInt(input.nonce.toString()),
+            BigInt(this.currentBlockHeight),
+            network,
+          );
         }
         if (input.command === 'FillOrder') {
           return encode_input_for_fill_order(
@@ -452,6 +471,7 @@ export class Transaction {
             Amount.from_atoms(input.fill_atoms.toString()),
             input.destination,
             BigInt(input.nonce.toString()),
+            BigInt(this.currentBlockHeight),
             network,
           );
         }

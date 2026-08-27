@@ -1,6 +1,6 @@
 {
   "name": "wasm-wrappers",
-  "version": "1.0.2",
+  "version": "1.4.0",
   "license": "MIT",
   "files": [
     "wasm_wrappers_bg.wasm",

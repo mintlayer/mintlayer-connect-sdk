@@ -12,7 +12,7 @@
     "docs": "typedoc --options typedoc.js"
   },
   "dependencies": {
-    "@mintlayer/wasm-lib": "^0.1.0"
+    "@mintlayer/wasm-lib": "workspace:*"
   },
   "keywords": [],
   "author": "",
