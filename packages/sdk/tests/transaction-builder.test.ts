@@ -220,3 +220,35 @@ test('nft transfer produces no token change and a fee', () => {
   expect(nftOut).toBeDefined();
   expect(nftOut.value.amount.atoms).toBe('1');
 });
+
+test('fromHex restores a coin transfer transaction', () => {
+  const transaction = new Transaction()
+    .setNetwork('testnet')
+    .setChangeAddress(CHANGE_ADDR)
+    .withUTXO(COIN_UTXO)
+    .addOutput(new Transaction().transfer(RECIPIENT, '10'))
+    .build();
+
+  const hex = transaction.hex();
+
+  const restored = Transaction.fromHEX(hex);
+
+  expect(restored).toBeDefined();
+  expect(restored.hex()).toBe(hex);
+
+  const originalJson = transaction.json();
+  const restoredJson = restored.json();
+
+  expect(restoredJson.id).toBe(originalJson.id);
+  expect(restoredJson.inputs).toEqual(originalJson.inputs);
+  expect(restoredJson.outputs).toEqual(originalJson.outputs);
+  expect(restoredJson.fee).toEqual(originalJson.fee);
+});
+
+test('fromHex rejects invalid hex', () => {
+  expect(() => Transaction.fromHEX('deadbeef')).toThrow();
+});
+
+test('fromHex rejects malformed hex', () => {
+  expect(() => Transaction.fromHEX('not-a-hex')).toThrow();
+});

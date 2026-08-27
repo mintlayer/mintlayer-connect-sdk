@@ -133,7 +133,34 @@ export class Transaction {
   }
 
   fromHEX(hex: string) {
+    if (typeof hex !== 'string') {
+      throw new Error('Transaction hex must be a string');
+    }
+
+    if (!hex.length) {
+      throw new Error('Transaction hex cannot be empty');
+    }
+
+    if (!/^[0-9a-fA-F]+$/.test(hex)) {
+      throw new Error('Transaction hex contains invalid characters');
+    }
+
+    if (hex.length % 2 !== 0) {
+      throw new Error('Transaction hex must have an even number of characters');
+    }
+
     return this;
+  }
+
+  static fromHEX(
+    hex: string,
+    options: {
+      network?: 'mainnet' | 'testnet';
+    } = {},
+  ) {
+    const transaction = new Transaction(options);
+
+    return transaction.fromHEX(hex);
   }
 
   getTransactionId() {
