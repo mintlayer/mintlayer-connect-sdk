@@ -12,13 +12,14 @@
     "docs": "typedoc --options typedoc.js"
   },
   "dependencies": {
-    "@mintlayer/wasm-lib": "^0.1.0"
+    "@mintlayer/wasm-lib": "workspace:*"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@types/jest": "^29.5.14",
+    "@types/node":"^20.4.2",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "jest-fetch-mock": "^3.0.3",

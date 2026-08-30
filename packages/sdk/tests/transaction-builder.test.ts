@@ -2,6 +2,9 @@ import {
   Transaction,
 } from '../src/transaction';
 
+import * as wasmLib from '@mintlayer/wasm-lib';
+
+
 const CHANGE_ADDR = 'tmt1qycauu4rc92v80vpjrtkqjv2utr7jl5ygve28sdt';
 const RECIPIENT = 'tmt1q9mfg7d6ul2nt5yhmm7l7r6wwyqkd822rymr83uc';
 const COIN_UTXO = {
@@ -219,4 +222,45 @@ test('nft transfer produces no token change and a fee', () => {
   ) as any;
   expect(nftOut).toBeDefined();
   expect(nftOut.value.amount.atoms).toBe('1');
+});
+
+test('fromHex restores a coin transfer transaction from predefined string', () => {
+  const t_hex =
+    '0100040000cfbf6a782377d1936ae404d49d4862267c72e365c65668cb07d5c78f1e1f9b7b010000000800000b0038d360ba010137d69c6f94355b7b37f4c3f899e0dd2f2765fb3b00000f4007ee39c08b0301d26a1ca86df0108c4fde32ec77ddf5eaedac5906';
+
+  const restored = Transaction.fromHEX(t_hex);
+
+  expect(restored.transaction_id).toBe('7b0272c04824ce1bba10495e8c1de135761687b82cf860d2baf06516a05ff776');
+});
+
+test('fromHex restores a coin transfer transaction', () => {
+  const transaction = new Transaction()
+    .setNetwork('testnet')
+    .setChangeAddress(CHANGE_ADDR)
+    .withUTXO(COIN_UTXO)
+    .addOutput(new Transaction().transfer(RECIPIENT, '10'))
+    .build();
+
+  const hex = transaction.hex();
+
+  const restored = Transaction.fromHEX(hex).enrichUtxo(COIN_UTXO);
+
+  expect(restored).toBeDefined();
+  expect(restored.hex()).toBe(hex);
+
+  const originalJson = transaction.json();
+  const restoredJson = restored.json();
+
+  expect(restoredJson.id).toBe(originalJson.id);
+  expect(restoredJson.inputs).toEqual(originalJson.inputs);
+  expect(restoredJson.outputs).toEqual(originalJson.outputs);
+  expect(restored.getFee()).toEqual(originalJson.fee);
+});
+
+test('fromHex rejects invalid hex', () => {
+  expect(() => Transaction.fromHEX('deadbeef')).toThrow();
+});
+
+test('fromHex rejects malformed hex', () => {
+  expect(() => Transaction.fromHEX('not-a-hex')).toThrow();
 });

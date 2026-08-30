@@ -2609,8 +2609,10 @@ class Client {
         const transaction_id = get_transaction_id(transaction, true);
 
         if (finalOutputs.some((output) => output.type === 'IssueNft')) {
+          const block_height = 200000n; // TODO: Get the current block height
           const token_id = get_token_id(
             mergeUint8Arrays(BINRepresentation.inputs),
+            block_height,
             this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
           );
           const index = finalOutputs.findIndex((output) => output.type === 'IssueNft');
@@ -2675,14 +2677,17 @@ class Client {
       .filter(({ input }) => input.input_type === 'AccountCommand' || input.input_type === 'Account')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
-          return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), network);
+          const block_height = 200000n; // TODO: Get the current block height
+          return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), block_height, network);
         }
         if (input.command === 'FillOrder') {
+          const block_height = 200000n; // TODO: Get the current block height
           return encode_input_for_fill_order(
             input.order_id,
             Amount.from_atoms(input.fill_atoms.toString()),
             input.destination,
             BigInt(input.nonce.toString()),
+            BigInt(block_height),
             network,
           );
         }
@@ -4150,7 +4155,7 @@ class Signer {
       (input, index) => {
         let address: string | undefined = undefined;
 
-        if(input.input.input_type === 'UTXO') {
+        if (input.input.input_type === 'UTXO') {
           const utxoInput = input as UtxoInput;
           address = utxoInput.utxo.destination;
         }
@@ -4168,13 +4173,19 @@ class Signer {
           throw new Error(`Address not found for input at index ${index}`);
         }
 
-        const addressPrivateKey = this.getPrivateKey(address)
+        const addressPrivateKey = this.getPrivateKey(address);
 
         if (!addressPrivateKey) {
           throw new Error(`Private key not found for address: ${address}`);
         }
 
         const transaction = this.hexToUint8Array(tx.HEXRepresentation_unsigned);
+
+        const block_height = 200000n; // TODO: Get the current block height
+        const additional_info = {
+          pool_info: {},
+          order_info: {}
+        };
 
         const witness = encode_witness(
           SignatureHashType.ALL,
@@ -4183,9 +4194,11 @@ class Signer {
           transaction,
           optUtxos,
           index,
+          additional_info,
+          block_height,
           network,
-        )
-        return witness
+        );
+        return witness;
       },
     )
 

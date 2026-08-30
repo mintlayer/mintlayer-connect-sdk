@@ -172,12 +172,15 @@ importers:
   packages/sdk:
     dependencies:
       '@mintlayer/wasm-lib':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: workspace:*
+        version: link:../wasm-lib
     devDependencies:
       '@types/jest':
         specifier: ^29.5.14
         version: 29.5.14
+      '@types/node':
+        specifier: ^20.4.2
+        version: 20.19.43
       jest:
         specifier: ^29.7.0
         version: 29.7.0(@types/node@20.19.43)
@@ -521,9 +524,6 @@ packages:
 
   '@leichtgewicht/ip-codec@2.0.5':
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
-
-  '@mintlayer/wasm-lib@0.1.0':
-    resolution: {integrity: sha512-XDcOHtTl6BZi3kmUCTvclIkLEujWuvck2wDd9ixifFHHYicAZFKzUcuKLUyo6Rah7+TZ1/iwMFEfY9GrvLN8+Q==}
 
   '@napi-rs/wasm-runtime@1.2.3':
     resolution: {integrity: sha512-UMduMbqO5s5zF2NkNacMT/yK5Y5QiKvWr2+50bzIIxFDwVJ2h49b+oyjaCGPhJxd2/gC2x39EHv/gHVuu36x2Q==}
@@ -4479,8 +4479,6 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@leichtgewicht/ip-codec@2.0.5': {}
-
-  '@mintlayer/wasm-lib@0.1.0': {}
 
   '@napi-rs/wasm-runtime@1.2.3(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
