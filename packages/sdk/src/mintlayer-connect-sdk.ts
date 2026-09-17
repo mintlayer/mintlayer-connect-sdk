@@ -2663,6 +2663,13 @@ class Client {
     const MAX_ATTEMPTS = 10;
     let attempts = 0;
 
+    // Snapshot the pre-loop amount of the fee-deducted output: the deduction
+    // must be relative to the original value in every fee iteration, not
+    // compounded onto the value mutated by the previous iteration.
+    const firstOutputOriginalAtoms = deductFeeFromFirstOutput
+      ? BigInt((outputs[0] as LockThenTransferOutput).value.amount.atoms)
+      : 0n;
+
     while (attempts < MAX_ATTEMPTS) {
       attempts++;
 
@@ -2709,9 +2716,10 @@ class Client {
 
       if (deductFeeFromFirstOutput) {
         const out = finalOutputs[0] as LockThenTransferOutput;
+        const netAtoms = firstOutputOriginalAtoms - totalFee;
         out.value.amount = {
-          atoms: (BigInt(out.value.amount.atoms) - totalFee).toString(),
-          decimal: (Number(BigInt(out.value.amount.atoms) - totalFee) / 1e11).toString(),
+          atoms: netAtoms.toString(),
+          decimal: (Number(netAtoms) / 1e11).toString(),
         };
       }
 
