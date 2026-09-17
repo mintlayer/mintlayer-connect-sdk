@@ -1395,6 +1395,16 @@ class Client {
   /** Placeholder HTLC creation fee in atoms, shared by legacy and raw builders. */
   private static readonly HTLC_FEE_ATOMS = BigInt(1 * Math.pow(10, 11)); // TODO: 0n
 
+  /**
+   * Block height used for fee estimation, token id derivation, order input
+   * encoding and signing.
+   * TODO: Get the current block height from the API provider.
+   * @private
+   */
+  private get feeBlockHeight(): bigint {
+    return 200000n;
+  }
+
   private network: 'mainnet' | 'testnet';
   private connectedAddresses: {
     receiving: string[];
@@ -1960,12 +1970,63 @@ class Client {
   }
 
   /**
+   * Single source of truth for account-command protocol fees, consumed by both
+   * the legacy type-based lookup and the raw builder (which use different
+   * vocabularies: 'MintToken' vs 'MintTokens').
+   * @private
+   */
+  private getFeeForCommand(
+    command:
+      | 'MintTokens'
+      | 'UnmintTokens'
+      | 'LockTokenSupply'
+      | 'FreezeToken'
+      | 'UnfreezeToken'
+      | 'ChangeTokenAuthority'
+      | 'ChangeMetadataUri',
+  ): bigint {
+    switch (command) {
+      case 'MintTokens':
+      case 'UnmintTokens':
+      case 'LockTokenSupply':
+        return this.protocolFee(token_supply_change_fee);
+      case 'FreezeToken':
+        return this.protocolFee(token_freeze_fee);
+      case 'ChangeTokenAuthority':
+        return this.protocolFee(token_change_authority_fee);
+      case 'ChangeMetadataUri':
+      case 'UnfreezeToken':
+        return decimalsToAtoms(50, 11);
+    }
+  }
+
+  /**
    * Returns the fee for a specific transaction type.
    * @param {string} type
    * @returns {bigint} Fee in atoms.
    */
   getFeeForType(type: string): bigint {
     this.ensureInitialized();
+
+    const typeToCommand: Partial<
+      Record<
+        string,
+        'MintTokens' | 'UnmintTokens' | 'LockTokenSupply' | 'FreezeToken' | 'UnfreezeToken' | 'ChangeTokenAuthority' | 'ChangeMetadataUri'
+      >
+    > = {
+      MintToken: 'MintTokens',
+      UnmintToken: 'UnmintTokens',
+      LockTokenSupply: 'LockTokenSupply',
+      FreezeToken: 'FreezeToken',
+      UnfreezeToken: 'UnfreezeToken',
+      ChangeTokenAuthority: 'ChangeTokenAuthority',
+      ChangeMetadataUri: 'ChangeMetadataUri',
+    };
+    const command = typeToCommand[type];
+    if (command) {
+      return this.getFeeForCommand(command);
+    }
+
     switch (type) {
       case 'Transfer':
         return 0n;
@@ -1975,18 +2036,6 @@ class Client {
         return this.protocolFee(nft_issuance_fee);
       case 'IssueFungibleToken':
         return this.protocolFee(fungible_token_issuance_fee);
-      case 'MintToken':
-      case 'UnmintToken':
-      case 'LockTokenSupply':
-        return this.protocolFee(token_supply_change_fee);
-      case 'ChangeTokenAuthority':
-        return this.protocolFee(token_change_authority_fee);
-      case 'ChangeMetadataUri':
-        return decimalsToAtoms(50, 11);
-      case 'FreezeToken':
-        return this.protocolFee(token_freeze_fee);
-      case 'UnfreezeToken':
-        return decimalsToAtoms(50, 11);
       case 'DataDeposit':
         return this.protocolFee(data_deposit_fee);
       case 'CreateDelegationId':
@@ -2016,7 +2065,7 @@ class Client {
    * @private
    */
   private protocolFee(fee: (block_height: bigint, network: Network) => Amount): bigint {
-    const block_height = 200000n; // TODO: Get the current block height
+    const block_height = this.feeBlockHeight;
     return BigInt(fee(block_height, this.getMLNetwork()).atoms());
   }
 
@@ -2778,7 +2827,7 @@ class Client {
         );
       }
       if (issueNftIndexes.length === 1) {
-        const block_height = 200000n; // TODO: Get the current block height
+        const block_height = this.feeBlockHeight;
         const token_id = get_token_id(
           mergeUint8Arrays(this.getTransactionInputsBytes(JSONRepresentation, this.network === 'mainnet' ? 0 : 1)),
           block_height,
@@ -2960,7 +3009,7 @@ class Client {
           case 'MintTokens': {
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
+            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
             const amount = this.normalizeRawAmount(
               meta.amount,
               details.number_of_decimals,
@@ -2982,7 +3031,7 @@ class Client {
           case 'UnmintTokens': {
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
+            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
             const amount = this.normalizeRawAmount(
               meta.amount,
               details.number_of_decimals,
@@ -3004,7 +3053,7 @@ class Client {
           case 'LockTokenSupply': {
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
+            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3020,7 +3069,7 @@ class Client {
           case 'FreezeToken': {
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
+            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3037,7 +3086,7 @@ class Client {
           case 'UnfreezeToken': {
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
+            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3056,7 +3105,7 @@ class Client {
             }
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
+            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3076,7 +3125,7 @@ class Client {
             }
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
+            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3093,7 +3142,7 @@ class Client {
           case 'FillOrder': {
             const order_id = this.validateRawId(meta.order_id, 'inputs (FillOrder)', 'order_id');
             const order: OrderData = await this.apiProvider.getOrder(order_id);
-            const nonce = this.nextExplicitNonce(meta.nonce, `inputs (FillOrder ${order_id})`) ?? order.nonce;
+            const nonce = this.nextRawNonce(`order:${order_id}`, order.nonce, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3114,7 +3163,7 @@ class Client {
           case 'ConcludeOrder': {
             const order_id = this.validateRawId(meta.order_id, 'inputs (ConcludeOrder)', 'order_id');
             const order: OrderData = await this.apiProvider.getOrder(order_id);
-            const nonce = this.nextExplicitNonce(meta.nonce, `inputs (ConcludeOrder ${order_id})`) ?? order.nonce;
+            const nonce = this.nextRawNonce(`order:${order_id}`, order.nonce, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3133,9 +3182,12 @@ class Client {
       } else if (meta.account_type === 'DelegationBalance') {
         const delegation_id = this.validateRawId(meta.delegation_id, 'inputs (DelegationBalance)', 'delegation_id');
         const delegation: DelegationDetails = await this.apiProvider.getDelegation(delegation_id);
-        const nonce =
-          this.nextExplicitNonce(meta.nonce, `inputs (DelegationBalance ${delegation_id})`) ??
-          delegation.next_nonce;
+        const nonce = this.nextRawNonce(
+          `delegation:${delegation_id}`,
+          delegation.next_nonce,
+          meta.nonce,
+          nonceCounters,
+        );
         inputs.push({
           input: {
             input_type: 'Account',
@@ -3298,14 +3350,11 @@ class Client {
       case 'MintTokens':
       case 'UnmintTokens':
       case 'LockTokenSupply':
-        return this.protocolFee(token_supply_change_fee);
       case 'FreezeToken':
-        return this.protocolFee(token_freeze_fee);
-      case 'ChangeTokenAuthority':
-        return this.protocolFee(token_change_authority_fee);
-      case 'ChangeMetadataUri':
       case 'UnfreezeToken':
-        return decimalsToAtoms(50, 11);
+      case 'ChangeTokenAuthority':
+      case 'ChangeMetadataUri':
+        return this.getFeeForCommand(input.input.command);
       default:
         return 0n; // FillOrder, ConcludeOrder and DelegationBalance carry no protocol fee
     }
@@ -3741,37 +3790,33 @@ class Client {
   }
 
   /**
-   * Validates an explicitly provided nonce, or returns undefined when absent.
-   * @private
-   */
-  private nextExplicitNonce(nonce: number | undefined, context: string): number | undefined {
-    if (nonce === undefined) {
-      return undefined;
-    }
-    if (!Number.isInteger(nonce) || nonce < 0) {
-      throw new Error(`${context}: nonce must be a non-negative integer`);
-    }
-    return nonce;
-  }
-
-  /**
-   * Assigns the next nonce for a token: explicit nonces win, otherwise nonces
-   * are assigned sequentially (in input order) starting at the token's next_nonce.
+   * Assigns the next nonce for a logical sequence (a token, order or
+   * delegation, identified by `key`): explicit nonces win and must not fall
+   * below the already-assigned ones; auto nonces continue sequentially from
+   * `base` in input order. Explicit nonces advance the counter so later
+   * inputs cannot collide with them.
    * @private
    */
   private nextRawNonce(
-    token_id: string,
+    key: string,
+    base: number,
     explicitNonce: number | undefined,
-    details: TokenDetails,
     counters: Map<string, number>,
   ): number {
-    const explicit = this.nextExplicitNonce(explicitNonce, `inputs (token ${token_id})`);
-    if (explicit !== undefined) {
-      return explicit;
+    const offset = counters.get(key) ?? 0;
+    if (explicitNonce !== undefined) {
+      if (!Number.isInteger(explicitNonce) || explicitNonce < 0) {
+        throw new Error(`inputs: nonce must be a non-negative integer (${key})`);
+      }
+      if (explicitNonce < base + offset) {
+        throw new Error(
+          `inputs: explicit nonce ${explicitNonce} for ${key} is below the next expected nonce ${base + offset}`,
+        );
+      }
+      counters.set(key, explicitNonce - base + 1);
+      return explicitNonce;
     }
-    const base = details.next_nonce ?? 0;
-    const offset = counters.get(token_id) ?? 0;
-    counters.set(token_id, offset + 1);
+    counters.set(key, offset + 1);
     return base + offset;
   }
 
@@ -3800,11 +3845,11 @@ class Client {
       .filter(({ input }) => input.input_type === 'AccountCommand' || input.input_type === 'Account')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
-          const block_height = 200000n; // TODO: Get the current block height
+          const block_height = this.feeBlockHeight;
           return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), block_height, network);
         }
         if (input.command === 'FillOrder') {
-          const block_height = 200000n; // TODO: Get the current block height
+          const block_height = this.feeBlockHeight;
           return encode_input_for_fill_order(
             input.order_id,
             Amount.from_atoms(input.fill_atoms.toString()),
@@ -3959,7 +4004,7 @@ class Client {
 
         const { destination: address, token_id } = output;
 
-        const chainTip = '200000'; // TODO unhardcode
+        const chainTip = this.feeBlockHeight;
 
         return encode_output_issue_nft(
           token_id as string,
@@ -3979,7 +4024,7 @@ class Client {
       if (output.type === 'IssueFungibleToken') {
         const { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, total_supply } = output;
 
-        const chainTip = '200000'; // TODO: unhardcode height
+        const chainTip = this.feeBlockHeight;
 
         const is_token_freezable = is_freezable ? FreezableToken.Yes : FreezableToken.No;
 
@@ -5237,6 +5282,15 @@ class Signer {
   private keys: Record<string, Uint8Array>;
   private network: Network;
 
+  /**
+   * Block height used for witness encoding.
+   * TODO: Get the current block height from the API provider.
+   * @private
+   */
+  private get feeBlockHeight(): bigint {
+    return 200000n;
+  }
+
   constructor(privateKeys: Record<string, Uint8Array>, network: Network = Network.Testnet) {
     this.keys = privateKeys;
     this.network = network;
@@ -5329,7 +5383,7 @@ class Signer {
 
         const transaction = this.hexToUint8Array(tx.HEXRepresentation_unsigned);
 
-        const block_height = 200000n; // TODO: Get the current block height
+        const block_height = this.feeBlockHeight;
         const additional_info = {
           pool_info: {},
           order_info: {}
