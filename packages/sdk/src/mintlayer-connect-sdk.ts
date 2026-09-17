@@ -887,6 +887,18 @@ type TransactionOpts = {
   forceSpendUtxo?: UtxoEntry[];
 };
 
+type AssembleTransactionArgs = {
+  outputs: Output[];
+  inputs?: Input[];
+  requiredCoin: bigint;
+  requiredToken: bigint;
+  sendToken?: { token_id: string; number_of_decimals: number };
+  baseFee: bigint;
+  /** Take the fee from the first output instead of the coin inputs (DelegationWithdraw semantics). */
+  deductFeeFromFirstOutput?: boolean;
+  opts?: TransactionOpts;
+};
+
 type BuildTransactionParams =
   | {
       type: 'Transfer';
@@ -2442,31 +2454,37 @@ class Client {
   }
 
   /**
-   * Builds a transaction based on the provided parameters.
-   * @param{BuildTransactionParams} arg
+   * Assembles a transaction from caller-provided outputs and coin/token requirements.
+   *
+   * Fetches UTXOs (unless overridden via `opts.withUTXO`), selects inputs to cover
+   * `requiredCoin`/`requiredToken` (plus fee), runs the fee-iteration loop, appends
+   * change outputs, encodes the transaction and computes its id.
+   * @private
    */
-  async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
-    const { type, params } = arg;
-
-    this.ensureInitialized();
-    if (!params) throw new Error('Missing params');
-
-    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
-
+  private async assembleTransaction({
+    outputs,
+    inputs = [],
+    requiredCoin,
+    requiredToken,
+    sendToken,
+    baseFee,
+    deductFeeFromFirstOutput = false,
+    opts,
+  }: AssembleTransactionArgs): Promise<Transaction> {
     const address = this.connectedAddresses;
     const currentAddress = address;
     const addressList = [...currentAddress.receiving, ...currentAddress.change];
 
     let data_utxos: UtxoEntry[];
 
-    if (arg?.opts?.withUTXO) {
-      data_utxos = arg?.opts?.withUTXO;
+    if (opts?.withUTXO) {
+      data_utxos = opts.withUTXO;
     } else {
       data_utxos = await this.apiProvider.getAccountUtxos(addressList, this.network === 'mainnet' ? 0 : 1);
     }
 
-    const forceSpendUtxo: UtxoEntry[] = arg?.opts?.forceSpendUtxo
-      ? arg?.opts?.forceSpendUtxo.map((item: UtxoEntry) => ({
+    const forceSpendUtxo: UtxoEntry[] = opts?.forceSpendUtxo
+      ? opts.forceSpendUtxo.map((item: UtxoEntry) => ({
           outpoint: {
             ...item.outpoint,
             input_type: 'UTXO',
@@ -2488,9 +2506,6 @@ class Client {
       return true;
     });
 
-    const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
-      this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
-
     let preciseFee = BigInt(0);
     let previousFee = BigInt(-1);
     const MAX_ATTEMPTS = 10;
@@ -2499,19 +2514,20 @@ class Client {
     while (attempts < MAX_ATTEMPTS) {
       attempts++;
 
-      const totalFee = this.getFeeForType(type) + preciseFee;
-      const input_amount_coin_req_w_fee = input_amount_coin_req + totalFee;
+      const totalFee = baseFee + preciseFee;
+      const input_amount_coin_req_w_fee = requiredCoin + totalFee;
 
-      const inputObjCoin =
-        type !== 'DelegationWithdraw' ? this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null) : [];
-      const inputObjToken = send_token?.token_id
-        ? this.selectUTXOs(utxos, input_amount_token_req, send_token.token_id)
+      const inputObjCoin = deductFeeFromFirstOutput
+        ? []
+        : this.selectUTXOs(utxos, input_amount_coin_req_w_fee, null);
+      const inputObjToken = sendToken?.token_id
+        ? this.selectUTXOs(utxos, requiredToken, sendToken.token_id)
         : [];
 
       if (forceSpendUtxo) {
         const forceCoinUtxos = forceSpendUtxo.filter((utxo) => utxo.utxo.value.type === 'Coin');
         const forceTokenUtxos = forceSpendUtxo.filter(
-          (utxo) => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === send_token?.token_id,
+          (utxo) => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === sendToken?.token_id,
         );
 
         if (forceCoinUtxos.length > 0) {
@@ -2527,19 +2543,19 @@ class Client {
       const totalInputValueCoin = inputObjCoin.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
       const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
 
-      if (type !== 'DelegationWithdraw' && totalInputValueCoin < input_amount_coin_req_w_fee) {
+      if (!deductFeeFromFirstOutput && totalInputValueCoin < input_amount_coin_req_w_fee) {
         throw new Error('Not enough coin UTXOs');
       }
-      if (totalInputValueToken < input_amount_token_req) {
+      if (totalInputValueToken < requiredToken) {
         throw new Error('Not enough token UTXOs');
       }
 
       const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
-      const changeAmountToken = totalInputValueToken - input_amount_token_req;
+      const changeAmountToken = totalInputValueToken - requiredToken;
 
       const finalOutputs = [...outputs];
 
-      if (type === 'DelegationWithdraw') {
+      if (deductFeeFromFirstOutput) {
         const out = finalOutputs[0] as LockThenTransferOutput;
         out.value.amount = {
           atoms: (BigInt(out.value.amount.atoms) - totalFee).toString(),
@@ -2561,13 +2577,13 @@ class Client {
         });
       }
 
-      if (changeAmountToken > 0n && send_token) {
-        const decimals = send_token.number_of_decimals;
+      if (changeAmountToken > 0n && sendToken) {
+        const decimals = sendToken.number_of_decimals;
         finalOutputs.push({
           type: 'Transfer',
           value: {
             type: 'TokenV1',
-            token_id: send_token.token_id,
+            token_id: sendToken.token_id,
             amount: {
               atoms: changeAmountToken.toString(),
               decimal: atomsToDecimal(changeAmountToken.toString(), decimals).toString(),
@@ -2643,6 +2659,35 @@ class Client {
     }
 
     throw new Error('Failed to build transaction after maximum attempts');
+  }
+
+  /**
+   * Builds a transaction based on the provided parameters.
+   * @param{BuildTransactionParams} arg
+   */
+  async buildTransaction(arg: BuildTransactionParams): Promise<Transaction> {
+    const { type, params } = arg;
+
+    this.ensureInitialized();
+    if (!params) throw new Error('Missing params');
+
+    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
+
+    const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
+      this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
+
+    const baseFee = this.getFeeForType(type);
+
+    return this.assembleTransaction({
+      outputs,
+      inputs,
+      requiredCoin: input_amount_coin_req,
+      requiredToken: input_amount_token_req,
+      sendToken: send_token,
+      baseFee,
+      deductFeeFromFirstOutput: type === 'DelegationWithdraw',
+      opts: arg?.opts,
+    });
   }
 
   /**
