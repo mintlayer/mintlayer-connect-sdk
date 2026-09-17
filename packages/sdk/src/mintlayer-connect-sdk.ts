@@ -57,6 +57,25 @@ import initWasm, {
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
+/**
+ * SDK-level sanity caps for developer-forged raw transactions (generous bounds,
+ * well above consensus limits, to fail fast on obviously invalid input).
+ */
+const MAX_RAW_OUTPUTS = 100;
+const MAX_RAW_TICKER_LENGTH = 32;
+const MAX_RAW_URI_LENGTH = 512;
+const MAX_RAW_NFT_NAME_LENGTH = 128;
+const MAX_RAW_NFT_DESCRIPTION_LENGTH = 1024;
+const MAX_RAW_HASH_LENGTH = 128;
+const MAX_RAW_DATA_DEPOSIT_LENGTH = 4096;
+const MAX_RAW_CREATOR_LENGTH = 128;
+
+/**
+ * C0/C1 control characters and Unicode bidi marks, stripped from display
+ * strings so they cannot hide direction/layout tricks in wallets and explorers.
+ */
+const DISPLAY_STRING_SANITIZE_RE = /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+
 function mergeUint8Arrays(arrays: Uint8Array[]) {
   const totalLength = arrays.reduce((sum: number, arr: Uint8Array) => sum + arr.length, 0);
 
@@ -776,7 +795,7 @@ type Timelock =
 }
   | {
   type: 'ForBlockCount';
-  content: number;
+  content: string | number;
 };
 
 type HtlcOutput = {
@@ -1637,7 +1656,7 @@ class Client {
   }
 
   /**
-   * Converts a string to a hex string.
+   * Converts a string to a hex string (UTF-8, zero-padded bytes).
    * @param str
    * @private
    */
@@ -1646,11 +1665,9 @@ class Client {
       return '';
     }
 
-    let hex = '';
-    for (let i = 0; i < str.length; i++) {
-      hex += str.charCodeAt(i).toString(16);
-    }
-    return hex;
+    return Array.from(new TextEncoder().encode(str))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
   }
 
   /**
@@ -2849,6 +2866,9 @@ class Client {
     if (!Array.isArray(args.outputs) || args.outputs.length === 0) {
       throw new Error('At least one output is required');
     }
+    if (args.outputs.length > MAX_RAW_OUTPUTS) {
+      throw new Error(`Too many outputs: ${args.outputs.length} (maximum ${MAX_RAW_OUTPUTS})`);
+    }
 
     const prepared = await this.prepareRawTransaction(args);
 
@@ -2872,9 +2892,11 @@ class Client {
    * @private
    */
   private async prepareRawTransaction(args: RawTransactionArgs): Promise<AssembleTransactionArgs> {
-    const tokenDetailsCache = new Map<string, TokenDetails>();
+    const tokenDetailsCache = new Map<string, Promise<TokenDetails>>();
 
-    const outputs = args.outputs.map((raw, index) => this.normalizeRawOutput(raw, index));
+    const outputs = await Promise.all(
+      args.outputs.map((raw, index) => this.normalizeRawOutput(raw, index, tokenDetailsCache)),
+    );
     const inputs = await this.normalizeRawInputs(args.inputs ?? [], tokenDetailsCache);
     const { requiredCoin, requiredToken, sendToken } = await this.computeRawRequirements(
       outputs,
@@ -2892,7 +2914,7 @@ class Client {
    */
   private async normalizeRawInputs(
     rawInputs: RawInput[],
-    tokenDetailsCache: Map<string, TokenDetails>,
+    tokenDetailsCache: Map<string, Promise<TokenDetails>>,
   ): Promise<Input[]> {
     const nonceCounters = new Map<string, number>();
     const inputs: Input[] = [];
@@ -2916,7 +2938,11 @@ class Client {
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
             const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
-            const amount = this.normalizeRawAmount(meta.amount, `inputs (command ${meta.command})`);
+            const amount = this.normalizeRawAmount(
+              meta.amount,
+              details.number_of_decimals,
+              `inputs (command ${meta.command})`,
+            );
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -2934,7 +2960,11 @@ class Client {
             const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
             const authority = this.getRawAuthority(meta.authority, details, meta.command);
             const nonce = this.nextRawNonce(meta.token_id, meta.nonce, details, nonceCounters);
-            const amount = this.normalizeRawAmount(meta.amount, `inputs (command ${meta.command})`);
+            const amount = this.normalizeRawAmount(
+              meta.amount,
+              details.number_of_decimals,
+              `inputs (command ${meta.command})`,
+            );
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3045,7 +3075,11 @@ class Client {
                 input_type: 'AccountCommand',
                 command: 'FillOrder',
                 order_id: meta.order_id,
-                fill_atoms: this.rawAtomsString(meta.fill_atoms, `inputs (FillOrder ${meta.order_id})`),
+                fill_atoms: this.rawAtomsString(
+                  meta.fill_atoms,
+                  `inputs (FillOrder ${meta.order_id})`,
+                  'fill_atoms',
+                ),
                 destination: meta.destination,
                 nonce: String(nonce),
               },
@@ -3080,7 +3114,11 @@ class Client {
           input: {
             input_type: 'Account',
             account_type: 'DelegationBalance',
-            amount: this.normalizeRawAmount(meta.amount, `inputs (DelegationBalance ${meta.delegation_id})`),
+            amount: this.normalizeRawAmount(
+              meta.amount,
+              11,
+              `inputs (DelegationBalance ${meta.delegation_id})`,
+            ),
             delegation_id: meta.delegation_id,
             nonce,
           },
@@ -3103,7 +3141,7 @@ class Client {
   private async computeRawRequirements(
     outputs: Output[],
     inputs: Input[],
-    tokenDetailsCache: Map<string, TokenDetails>,
+    tokenDetailsCache: Map<string, Promise<TokenDetails>>,
   ): Promise<{
     requiredCoin: bigint;
     requiredToken: bigint;
@@ -3239,7 +3277,11 @@ class Client {
    * Normalizes and validates a developer-forged output.
    * @private
    */
-  private normalizeRawOutput(raw: RawOutput, index: number): Output {
+  private async normalizeRawOutput(
+    raw: RawOutput,
+    index: number,
+    tokenDetailsCache: Map<string, Promise<TokenDetails>>,
+  ): Promise<Output> {
     const context = `outputs[${index}]`;
 
     if (!raw || typeof raw !== 'object' || !raw.type) {
@@ -3254,7 +3296,7 @@ class Client {
         return {
           type: 'Transfer',
           destination: raw.destination,
-          value: this.normalizeRawValue(raw.value, context),
+          value: await this.normalizeRawValue(raw.value, context, tokenDetailsCache),
         };
       }
       case 'LockThenTransfer': {
@@ -3264,18 +3306,19 @@ class Client {
         return {
           type: 'LockThenTransfer',
           destination: raw.destination,
-          value: this.normalizeRawValue(raw.value, context),
+          value: await this.normalizeRawValue(raw.value, context, tokenDetailsCache),
           lock: this.normalizeRawLock(raw.lock, context),
         };
       }
       case 'BurnToken': {
-        return { type: 'BurnToken', value: this.normalizeRawValue(raw.value, context) };
+        return { type: 'BurnToken', value: await this.normalizeRawValue(raw.value, context, tokenDetailsCache) };
       }
       case 'DataDeposit': {
-        if (typeof raw.data !== 'string' || raw.data.length === 0) {
+        const data = this.sanitizeRawDisplayString(raw.data, context, 'data', MAX_RAW_DATA_DEPOSIT_LENGTH);
+        if (data.length === 0) {
           throw new Error(`${context}: data must be a non-empty string`);
         }
-        return { type: 'DataDeposit', data: raw.data };
+        return { type: 'DataDeposit', data };
       }
       case 'IssueFungibleToken': {
         if (!raw.authority) {
@@ -3288,7 +3331,10 @@ class Client {
         if (raw.total_supply?.type === 'Unlimited' || raw.total_supply?.type === 'Lockable') {
           total_supply = { type: raw.total_supply.type };
         } else if (raw.total_supply?.type === 'Fixed') {
-          total_supply = { type: 'Fixed', amount: this.normalizeRawAmount(raw.total_supply.amount, context) };
+          total_supply = {
+            type: 'Fixed',
+            amount: this.normalizeRawAmount(raw.total_supply.amount, raw.number_of_decimals, context),
+          };
         } else {
           throw new Error(`${context}: total_supply.type must be "Unlimited", "Lockable" or "Fixed"`);
         }
@@ -3296,9 +3342,14 @@ class Client {
           type: 'IssueFungibleToken',
           authority: raw.authority,
           is_freezable: raw.is_freezable === true,
-          metadata_uri: this.normalizeRawStringField(raw.metadata_uri, context, 'metadata_uri'),
+          metadata_uri: this.normalizeRawStringField(raw.metadata_uri, context, 'metadata_uri', MAX_RAW_URI_LENGTH),
           number_of_decimals: raw.number_of_decimals,
-          token_ticker: this.normalizeRawStringField(raw.token_ticker, context, 'token_ticker'),
+          token_ticker: this.normalizeRawStringField(
+            raw.token_ticker,
+            context,
+            'token_ticker',
+            MAX_RAW_TICKER_LENGTH,
+          ),
           total_supply,
         };
       }
@@ -3315,18 +3366,26 @@ class Client {
           destination: raw.destination,
           token_id: raw.token_id ?? '',
           data: {
-            name: this.normalizeRawStringField(data.name, context, 'name'),
-            ticker: this.normalizeRawStringField(data.ticker, context, 'ticker'),
-            description: this.normalizeRawStringField(data.description, context, 'description'),
-            media_hash: this.normalizeRawStringField(data.media_hash, context, 'media_hash'),
-            media_uri: this.normalizeRawStringField(data.media_uri, context, 'media_uri'),
-            icon_uri: this.normalizeRawStringField(data.icon_uri, context, 'icon_uri'),
+            name: this.normalizeRawStringField(data.name, context, 'name', MAX_RAW_NFT_NAME_LENGTH),
+            ticker: this.normalizeRawStringField(data.ticker, context, 'ticker', MAX_RAW_TICKER_LENGTH),
+            description: this.normalizeRawStringField(
+              data.description,
+              context,
+              'description',
+              MAX_RAW_NFT_DESCRIPTION_LENGTH,
+            ),
+            media_hash: this.normalizeRawStringField(data.media_hash, context, 'media_hash', MAX_RAW_HASH_LENGTH),
+            media_uri: this.normalizeRawStringField(data.media_uri, context, 'media_uri', MAX_RAW_URI_LENGTH),
+            icon_uri: this.normalizeRawStringField(data.icon_uri, context, 'icon_uri', MAX_RAW_URI_LENGTH),
             additional_metadata_uri: this.normalizeRawStringField(
               data.additional_metadata_uri,
               context,
               'additional_metadata_uri',
+              MAX_RAW_URI_LENGTH,
             ),
-            creator: raw.creator ?? null,
+            creator: raw.creator
+              ? this.sanitizeRawDisplayString(raw.creator, context, 'creator', MAX_RAW_CREATOR_LENGTH)
+              : null,
           },
         };
       }
@@ -3334,15 +3393,25 @@ class Client {
         if (!raw.conclude_destination) {
           throw new Error(`${context}: conclude_destination is required`);
         }
+        const ask_currency = this.normalizeRawCurrency(raw.ask_currency, context, 'ask_currency');
+        const give_currency = this.normalizeRawCurrency(raw.give_currency, context, 'give_currency');
+        const askDecimals =
+          ask_currency.type === 'Coin'
+            ? 11
+            : (await this.getRawTokenDetails(ask_currency.token_id, tokenDetailsCache)).number_of_decimals;
+        const giveDecimals =
+          give_currency.type === 'Coin'
+            ? 11
+            : (await this.getRawTokenDetails(give_currency.token_id, tokenDetailsCache)).number_of_decimals;
         return {
           type: 'CreateOrder',
           conclude_destination: raw.conclude_destination,
-          ask_currency: this.normalizeRawCurrency(raw.ask_currency, context, 'ask_currency'),
-          ask_balance: this.normalizeRawAmount(raw.ask_balance, context),
-          give_currency: this.normalizeRawCurrency(raw.give_currency, context, 'give_currency'),
-          give_balance: this.normalizeRawAmount(raw.give_balance, context),
-          initially_asked: this.normalizeRawAmount(raw.initially_asked, context),
-          initially_given: this.normalizeRawAmount(raw.initially_given, context),
+          ask_currency,
+          ask_balance: this.normalizeRawAmount(raw.ask_balance, askDecimals, context),
+          give_currency,
+          give_balance: this.normalizeRawAmount(raw.give_balance, giveDecimals, context),
+          initially_asked: this.normalizeRawAmount(raw.initially_asked, askDecimals, context),
+          initially_given: this.normalizeRawAmount(raw.initially_given, giveDecimals, context),
         };
       }
       case 'CreateDelegationId': {
@@ -3358,7 +3427,11 @@ class Client {
         if (!raw.delegation_id) {
           throw new Error(`${context}: delegation_id is required`);
         }
-        return { type: 'DelegateStaking', delegation_id: raw.delegation_id, amount: this.normalizeRawAmount(raw.amount, context) };
+        return {
+          type: 'DelegateStaking',
+          delegation_id: raw.delegation_id,
+          amount: this.normalizeRawAmount(raw.amount, 11, context),
+        };
       }
       case 'Htlc': {
         if (!raw.htlc || typeof raw.htlc !== 'object') {
@@ -3369,7 +3442,7 @@ class Client {
         }
         return {
           type: 'Htlc',
-          value: this.normalizeRawValue(raw.value, context),
+          value: await this.normalizeRawValue(raw.value, context, tokenDetailsCache),
           htlc: {
             refund_key: raw.htlc.refund_key,
             spend_key: raw.htlc.spend_key,
@@ -3384,10 +3457,17 @@ class Client {
   }
 
   /**
-   * Normalizes a developer-forged value (Coin or TokenV1).
+   * Normalizes a developer-forged value (Coin or TokenV1). The decimal amount
+   * is always recomputed from the validated atoms (11 decimals for Coin, the
+   * token's number_of_decimals for TokenV1) so wallets can trust the display
+   * value they show the user.
    * @private
    */
-  private normalizeRawValue(value: RawValue, context: string): Value {
+  private async normalizeRawValue(
+    value: RawValue,
+    context: string,
+    tokenDetailsCache: Map<string, Promise<TokenDetails>>,
+  ): Promise<Value> {
     if (!value || typeof value !== 'object') {
       throw new Error(`${context}: value is required`);
     }
@@ -3397,53 +3477,98 @@ class Client {
     if (value.type === 'TokenV1' && !value.token_id) {
       throw new Error(`${context}: TokenV1 value requires token_id`);
     }
-    const amount = this.normalizeRawAmount(value.amount, context);
-    return value.type === 'Coin' ? { type: 'Coin', amount } : { type: 'TokenV1', token_id: value.token_id, amount };
+    if (value.type === 'Coin') {
+      return { type: 'Coin', amount: this.normalizeRawAmount(value.amount, 11, context) };
+    }
+    const details = await this.getRawTokenDetails(value.token_id, tokenDetailsCache);
+    return {
+      type: 'TokenV1',
+      token_id: value.token_id,
+      amount: this.normalizeRawAmount(value.amount, details.number_of_decimals, context),
+    };
   }
 
   /**
-   * Validates and normalizes an amount to the canonical `{atoms, decimal}` fields.
+   * Validates an amount and normalizes it to the canonical `{atoms, decimal}`
+   * fields. The decimal value is always recomputed from the validated atoms —
+   * a caller-supplied decimal that disagrees is rejected, never echoed.
    * @private
    */
-  private normalizeRawAmount(amount: RawAmount, context: string): AmountFields {
+  private normalizeRawAmount(amount: RawAmount, decimals: number, context: string): AmountFields {
     if (!amount || typeof amount !== 'object') {
       throw new Error(`${context}: amount is required`);
     }
-    return {
-      atoms: this.rawAtomsString(amount.atoms, context),
-      decimal: String(amount.decimal),
-    };
+    const atoms = this.rawAtomsString(amount.atoms, context);
+    const decimal = atomsToDecimal(atoms, decimals);
+    if (amount.decimal !== undefined && amount.decimal !== null && String(amount.decimal) !== decimal) {
+      throw new Error(
+        `${context}: amount.decimal "${amount.decimal}" does not match ${atoms} atoms at ${decimals} decimals ("${decimal}") — decimals are always recomputed from atoms`,
+      );
+    }
+    return { atoms, decimal };
   }
 
   /**
    * Validates that an atoms value is a non-negative integer and returns it as string.
    * @private
    */
-  private rawAtomsString(atoms: string | number, context: string): string {
+  private rawAtomsString(atoms: string | number, context: string, label = 'amount.atoms'): string {
     const atomsStr = String(atoms);
     if (!/^\d+$/.test(atomsStr)) {
-      throw new Error(`${context}: amount.atoms must be a non-negative integer expressed in atoms (got "${atoms}")`);
+      throw new Error(`${context}: ${label} must be a non-negative integer expressed in atoms (got "${atoms}")`);
     }
     return atomsStr;
   }
 
   /**
+   * Strips C0/C1 control characters and Unicode bidi marks from a display
+   * string and enforces a maximum length.
+   * @private
+   */
+  private sanitizeRawDisplayString(value: string, context: string, name: string, maxLength: number): string {
+    if (typeof value !== 'string') {
+      throw new Error(`${context}: ${name} must be a string`);
+    }
+    const sanitized = value.replace(DISPLAY_STRING_SANITIZE_RE, '');
+    if (sanitized.length > maxLength) {
+      throw new Error(`${context}: ${name} must be at most ${maxLength} characters`);
+    }
+    return sanitized;
+  }
+
+  /**
    * Wraps a plain string into the canonical `{hex, string}` pair, or validates
-   * an already-paired value.
+   * an already-paired value. The hex is always recomputed from the sanitized
+   * string; a caller-provided hex that disagrees is rejected.
    * @private
    */
   private normalizeRawStringField(
     field: RawStringField,
     context: string,
     name: string,
+    maxLength: number,
   ): { hex: string; string: string } {
+    let string_: string;
     if (typeof field === 'string') {
-      return { hex: this.stringToHex(field), string: field };
+      string_ = this.sanitizeRawDisplayString(field, context, name, maxLength);
+    } else if (field && typeof field === 'object' && typeof field.string === 'string') {
+      string_ = this.sanitizeRawDisplayString(field.string, context, name, maxLength);
+    } else {
+      throw new Error(`${context}: ${name} must be a string or a {hex, string} pair`);
     }
-    if (field && typeof field.hex === 'string' && typeof field.string === 'string') {
-      return { hex: field.hex, string: field.string };
+
+    const hex = this.stringToHex(string_);
+
+    if (field && typeof field === 'object' && field.hex !== undefined) {
+      if (typeof field.hex !== 'string' || field.hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(field.hex)) {
+        throw new Error(`${context}: ${name}.hex must be an even-length hex string`);
+      }
+      if (field.hex.toLowerCase() !== hex) {
+        throw new Error(`${context}: ${name}.hex does not match ${name}.string`);
+      }
     }
-    throw new Error(`${context}: ${name} must be a string or a {hex, string} pair`);
+
+    return { hex, string: string_ };
   }
 
   /**
@@ -3475,7 +3600,9 @@ class Client {
   }
 
   /**
-   * Normalizes a LockThenTransfer lock.
+   * Normalizes a LockThenTransfer lock. Contents are validated as non-negative
+   * integers and kept as strings (avoids Number precision loss; BigInt is
+   * applied at encoding time).
    * @private
    */
   private normalizeRawLock(
@@ -3486,16 +3613,16 @@ class Client {
       throw new Error(`${context}: lock.type must be "ForBlockCount" or "UntilTime"`);
     }
     if (lock.type === 'ForBlockCount') {
-      const content = this.rawAtomsString(lock.content, context);
-      return { type: 'ForBlockCount', content };
+      return { type: 'ForBlockCount', content: this.rawAtomsString(lock.content, context, 'lock.content') };
     }
     const timestamp =
       typeof lock.content === 'object' && lock.content !== null ? lock.content.timestamp : lock.content;
-    return { type: 'UntilTime', content: { timestamp: String(timestamp) } };
+    return { type: 'UntilTime', content: { timestamp: this.rawAtomsString(timestamp, context, 'timestamp') } };
   }
 
   /**
-   * Normalizes an HTLC refund timelock.
+   * Normalizes an HTLC refund timelock. Contents are validated as non-negative
+   * integers and kept as strings (BigInt is applied at encoding time).
    * @private
    */
   private normalizeRawTimelock(
@@ -3506,12 +3633,15 @@ class Client {
       throw new Error(`${context}: htlc.refund_timelock.type must be "ForBlockCount" or "UntilTime"`);
     }
     if (timelock.type === 'ForBlockCount') {
-      return { type: 'ForBlockCount', content: Number(this.rawAtomsString(timelock.content, context)) };
+      return { type: 'ForBlockCount', content: this.rawAtomsString(timelock.content, context, 'content') };
     }
     if (!timelock.content || typeof timelock.content !== 'object' || timelock.content.timestamp === undefined) {
       throw new Error(`${context}: htlc.refund_timelock.content.timestamp is required`);
     }
-    return { type: 'UntilTime', content: { timestamp: String(timelock.content.timestamp) } };
+    return {
+      type: 'UntilTime',
+      content: { timestamp: this.rawAtomsString(timelock.content.timestamp, context, 'timestamp') },
+    };
   }
 
   /**
@@ -3533,19 +3663,19 @@ class Client {
   }
 
   /**
-   * Fetches (and caches) token details for nonce/authority inference.
+   * Fetches (and caches) token details for decimals/nonce/authority inference.
+   * The cache stores the promise so concurrent lookups share one request.
    * @private
    */
   private async getRawTokenDetails(
     token_id: string,
-    cache: Map<string, TokenDetails>,
+    cache: Map<string, Promise<TokenDetails>>,
   ): Promise<TokenDetails> {
-    const cached = cache.get(token_id);
-    if (cached) {
-      return cached;
+    let details = cache.get(token_id);
+    if (!details) {
+      details = this.apiProvider.getToken(token_id) as Promise<TokenDetails>;
+      cache.set(token_id, details);
     }
-    const details: TokenDetails = await this.apiProvider.getToken(token_id);
-    cache.set(token_id, details);
     return details;
   }
 

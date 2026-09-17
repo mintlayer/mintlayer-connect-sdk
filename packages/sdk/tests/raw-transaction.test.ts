@@ -126,8 +126,8 @@ describe('buildRawTransaction', () => {
     const client = await Client.create({ network: 'testnet', autoRestore: false });
     await client.connect();
 
-    const FEE_ATOMS = '1000000000'; // 10 ML
-    const USER_ATOMS = '50000000000'; // 500 ML
+    const FEE_ATOMS = '1000000000000'; // 10 ML
+    const USER_ATOMS = '50000000000000'; // 500 ML
 
     const tx = (await client.buildRawTransaction({
       outputs: [
@@ -138,7 +138,7 @@ describe('buildRawTransaction', () => {
           metadata_uri: 'ipfs://QmExampleHash123',
           number_of_decimals: 11,
           token_ticker: 'XYZ2',
-          total_supply: { type: 'Fixed', amount: { atoms: '1000000000000', decimal: '1000' } },
+          total_supply: { type: 'Fixed', amount: { atoms: '1000000000000', decimal: '10' } },
         },
         {
           type: 'Transfer',
@@ -241,7 +241,7 @@ describe('buildRawTransaction', () => {
         {
           type: 'Transfer',
           destination: USER_ADDRESS,
-          value: { type: 'Coin', amount: { atoms: '1000000000', decimal: '10' } },
+          value: { type: 'Coin', amount: { atoms: '1000000000000', decimal: '10' } },
         },
       ],
       inputs: [
@@ -293,7 +293,7 @@ describe('buildRawTransaction', () => {
         {
           type: 'Transfer',
           destination: USER_ADDRESS,
-          value: { type: 'Coin', amount: { atoms: '1000000000', decimal: '10' } },
+          value: { type: 'Coin', amount: { atoms: '1000000000000', decimal: '10' } },
         },
       ],
       inputs: [
@@ -379,7 +379,7 @@ describe('buildRawTransaction rejections', () => {
           {
             type: 'Transfer',
             destination: USER_ADDRESS,
-            value: { type: 'Coin', amount: { atoms: '1000000000', decimal: '10' } },
+            value: { type: 'Coin', amount: { atoms: '1000000000000', decimal: '10' } },
           },
         ],
         inputs: [
