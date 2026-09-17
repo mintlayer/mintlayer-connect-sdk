@@ -1392,6 +1392,9 @@ export type VerifyChallengeArgs = {
 };
 
 class Client {
+  /** Placeholder HTLC creation fee in atoms, shared by legacy and raw builders. */
+  private static readonly HTLC_FEE_ATOMS = BigInt(1 * Math.pow(10, 11)); // TODO: 0n
+
   private network: 'mainnet' | 'testnet';
   private connectedAddresses: {
     receiving: string[];
@@ -2001,7 +2004,7 @@ class Client {
       case 'ConcludeOrder':
         return 0n;
       case 'Htlc':
-        return BigInt(1 * Math.pow(10, 11)); // TODO: 0n
+        return Client.HTLC_FEE_ATOMS;
       default:
         throw new Error(`Unknown transaction type: ${type}`);
     }
@@ -2673,7 +2676,7 @@ class Client {
         ? this.selectUTXOs(utxos, requiredToken, sendToken.token_id)
         : [];
 
-      if (forceSpendUtxo) {
+      if (forceSpendUtxo.length > 0) {
         const forceCoinUtxos = forceSpendUtxo.filter((utxo) => utxo.utxo.value.type === 'Coin');
         const forceTokenUtxos = forceSpendUtxo.filter(
           (utxo) => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === sendToken?.token_id,
@@ -2754,6 +2757,33 @@ class Client {
         id: 'to_be_filled_in',
       };
 
+      // IssueNft outputs need their token id before encoding (the wasm encoder
+      // rejects a placeholder id). The id is derived from the encoded inputs,
+      // which do not depend on the outputs, so it can be computed up front.
+      const issueNftIndexes = finalOutputs.reduce<number[]>(
+        (acc, output, index) => (output.type === 'IssueNft' ? [...acc, index] : acc),
+        [],
+      );
+      if (issueNftIndexes.length > 1) {
+        throw new Error(
+          'Only one IssueNft output per transaction is supported: the token id is derived from the transaction inputs, so multiple issuances need separate transactions',
+        );
+      }
+      if (issueNftIndexes.length === 1) {
+        const block_height = 200000n; // TODO: Get the current block height
+        const token_id = get_token_id(
+          mergeUint8Arrays(this.getTransactionInputsBytes(JSONRepresentation, this.network === 'mainnet' ? 0 : 1)),
+          block_height,
+          this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
+        );
+        const index = issueNftIndexes[0];
+        const output = finalOutputs[index] as IssueNftOutput;
+        finalOutputs[index] = {
+          ...output,
+          token_id,
+        };
+      }
+
       const BINRepresentation = this.getTransactionBINrepresentation(
         JSONRepresentation,
         this.network === 'mainnet' ? 0 : 1,
@@ -2772,21 +2802,6 @@ class Client {
         );
 
         const transaction_id = get_transaction_id(transaction, true);
-
-        if (finalOutputs.some((output) => output.type === 'IssueNft')) {
-          const block_height = 200000n; // TODO: Get the current block height
-          const token_id = get_token_id(
-            mergeUint8Arrays(BINRepresentation.inputs),
-            block_height,
-            this.network === 'mainnet' ? Network.Mainnet : Network.Testnet,
-          );
-          const index = finalOutputs.findIndex((output) => output.type === 'IssueNft');
-          const output = finalOutputs[index] as IssueNftOutput;
-          finalOutputs[index] = {
-            ...output,
-            token_id,
-          };
-        }
 
         const HEXRepresentation_unsigned = transaction.reduce(
           (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
@@ -3068,16 +3083,17 @@ class Client {
             break;
           }
           case 'FillOrder': {
-            const order: OrderData = await this.apiProvider.getOrder(meta.order_id);
-            const nonce = this.nextExplicitNonce(meta.nonce, `inputs (FillOrder ${meta.order_id})`) ?? order.nonce;
+            const order_id = this.validateRawId(meta.order_id, 'inputs (FillOrder)', 'order_id');
+            const order: OrderData = await this.apiProvider.getOrder(order_id);
+            const nonce = this.nextExplicitNonce(meta.nonce, `inputs (FillOrder ${order_id})`) ?? order.nonce;
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
                 command: 'FillOrder',
-                order_id: meta.order_id,
+                order_id,
                 fill_atoms: this.rawAtomsString(
                   meta.fill_atoms,
-                  `inputs (FillOrder ${meta.order_id})`,
+                  `inputs (FillOrder ${order_id})`,
                   'fill_atoms',
                 ),
                 destination: meta.destination,
@@ -3088,13 +3104,14 @@ class Client {
             break;
           }
           case 'ConcludeOrder': {
-            const order: OrderData = await this.apiProvider.getOrder(meta.order_id);
-            const nonce = this.nextExplicitNonce(meta.nonce, `inputs (ConcludeOrder ${meta.order_id})`) ?? order.nonce;
+            const order_id = this.validateRawId(meta.order_id, 'inputs (ConcludeOrder)', 'order_id');
+            const order: OrderData = await this.apiProvider.getOrder(order_id);
+            const nonce = this.nextExplicitNonce(meta.nonce, `inputs (ConcludeOrder ${order_id})`) ?? order.nonce;
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
                 command: 'ConcludeOrder',
-                order_id: meta.order_id,
+                order_id,
                 destination: meta.destination,
                 nonce,
               },
@@ -3106,9 +3123,10 @@ class Client {
             throw new Error(`inputs: unsupported account command "${String((meta as { command?: unknown }).command)}"`);
         }
       } else if (meta.account_type === 'DelegationBalance') {
-        const delegation: DelegationDetails = await this.apiProvider.getDelegation(meta.delegation_id);
+        const delegation_id = this.validateRawId(meta.delegation_id, 'inputs (DelegationBalance)', 'delegation_id');
+        const delegation: DelegationDetails = await this.apiProvider.getDelegation(delegation_id);
         const nonce =
-          this.nextExplicitNonce(meta.nonce, `inputs (DelegationBalance ${meta.delegation_id})`) ??
+          this.nextExplicitNonce(meta.nonce, `inputs (DelegationBalance ${delegation_id})`) ??
           delegation.next_nonce;
         inputs.push({
           input: {
@@ -3117,9 +3135,9 @@ class Client {
             amount: this.normalizeRawAmount(
               meta.amount,
               11,
-              `inputs (DelegationBalance ${meta.delegation_id})`,
+              `inputs (DelegationBalance ${delegation_id})`,
             ),
-            delegation_id: meta.delegation_id,
+            delegation_id,
             nonce,
           },
         });
@@ -3136,6 +3154,11 @@ class Client {
   /**
    * Computes coin/token requirements for raw outputs and inputs, including
    * protocol fees and the fees of the provided account inputs.
+   *
+   * Token requirements are netted against same-transaction mints: a token
+   * requires UTXOs only for the amount by which its outputs exceed the amount
+   * minted in the same transaction. Over-minting (minting more than the
+   * outputs spend) is allowed and simply leaves the surplus minted.
    * @private
    */
   private async computeRawRequirements(
@@ -3149,20 +3172,26 @@ class Client {
   }> {
     let requiredCoin = 0n;
     const tokenRequirements = new Map<string, bigint>();
-    const mintedTokens = new Set<string>();
+    const outputTokenTotals = new Map<string, bigint>();
+    const mintedTotals = new Map<string, bigint>();
 
     for (const input of inputs) {
       if (input.input.input_type !== 'AccountCommand') {
         continue;
       }
       if (input.input.command === 'MintTokens') {
-        mintedTokens.add(input.input.token_id);
+        const token_id = input.input.token_id;
+        mintedTotals.set(token_id, (mintedTotals.get(token_id) ?? 0n) + BigInt(input.input.amount.atoms));
       }
       if (input.input.command === 'UnmintTokens') {
         const token_id = input.input.token_id;
         tokenRequirements.set(token_id, (tokenRequirements.get(token_id) ?? 0n) + BigInt(input.input.amount.atoms));
       }
     }
+
+    const addTokenOutput = (token_id: string, atoms: bigint) => {
+      outputTokenTotals.set(token_id, (outputTokenTotals.get(token_id) ?? 0n) + atoms);
+    };
 
     outputs.forEach((output, index) => {
       const context = `outputs[${index}]`;
@@ -3172,22 +3201,17 @@ class Client {
         case 'BurnToken': {
           if (output.value.type === 'Coin') {
             requiredCoin += BigInt(output.value.amount.atoms);
-          } else if (!mintedTokens.has(output.value.token_id)) {
-            tokenRequirements.set(
-              output.value.token_id,
-              (tokenRequirements.get(output.value.token_id) ?? 0n) + BigInt(output.value.amount.atoms),
-            );
+          } else {
+            addTokenOutput(output.value.token_id, BigInt(output.value.amount.atoms));
           }
           break;
         }
         case 'Htlc': {
+          requiredCoin += Client.HTLC_FEE_ATOMS;
           if (output.value.type === 'Coin') {
             requiredCoin += BigInt(output.value.amount.atoms);
-          } else if (output.value.token_id && !mintedTokens.has(output.value.token_id)) {
-            tokenRequirements.set(
-              output.value.token_id,
-              (tokenRequirements.get(output.value.token_id) ?? 0n) + BigInt(output.value.amount.atoms),
-            );
+          } else if (output.value.token_id) {
+            addTokenOutput(output.value.token_id, BigInt(output.value.amount.atoms));
           }
           break;
         }
@@ -3198,11 +3222,8 @@ class Client {
         case 'CreateOrder': {
           if (output.give_currency.type === 'Coin') {
             requiredCoin += BigInt(output.give_balance.atoms);
-          } else if (!mintedTokens.has(output.give_currency.token_id)) {
-            tokenRequirements.set(
-              output.give_currency.token_id,
-              (tokenRequirements.get(output.give_currency.token_id) ?? 0n) + BigInt(output.give_balance.atoms),
-            );
+          } else {
+            addTokenOutput(output.give_currency.token_id, BigInt(output.give_balance.atoms));
           }
           break;
         }
@@ -3224,6 +3245,15 @@ class Client {
           throw new Error(`${context}: unknown output type`);
       }
     });
+
+    // Net the token outputs against same-transaction mints; only a positive
+    // remainder has to be covered from token UTXOs.
+    for (const [token_id, outAtoms] of outputTokenTotals) {
+      const net = outAtoms - (mintedTotals.get(token_id) ?? 0n);
+      if (net > 0n) {
+        tokenRequirements.set(token_id, (tokenRequirements.get(token_id) ?? 0n) + net);
+      }
+    }
 
     for (const input of inputs) {
       requiredCoin += this.getFeeForRawInput(input);
@@ -3364,7 +3394,7 @@ class Client {
         return {
           type: 'IssueNft',
           destination: raw.destination,
-          token_id: raw.token_id ?? '',
+          token_id: raw.token_id ? this.validateRawId(raw.token_id, context, 'token_id') : '',
           data: {
             name: this.normalizeRawStringField(data.name, context, 'name', MAX_RAW_NFT_NAME_LENGTH),
             ticker: this.normalizeRawStringField(data.ticker, context, 'ticker', MAX_RAW_TICKER_LENGTH),
@@ -3418,18 +3448,14 @@ class Client {
         if (!raw.destination) {
           throw new Error(`${context}: destination is required`);
         }
-        if (!raw.pool_id) {
-          throw new Error(`${context}: pool_id is required`);
-        }
-        return { type: 'CreateDelegationId', destination: raw.destination, pool_id: raw.pool_id };
+        const pool_id = this.validateRawId(raw.pool_id, context, 'pool_id');
+        return { type: 'CreateDelegationId', destination: raw.destination, pool_id };
       }
       case 'DelegateStaking': {
-        if (!raw.delegation_id) {
-          throw new Error(`${context}: delegation_id is required`);
-        }
+        const delegation_id = this.validateRawId(raw.delegation_id, context, 'delegation_id');
         return {
           type: 'DelegateStaking',
-          delegation_id: raw.delegation_id,
+          delegation_id,
           amount: this.normalizeRawAmount(raw.amount, 11, context),
         };
       }
@@ -3518,6 +3544,20 @@ class Client {
       throw new Error(`${context}: ${label} must be a non-negative integer expressed in atoms (got "${atoms}")`);
     }
     return atomsStr;
+  }
+
+  /**
+   * Validates an on-chain identifier (token/order/delegation/pool id) before it
+   * is interpolated into API paths or passed to the wasm encoders. Mintlayer
+   * ids are bech32-like (e.g. 'tmltk1…', 'tdelg1…'), hence lowercase
+   * alphanumeric with sane length bounds.
+   * @private
+   */
+  private validateRawId(id: string, context: string, name: string): string {
+    if (typeof id !== 'string' || id.length < 10 || id.length > 100 || !/^[a-z0-9]+$/.test(id)) {
+      throw new Error(`${context}: ${name} has an invalid format`);
+    }
+    return id;
   }
 
   /**
@@ -3671,6 +3711,7 @@ class Client {
     token_id: string,
     cache: Map<string, Promise<TokenDetails>>,
   ): Promise<TokenDetails> {
+    this.validateRawId(token_id, 'token_id lookup', 'token_id');
     let details = cache.get(token_id);
     if (!details) {
       details = this.apiProvider.getToken(token_id) as Promise<TokenDetails>;
@@ -3727,23 +3768,16 @@ class Client {
   }
 
   /**
-   * Returns the transaction binary representation.
-   * @param transactionJSONrepresentation
-   * @param _network
+   * Encodes the transaction inputs (account commands first, then UTXO inputs).
+   * Input bytes do not depend on the outputs, so this can be used standalone —
+   * e.g. to derive the token id of an IssueNft output before encoding it.
+   * @private
    */
-  getTransactionBINrepresentation(
+  private getTransactionInputsBytes(
     transactionJSONrepresentation: TransactionJSONRepresentation,
-    _network: Network,
-  ): {
-    inputs: Uint8Array[];
-    outputs: Uint8Array[];
-    transactionsize: number;
-  } {
-    const network = _network;
-    // Binarisation
-    // calculate fee and prepare as much transaction as possible
-    const inputs = transactionJSONrepresentation.inputs;
-    const outpointedSourceIds = (inputs as UtxoInput[])
+    network: Network,
+  ): Uint8Array[] {
+    const outpointedSourceIds = (transactionJSONrepresentation.inputs as UtxoInput[])
       .filter(({ input }) => input.input_type === 'UTXO')
       .map(({ input }) => {
         const bytes = Uint8Array.from(input.source_id.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
@@ -3824,6 +3858,27 @@ class Client {
       });
 
     const inputsArray = [...inputCommands, ...inputsIds].filter((x): x is NonNullable<typeof x> => x !== undefined);
+
+    return inputsArray;
+  }
+
+  /**
+   * Returns the transaction binary representation.
+   * @param transactionJSONrepresentation
+   * @param _network
+   */
+  getTransactionBINrepresentation(
+    transactionJSONrepresentation: TransactionJSONRepresentation,
+    _network: Network,
+  ): {
+    inputs: Uint8Array[];
+    outputs: Uint8Array[];
+    transactionsize: number;
+  } {
+    const network = _network;
+    // Binarisation
+    // calculate fee and prepare as much transaction as possible
+    const inputsArray = this.getTransactionInputsBytes(transactionJSONrepresentation, network);
 
     const outputsArrayItems = transactionJSONrepresentation.outputs.map((output) => {
       if (output.type === 'Transfer') {
