@@ -13,15 +13,17 @@ import {
 } from '../src/mintlayer-connect-sdk';
 import fetchMock from 'jest-fetch-mock';
 
-import { addresses, utxos } from './__mocks__/accounts/account_01';
+import { MOCK_TOKEN, MOCK_TOKEN_AUTHORITY, MOCK_TOKEN_ID, setupApiMocks } from './helpers/api-mocks';
+
+import { addresses } from './__mocks__/accounts/account_01';
 
 const receiving = addresses.addressesByChain.mintlayer.receiving;
 const changeAddresses = addresses.addressesByChain.mintlayer.change;
 
 const USER_ADDRESS = receiving[0]; // tmt1q9874wgx6enm2mzfu0yxhzleu84pp00l95l7er5z
 const FEE_ADDRESS = receiving[1]; // tmt1q93ldqwvlpq5xc0n2nqnvgdzghqf6krjxsfryl0c
-const TOKEN_AUTHORITY = 'tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx';
-const TOKEN_ID = 'tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq';
+const TOKEN_AUTHORITY = MOCK_TOKEN_AUTHORITY;
+const TOKEN_ID = MOCK_TOKEN_ID;
 
 /** Largest coin UTXO of the mocked account (17032.056043 ML). */
 const LARGEST_COIN_UTXO = {
@@ -55,70 +57,10 @@ function coinTransferSum(tx: AnyTx): bigint {
     .reduce((acc: bigint, o: any) => acc + BigInt(o.value.amount.atoms), 0n);
 }
 
+let mocks: ReturnType<typeof setupApiMocks>;
+
 beforeEach(() => {
-  fetchMock.resetMocks();
-
-  (window as any).mojito = {
-    isExtension: true,
-    connect: jest.fn().mockResolvedValue(addresses),
-    restore: jest.fn().mockResolvedValue(addresses),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-    request: jest.fn().mockResolvedValue('signed-transaction'),
-  };
-
-  fetchMock.doMock();
-
-  fetchMock.mockResponse(async req => {
-    const url = req.url;
-
-    if (url.endsWith('/chain/tip')) {
-      return JSON.stringify({ height: 200000 });
-    }
-
-    if (url.includes('/token/')) {
-      const tokenId = url.split('/token/').pop();
-      if (tokenId === TOKEN_ID) {
-        return JSON.stringify({
-          authority: TOKEN_AUTHORITY,
-          circulating_supply: {
-            atoms: '209000000000',
-            decimal: '2090',
-          },
-          frozen: false,
-          is_locked: false,
-          is_token_freezable: true,
-          is_token_unfreezable: null,
-          metadata_uri: {
-            hex: '697066733a2f2f516d4578616d706c6548617368313233',
-            string: 'ipfs://QmExampleHash123',
-          },
-          next_nonce: 7,
-          number_of_decimals: 8,
-          token_ticker: {
-            hex: '58595a32',
-            string: 'XYZ2',
-          },
-          total_supply: {
-            Fixed: {
-              atoms: '100000000000000',
-            },
-          },
-        });
-      }
-      return JSON.stringify({ a: 'b' });
-    }
-
-    if (url.endsWith('/batch')) {
-      return {
-        body: JSON.stringify({
-          results: [utxos],
-        }),
-      };
-    }
-
-    console.warn('No mock for:', url);
-    return JSON.stringify({ error: 'No mock defined' });
-  });
+  mocks = setupApiMocks();
 });
 
 describe('buildRawTransaction', () => {
