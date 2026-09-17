@@ -13,20 +13,34 @@ jobs:
       id-token: write # required by NPM_CONFIG_PROVENANCE for npm provenance signing
 
     steps:
+      # Release events fire on the default branch by default; check out the
+      # tagged commit that is being released.
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
-          version: 8
+          version: 10
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3
         with:
           node-version: '20'
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify package version matches release tag
+        if: github.event_name == 'release'
+        run: |
+          PKG_VERSION="$(node -p "require('./packages/sdk/package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: packages/sdk/package.json is $PKG_VERSION but release tag is $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -34,6 +48,13 @@ jobs:
       - name: Run SDK tests
         run: pnpm --filter @mintlayer/sdk run test
 
+      - name: Build SDK
+        run: pnpm --filter @mintlayer/sdk run build
+
+      # --no-git-checks is required because a tag checkout is a detached HEAD,
+      # so pnpm's default-branch check can never pass. The workflow instead
+      # verifies the tag↔package.json version match above, and the fresh
+      # checkout guarantees a clean worktree.
       - name: Publish SDK
         run: pnpm --filter @mintlayer/sdk publish --access public --no-git-checks
         env:

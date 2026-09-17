@@ -4,11 +4,15 @@
   "description": "",
   "main": "dist/mintlayer-connect-sdk.js",
   "types": "dist/mintlayer-connect-sdk.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "serve": "npx http-server . -p 8080",
     "test": "jest",
     "test:watch": "jest --watch",
+    "prepublishOnly": "pnpm run test && pnpm run build",
     "docs": "typedoc --options typedoc.js"
   },
   "dependencies": {
