@@ -23,7 +23,7 @@ publish.
    - Configure:
      - *Packages and scopes*: **Read and write**
      - *Scope*: select only **`@mintlayer/sdk`**
-     - *Expiration*: **1 year or less** (calendar a renewal reminder).
+     - *Expiration*: **1 year or less** (and calendar a renewal reminder).
 2. **Add the token to GitHub**
    - Repository → *Settings* → *Secrets and variables* → *Actions* →
      *New repository secret*.

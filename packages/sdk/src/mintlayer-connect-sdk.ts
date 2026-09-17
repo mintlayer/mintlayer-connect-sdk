@@ -1006,6 +1006,14 @@ interface Transaction {
   transaction_id: string;
 }
 
+/**
+ * Public type alias for the result of the build* methods (buildTransaction,
+ * buildRawTransaction, buildTransfer, …). Exported under a distinct name
+ * because `Transaction` refers to the TransactionBuilder class re-exported
+ * from './transaction'.
+ */
+export type BuiltTransaction = Transaction;
+
 interface TokenDetails {
   token_id: string;
   number_of_decimals: number;
