@@ -5191,6 +5191,73 @@ class Signer {
 export { Transaction } from './transaction';
 export * from './wallet-state';
 
+/**
+ * Low-level encoding primitives from @mintlayer/wasm-lib, re-exported for
+ * parity with the go-sdk. These are composable building blocks: encode every
+ * input/output, concatenate the resulting byte arrays and pass them to
+ * `encode_transaction(inputs, outputs, flags)`.
+ */
+export {
+  // outputs
+  encode_output_transfer,
+  encode_output_token_transfer,
+  encode_output_lock_then_transfer,
+  encode_output_token_lock_then_transfer,
+  encode_output_coin_burn,
+  encode_output_token_burn,
+  encode_output_data_deposit,
+  encode_output_htlc,
+  encode_output_create_delegation,
+  encode_output_delegate_staking,
+  encode_output_create_stake_pool,
+  encode_output_issue_fungible_token,
+  encode_output_issue_nft,
+  encode_output_produce_block_from_stake,
+  encode_create_order_output,
+  // inputs
+  encode_input_for_utxo,
+  encode_input_for_mint_tokens,
+  encode_input_for_unmint_tokens,
+  encode_input_for_lock_token_supply,
+  encode_input_for_freeze_token,
+  encode_input_for_unfreeze_token,
+  encode_input_for_freeze_order,
+  encode_input_for_withdraw_from_delegation,
+  encode_input_for_change_token_authority,
+  encode_input_for_change_token_metadata_uri,
+  encode_input_for_fill_order,
+  encode_input_for_conclude_order,
+  encode_outpoint_source_id,
+  // staking/pool helpers
+  encode_stake_pool_data,
+  encode_destination,
+  // transactions
+  encode_transaction,
+  encode_signed_transaction,
+  estimate_transaction_size,
+  get_transaction_id,
+  // locks
+  encode_lock_for_block_count,
+  encode_lock_for_seconds,
+  encode_lock_until_time,
+  encode_lock_until_height,
+  // fee helpers
+  fungible_token_issuance_fee,
+  nft_issuance_fee,
+  token_supply_change_fee,
+  token_freeze_fee,
+  token_change_authority_fee,
+  data_deposit_fee,
+  // supporting types/enums needed to call the primitives
+  Amount,
+  Network,
+  SourceId,
+  TotalSupply,
+  FreezableToken,
+  TokenUnfreezable,
+  SignatureHashType,
+} from '@mintlayer/wasm-lib';
+
 export {
   Client,
   Signer,
