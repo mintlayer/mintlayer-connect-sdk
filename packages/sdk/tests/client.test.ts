@@ -1,50 +1,33 @@
 import { Client } from '../src/mintlayer-connect-sdk'
 import fetchMock from 'jest-fetch-mock';
-import { addresses } from './__mocks__/accounts/account_01';
+import { setupApiMocks } from './helpers/api-mocks';
+
+let mocks: ReturnType<typeof setupApiMocks>;
 
 beforeEach(() => {
-  fetchMock.resetMocks();
+  mocks = setupApiMocks();
 
-  (window as any).mojito = {
-    isExtension: true,
-    connect: jest.fn().mockResolvedValue({
-      addressesByChain: {
-        mintlayer: {
-          receiving: ['taddr1receiving'],
-          change: ['taddr1change'],
-        },
+  // this suite uses a minimal wallet: one receiving / one change address
+  const walletAddresses = {
+    addressesByChain: {
+      mintlayer: {
+        receiving: ['taddr1receiving'],
+        change: ['taddr1change'],
       },
-    }),
-    restore: jest.fn().mockResolvedValue({
-      addressesByChain: {
-        mintlayer: {
-          receiving: ['taddr1receiving'],
-          change: ['taddr1change'],
-        },
-      },
-    }),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-    request: jest.fn().mockResolvedValue('signed-transaction'),
+    },
   };
-
-  fetchMock.doMock();
+  (window as any).mojito.connect = jest.fn().mockResolvedValue(walletAddresses);
+  (window as any).mojito.restore = jest.fn().mockResolvedValue(walletAddresses);
 
   fetchMock.mockResponse(async req => {
-    const url = req.url;
-
-    if (url.endsWith('/chain/tip')) {
-      return JSON.stringify({ height: 200000 });
-    }
-
-    if (url.includes('/address/')) {
+    if (req.url.includes('/address/')) {
       return JSON.stringify({
         coin_balance: { atoms: '1000000000000', decimal: '10' },
         tokens: [],
       });
     }
 
-    console.warn('No mock for:', url);
-    return JSON.stringify({ error: 'No mock defined' });
+    return mocks.defaultRouter(req);
   });
 });
 

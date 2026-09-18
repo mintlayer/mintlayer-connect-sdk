@@ -1,0 +1,93 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. sdk-v1.1.0)'
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Derive package from tag
+        run: |
+          TAG="${{ inputs.tag }}"
+          case "$TAG" in
+            sdk-v*)      PKG="@mintlayer/sdk" ;;
+            react-v*)    PKG="@mintlayer/react" ;;
+            wasm-lib-v*) PKG="@mintlayer/wasm-lib" ;;
+            *) echo "Unknown tag format: $TAG (expected sdk-vX.Y.Z | react-vX.Y.Z | wasm-lib-vX.Y.Z)" >&2; exit 1 ;;
+          esac
+          echo "PKG=$PKG" >> "$GITHUB_ENV"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "PKG_DIR=packages/${PKG#*/}" >> "$GITHUB_ENV"
+
+      - name: Checkout release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Verify package version matches tag
+        run: |
+          PKG_VERSION="$(node -p "require('./${PKG_DIR}/package.json').version")"
+          TAG_VERSION="${TAG#*v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: ${PKG_DIR}/package.json is $PKG_VERSION but tag is $TAG" >&2
+            exit 1
+          fi
+          echo "Publishing $PKG@$PKG_VERSION from $TAG"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org/
+          cache: pnpm
+
+      - name: Install latest npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm --filter "$PKG" build --if-present
+
+      - name: Test
+        run: pnpm --filter "$PKG" test --if-present
+
+      - name: Replace workspace: dependencies with concrete versions
+        shell: node {0}
+        run: |
+          const fs = require('fs');
+          const path = process.env.PKG_DIR + '/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          for (const section of ['dependencies', 'peerDependencies', 'devDependencies', 'optionalDependencies']) {
+            const deps = pkg[section];
+            if (!deps) continue;
+            for (const [name, spec] of Object.entries(deps)) {
+              if (typeof spec !== 'string' || !spec.startsWith('workspace:')) continue;
+              const dep = JSON.parse(fs.readFileSync('packages/' + name.split('/')[1] + '/package.json', 'utf8'));
+              const prefix = spec.slice('workspace:'.length);
+              deps[name] = prefix === '*' ? '^' + dep.version : prefix.replace(/\*/, dep.version);
+            }
+          }
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + '\n');
+          console.log('Resolved workspace deps for', process.env.PKG);
+
+      - name: Stage publish
+        working-directory: ${{ env.PKG_DIR }}
+        run: npm stage publish --provenance

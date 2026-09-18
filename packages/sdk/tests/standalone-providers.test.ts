@@ -1,5 +1,6 @@
 import { Client, MnemonicAccountProvider, PrivateKeyAccountProvider } from '../src/mintlayer-connect-sdk';
-import fetchMock from 'jest-fetch-mock';
+
+import { setupApiMocks } from './helpers/api-mocks';
 
 const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 
@@ -30,18 +31,10 @@ const UTXOS = [
   },
 ];
 
-function setupFetchMock() {
-  fetchMock.resetMocks();
-  fetchMock.doMock();
-  fetchMock.mockResponse(async (req) => {
-    if (req.url.endsWith('/chain/tip')) return JSON.stringify({ height: 200000 });
-    if (req.url.endsWith('/batch')) return JSON.stringify({ results: [UTXOS] });
-    return JSON.stringify({});
-  });
-}
-
 describe('MnemonicAccountProvider', () => {
-  beforeEach(setupFetchMock);
+  beforeEach(() => {
+    setupApiMocks({ utxos: UTXOS });
+  });
 
   test('derives correct addresses from mnemonic', async () => {
     const provider = new MnemonicAccountProvider(TEST_MNEMONIC, 'testnet');
@@ -86,7 +79,9 @@ describe('MnemonicAccountProvider', () => {
 });
 
 describe('PrivateKeyAccountProvider', () => {
-  beforeEach(setupFetchMock);
+  beforeEach(() => {
+    setupApiMocks({ utxos: UTXOS });
+  });
 
   test('returns provided addresses', async () => {
     const provider = new PrivateKeyAccountProvider(

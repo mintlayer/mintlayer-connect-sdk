@@ -20,7 +20,7 @@ function stringToUint8Array(str: string): Uint8Array {
 
 function hexToUint8Array(hex: any) {
   if (hex.length % 2 !== 0) {
-    throw new Error("Invalid hex string");
+    throw new Error('Invalid hex string');
   }
 
   const array = new Uint8Array(hex.length / 2);
@@ -33,7 +33,7 @@ function hexToUint8Array(hex: any) {
 
 function uint8ArrayToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
+    .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
@@ -48,7 +48,8 @@ function atomsToDecimal(atoms: string | number, decimals: number): string {
   if (atomsLength <= decimals) {
     // Pad with leading zeros
     const padded = atomsStr.padStart(decimals, '0');
-    return '0.' + padded.replace(/0+$/, '') || '0';
+    const fractionalPart = padded.replace(/0+$/, '');
+    return fractionalPart === '' ? '0' : '0.' + fractionalPart;
   }
 
   // Insert decimal point
@@ -58,11 +59,18 @@ function atomsToDecimal(atoms: string | number, decimals: number): string {
   return fractionalPart === '' ? integerPart : `${integerPart}.${fractionalPart}`;
 }
 
-export {
-  mergeUint8Arrays,
-  stringToUint8Array,
-  hexToUint8Array,
-  uint8ArrayToHex,
-  BASE58_ALPHABET,
-  atomsToDecimal,
+export function decimalsToAtoms(value: string | number, decimals: number): bigint {
+  const v = Number(value);
+  const [intPart, fracPart = ''] = v.toFixed(decimals).split('.');
+  const paddedFrac = (fracPart + '0'.repeat(decimals)).slice(0, decimals);
+  const full = intPart + paddedFrac;
+  return BigInt(full);
 }
+
+export function decimals(value: string | number, decimals: number): string {
+  const v = Number(value);
+  if (isNaN(v)) return '0';
+  return v.toFixed(decimals).replace(/\.?0+$/, '');
+}
+
+export { mergeUint8Arrays, stringToUint8Array, hexToUint8Array, uint8ArrayToHex, BASE58_ALPHABET, atomsToDecimal };

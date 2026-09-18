@@ -110,13 +110,7 @@ export type SpendPolicy = {
  * Derived status of a wallet-owned output.
  */
 export type WalletUtxoStatus =
-  | 'confirmed'
-  | 'unconfirmed'
-  | 'spent'
-  | 'spent_pending'
-  | 'conflicted'
-  | 'orphaned'
-  | 'rejected';
+  'confirmed' | 'unconfirmed' | 'spent' | 'spent_pending' | 'conflicted' | 'orphaned' | 'rejected';
 
 /**
  * Wallet-owned UTXO with derived state metadata.
