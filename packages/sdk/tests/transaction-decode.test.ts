@@ -482,19 +482,17 @@ describe('Review-round regression pins', () => {
   test('assembleRaw guards: UTXOs and change address are required', () => {
     // no withUTXO at all → hard guard (previously crashed deep in selection)
     expect(() =>
-      Transaction.assembleRaw(
-        { outputs: [], inputs: [], requiredCoin: 0n, requiredToken: 0n, baseFee: 0n } as any,
-        { network: 'testnet', changeAddress: changeAddresses[0] },
-      ),
+      Transaction.assembleRaw({ outputs: [], inputs: [], requiredCoin: 0n, requiredToken: 0n, baseFee: 0n } as any, {
+        network: 'testnet',
+        changeAddress: changeAddresses[0],
+      }),
     ).toThrow('UTXOs are required');
 
     // same guard with an actual coin requirement (empty UTXO plan)
     expect(() =>
       Transaction.assembleRaw(
         {
-          outputs: [
-            { type: 'Transfer', destination: USER_ADDRESS, value: { type: 'Coin', amount: { atoms: '1' } } },
-          ],
+          outputs: [{ type: 'Transfer', destination: USER_ADDRESS, value: { type: 'Coin', amount: { atoms: '1' } } }],
           inputs: [],
           requiredCoin: 1n,
           requiredToken: 0n,
@@ -549,7 +547,8 @@ describe('Review-round regression pins', () => {
     // baseline: without force, auto-selection spends the outpoint once
     const plain = (await client.buildRawTransaction({ outputs: outputs as any })) as LooseBuiltTransaction;
     const plainSpent = plain.JSONRepresentation.inputs.filter(
-      (i: any) => i.input?.input_type === 'UTXO' && i.input.source_id === forcedEntry.outpoint.source_id && i.input.index === 1,
+      (i: any) =>
+        i.input?.input_type === 'UTXO' && i.input.source_id === forcedEntry.outpoint.source_id && i.input.index === 1,
     );
     expect(plainSpent).toHaveLength(1);
 
@@ -615,25 +614,29 @@ describe('Review-round regression pins', () => {
 
   test('DelegationWithdraw-style fee deduction does not compound across fee iterations', () => {
     const AMOUNT = '1099511627777'; // 2^40 + 1 — varint-boundary scale amount
-    const assembled = Transaction.assembleRaw(
-      {
-        outputs: [
-          {
-            type: 'LockThenTransfer',
-            destination: USER_ADDRESS,
-            value: { type: 'Coin', amount: { atoms: AMOUNT, decimal: atomsToDecimal(AMOUNT, 11) } },
-            lock: { type: 'ForBlockCount', content: 10 },
-          },
-        ],
-        inputs: [],
-        requiredCoin: 0n, // withdraw: funds come from the delegation input, not coin UTXOs
-        requiredToken: 0n,
-        baseFee: 0n,
-        deductFeeFromFirstOutput: true,
-        withUTXO: [],
-      } as any,
-      { network: 'testnet', changeAddress: changeAddresses[0] },
-    );
+    const prepared = {
+      outputs: [
+        {
+          type: 'LockThenTransfer',
+          destination: USER_ADDRESS,
+          value: { type: 'Coin', amount: { atoms: AMOUNT, decimal: atomsToDecimal(AMOUNT, 11) } },
+          lock: { type: 'ForBlockCount', content: 10 },
+        },
+      ],
+      inputs: [],
+      requiredCoin: 0n, // withdraw: funds come from the delegation input, not coin UTXOs
+      requiredToken: 0n,
+      // nonzero so iteration 0 already deducts a REAL fee — with baseFee 0 the
+      // loop converged in one deduction and cross-iteration compounding was
+      // invisible to this test
+      baseFee: 1_000_000_000n,
+      deductFeeFromFirstOutput: true,
+      withUTXO: [],
+    } as any;
+    const assembled = Transaction.assembleRaw(prepared, {
+      network: 'testnet',
+      changeAddress: changeAddresses[0],
+    });
 
     const j = assembled.JSONRepresentation as any;
     const outAtoms = BigInt(j.outputs[0].value.amount.atoms);
@@ -643,6 +646,11 @@ describe('Review-round regression pins', () => {
     // in every fee iteration, never applied onto the previous iteration's
     // mutated output value
     expect(outAtoms + feeAtoms).toBe(BigInt(AMOUNT));
+
+    // caller-mutation guard: assembling must leave the caller's prepared
+    // outputs untouched — the fee-deducted output is written to a deep clone,
+    // never back onto `prepared.outputs[0]`
+    expect((prepared.outputs[0] as any).value.amount.atoms).toBe(AMOUNT);
   });
 
   test('fee conservation across varint-boundary amounts on the normal path', async () => {

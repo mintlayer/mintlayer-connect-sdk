@@ -15,7 +15,6 @@ import initWasm, {
   encode_output_token_lock_then_transfer,
   encode_output_lock_then_transfer,
   data_deposit_fee,
-  TotalSupply,
   encode_signed_transaction,
   encode_witness,
   SignatureHashType,
@@ -1997,7 +1996,7 @@ class Client {
             decimal: amount.toString(),
           },
           delegation_id,
-          nonce: delegation_details.next_nonce,
+          nonce: this.validateNextNonce(delegation_details.next_nonce, 'delegation'),
         },
       });
 

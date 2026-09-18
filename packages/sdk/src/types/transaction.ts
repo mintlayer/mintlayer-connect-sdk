@@ -311,11 +311,6 @@ export interface TransactionJSONRepresentation {
   id: string;
 }
 
-export interface Outpoint {
-  id: string;
-  index: number;
-}
-
 export interface UtxoOutpoint {
   index: number;
   source_type: SourceId;

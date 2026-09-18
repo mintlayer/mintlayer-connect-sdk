@@ -62,7 +62,7 @@ export const FEE_AMOUNT_PER_KB = BigInt('100000000000');
  * encodings when the caller has not set one. The chain rejects stale fee
  * heights below the current tip, so this is kept comfortably ahead; the
  * raw assembler has always used it, and it is the default for the fluent
- * builder when `setCurrentBlockHeight` was not called.
+ * builder when no block height was passed to the constructor.
  */
 export const FEE_BLOCK_HEIGHT = 200000n;
 
@@ -564,7 +564,9 @@ export class Transaction {
       preciseFee = nextPreciseFee;
     }
 
-    throw new Error('Failed to build transaction after maximum attempts');
+    throw new Error(
+      `Fee did not converge after ${MAX_FEE_ATTEMPTS} attempts (last fee ${preciseFee} atoms, previous ${previousFee})`,
+    );
   }
 
   hex() {
@@ -633,6 +635,14 @@ export class Transaction {
     // spend inside one transaction + double-counted change math).
     const forcedOutpointKeys = new Set(forcedUtxos.map(({ input }) => `${input.source_id}:${input.index}`));
     const isForced = (entry: UtxoInput) => forcedOutpointKeys.has(`${entry.input.source_id}:${entry.input.index}`);
+    // A caller-supplied duplicate inside forceSpendUtxo itself is dropped too.
+    const seenForced = new Set<string>();
+    const dedupedForcedUtxos = forcedUtxos.filter(({ input }) => {
+      const key = `${input.source_id}:${input.index}`;
+      if (seenForced.has(key)) return false;
+      seenForced.add(key);
+      return true;
+    });
 
     let preciseFee = BigInt(0);
     let previousFee = BigInt(-1);
@@ -656,9 +666,9 @@ export class Transaction {
         ? selectUTXOsFor(utxos, requiredToken, sendToken.token_id).filter((entry) => !isForced(entry))
         : [];
 
-      if (forcedUtxos.length > 0) {
-        const forceCoinUtxos = forcedUtxos.filter((utxo) => utxo.utxo.value.type === 'Coin');
-        const forceTokenUtxos = forcedUtxos.filter(
+      if (dedupedForcedUtxos.length > 0) {
+        const forceCoinUtxos = dedupedForcedUtxos.filter((utxo) => utxo.utxo.value.type === 'Coin');
+        const forceTokenUtxos = dedupedForcedUtxos.filter(
           (utxo) => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === sendToken?.token_id,
         );
         if (forceCoinUtxos.length > 0) {
@@ -673,17 +683,37 @@ export class Transaction {
       const totalInputValueToken = inputObjToken.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
 
       if (!deductFeeFromFirstOutput && totalInputValueCoin < input_amount_coin_req_w_fee) {
-        throw new Error('Not enough coin UTXOs');
+        throw new Error(
+          `Not enough coin UTXOs: required ${input_amount_coin_req_w_fee} atoms (outputs + fee), selected ${totalInputValueCoin}`,
+        );
       }
       if (totalInputValueToken < requiredToken) {
-        throw new Error('Not enough token UTXOs');
+        throw new Error(
+          `Not enough token UTXOs for ${sendToken?.token_id}: required ${requiredToken} atoms, selected ${totalInputValueToken}`,
+        );
       }
 
-      const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
+      // When the fee is deducted from the first output it must NOT also be
+      // subtracted from the coin change — forced coin inputs would otherwise
+      // be double-charged (inputs - outputs != fee).
+      const changeAmountCoin = deductFeeFromFirstOutput
+        ? totalInputValueCoin - requiredCoin
+        : totalInputValueCoin - input_amount_coin_req_w_fee;
       const changeAmountToken = totalInputValueToken - requiredToken;
 
-      // Fresh object — never mutate the caller's prepared outputs.
-      const finalOutputs: Output[] = outputs.map((output) => ({ ...output }));
+      // Fresh objects — never mutate the caller's prepared outputs (the
+      // fee-deducted output is cloned deeply: value/amount are written below).
+      const finalOutputs: Output[] = outputs.map((output, outputIndex) =>
+        deductFeeFromFirstOutput && outputIndex === 0
+          ? {
+              ...output,
+              value: {
+                ...(output as LockThenTransferOutput).value,
+                amount: { ...(output as LockThenTransferOutput).value.amount },
+              },
+            }
+          : { ...output },
+      );
       if (deductFeeFromFirstOutput) {
         const out = finalOutputs[0] as LockThenTransferOutput;
         const netAtoms = firstOutputOriginalAtoms - totalFee;
