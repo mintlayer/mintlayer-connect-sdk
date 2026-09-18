@@ -19,7 +19,7 @@ type LockThenTransferUtxo = BaseUtxo & {
   type: 'LockThenTransfer';
   lock: {
     type: 'ForBlockCount' | 'UntilTime';
-    content: string;
+    content: string | number | { timestamp: string };
   };
 };
 
@@ -40,7 +40,7 @@ type IssueNftUtxo = {
   };
 };
 
-type Utxo = TransferUtxo | LockThenTransferUtxo | IssueNftUtxo | HtlcUtxo;
+export type Utxo = TransferUtxo | LockThenTransferUtxo | IssueNftUtxo | HtlcUtxo;
 
 export type UtxoInput = {
   input: {
@@ -136,7 +136,7 @@ type ConcludeOrderInput = {
   utxo: null;
 };
 
-type Input =
+export type Input =
   | UtxoInput
   | MintTokensInput
   | UnmintTokensInput
@@ -149,29 +149,29 @@ type Input =
   | ConcludeOrderInput
   | DelegationWithdrawInput;
 
-type TransferOutput = {
+export type TransferOutput = {
   type: 'Transfer';
   destination: string;
   value: Value;
 };
 
-type LockThenTransferOutput = {
+export type LockThenTransferOutput = {
   type: 'LockThenTransfer';
   destination: string;
   value: Value;
   lock: {
     type: 'ForBlockCount' | 'UntilTime';
-    content: string;
+    content: string | number | { timestamp: string };
   };
 };
 
-type CreateDelegationIdOutput = {
+export type CreateDelegationIdOutput = {
   type: 'CreateDelegationId';
   destination: string;
   pool_id: string;
 };
 
-type DelegateStakingOutput = {
+export type DelegateStakingOutput = {
   type: 'DelegateStaking';
   delegation_id: string;
   amount: AmountFields;
@@ -187,17 +187,17 @@ type DelegationWithdrawInput = {
   };
 };
 
-type BurnTokenOutput = {
+export type BurnTokenOutput = {
   type: 'BurnToken';
   value: Value;
 };
 
-type DataDepositOutput = {
+export type DataDepositOutput = {
   type: 'DataDeposit';
   data: string;
 };
 
-type TotalSupplyValue =
+export type TotalSupplyValue =
   | {
   type: 'Unlimited' | 'Lockable';
 }
@@ -206,7 +206,7 @@ type TotalSupplyValue =
   amount: AmountFields;
 };
 
-type IssueFungibleTokenOutput = {
+export type IssueFungibleTokenOutput = {
   type: 'IssueFungibleToken';
   authority: string;
   is_freezable: boolean;
@@ -220,15 +220,15 @@ export type Timelock =
   | {
   type: 'UntilTime';
   content: {
-    timestamp: string;
+    timestamp: string | number;
   };
 }
   | {
   type: 'ForBlockCount';
-  content: number;
+  content: string | number;
 };
 
-type HtlcOutput = {
+export type HtlcOutput = {
   type: 'Htlc';
   value: {
     token_id?: string;
@@ -247,7 +247,7 @@ type HtlcOutput = {
   }
 }
 
-type IssueNftOutput = {
+export type IssueNftOutput = {
   type: 'IssueNft';
   destination: string;
   token_id?: string;
@@ -274,7 +274,7 @@ type CreateOrderOutput = {
   conclude_destination: string;
 };
 
-type Output =
+export type Output =
   | TransferOutput
   | LockThenTransferOutput
   | BurnTokenOutput
@@ -286,23 +286,23 @@ type Output =
   | DelegateStakingOutput
   | HtlcOutput;
 
-type AmountFields = {
+export type AmountFields = {
   atoms: string;
   decimal: string;
 };
 
-type Coin = {
+export type Coin = {
   type: 'Coin';
   amount: AmountFields;
 };
 
-type Token = {
+export type Token = {
   type: 'TokenV1';
   token_id: string;
   amount: AmountFields;
 };
 
-type Value = Coin | Token;
+export type Value = Coin | Token;
 
 export interface TransactionJSONRepresentation {
   inputs: Input[];
@@ -312,12 +312,12 @@ export interface TransactionJSONRepresentation {
 }
 
 
-interface Outpoint {
+export interface Outpoint {
   id: string;
   index: number;
 }
 
-interface UtxoOutpoint {
+export interface UtxoOutpoint {
   index: number;
   source_type: SourceId;
   source_id: string;

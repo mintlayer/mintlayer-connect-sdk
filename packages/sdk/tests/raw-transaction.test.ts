@@ -1,8 +1,7 @@
+// Low-level wasm primitives come from the wasm lib directly — the SDK no
+// longer re-exports them.
 import {
   Amount,
-  BuiltTransaction,
-  Client,
-  FEE_BLOCK_HEIGHT,
   Network,
   SourceId,
   data_deposit_fee,
@@ -14,7 +13,8 @@ import {
   fungible_token_issuance_fee,
   nft_issuance_fee,
   token_supply_change_fee,
-} from '../src/mintlayer-connect-sdk';
+} from '@mintlayer/wasm-lib';
+import { BuiltTransaction, Client, FEE_BLOCK_HEIGHT } from '../src/mintlayer-connect-sdk';
 import {
   createConnectedClient,
   expectRejectionWithoutProviderCalls,
