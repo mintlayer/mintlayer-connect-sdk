@@ -64,10 +64,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm --filter "$PKG" build --if-present
+        run: pnpm --filter "$PKG" run --if-present build
 
       - name: Test
-        run: pnpm --filter "$PKG" test --if-present
+        run: pnpm --filter "$PKG" run --if-present test
 
       - name: Replace workspace dependencies with concrete versions
         shell: node {0}
