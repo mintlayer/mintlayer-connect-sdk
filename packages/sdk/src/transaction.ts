@@ -992,19 +992,21 @@ export class Transaction {
     });
     const outputsArray = outputsArrayItems.filter((x: any): x is NonNullable<typeof x> => x !== undefined);
 
-    const inputAddresses: string[] = (transactionJSONrepresentation.inputs as UtxoInput[])
-      // @ts-ignore
+    const inputAddresses: string[] = (transactionJSONrepresentation.inputs as any[])
       .filter(({ input, utxo }) => input.input_type === 'UTXO' || utxo?.htlc)
-      .map((input) => {
-        if (input.utxo.destination){
-          return input.utxo.destination;
+      .map((entry: any) => {
+        // decoded transactions carry no utxo payload — size estimation then
+        // falls back to the account-command destinations below
+        if ((entry as any).utxo?.destination) {
+          return (entry as any).utxo.destination;
         }
-        // @ts-ignore
-        if (input?.utxo?.htlc) {
-          // @ts-ignore
-          return [input.utxo.htlc.spend_key, input.utxo.htlc.refund_key]; // TODO: need to handle spend too
+        if ((entry as any)?.utxo?.htlc) {
+          return [(entry as any).utxo.htlc.spend_key, (entry as any).utxo.htlc.refund_key]; // TODO: need to handle spend too
         }
-      }).flat();
+        return undefined;
+      })
+      .filter((x): x is string => typeof x === 'string')
+      .flat();
 
     const firstInput = transactionJSONrepresentation.inputs[0]?.input as any;
 
@@ -1147,7 +1149,8 @@ const decodedInput = (input: any, index: number): any => {
   if (input.Utxo) {
     return {
       input: {
-        index,
+        // the OUTPOINT index from the decode — NOT the input's array position
+        index: input.Utxo.index,
         input_type: 'UTXO',
         source_id: input.Utxo.id.Transaction,
         source_type: 'Transaction',
