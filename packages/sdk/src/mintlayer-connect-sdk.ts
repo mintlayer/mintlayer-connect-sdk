@@ -962,6 +962,12 @@ export type RawOutput =
         refund_key: string;
         secret_hash: string | { hex: string; string: string | null };
         spend_key: string;
+        /**
+         * UntilTime content accepts either the wrapped `{ timestamp }` object
+         * or a bare scalar timestamp; both normalize to the identical
+         * canonical `{ timestamp: string }` shape (accepted since the
+         * round-3 lock/timelock consolidation).
+         */
         refund_timelock:
           | { type: 'UntilTime'; content: { timestamp: string | number } }
           | { type: 'ForBlockCount'; content: string | number };
@@ -3461,9 +3467,7 @@ class Client {
         if (!raw.authority) {
           throw new Error(`${context}: authority is required`);
         }
-        if (!Number.isInteger(raw.number_of_decimals) || raw.number_of_decimals < 0) {
-          throw new Error(`${context}: number_of_decimals must be a non-negative integer`);
-        }
+        this.validateTokenDecimals(raw.number_of_decimals, context);
         let total_supply: TotalSupplyValue;
         if (raw.total_supply?.type === 'Unlimited' || raw.total_supply?.type === 'Lockable') {
           total_supply = { type: raw.total_supply.type };
@@ -3591,7 +3595,8 @@ class Client {
 
   /**
    * Validates a Coin/TokenV1 currency discriminant, shared by value and
-   * CreateOrder currency normalization.
+   * CreateOrder currency normalization. Returns fresh canonical objects so
+   * extra caller properties cannot leak into the transaction JSON.
    * @private
    */
   private validateRawCurrency(
@@ -3605,7 +3610,7 @@ class Client {
     if (currency.type === 'TokenV1' && !currency.token_id) {
       throw new Error(`${context}: ${name} TokenV1 requires token_id`);
     }
-    return currency;
+    return currency.type === 'Coin' ? { type: 'Coin' } : { type: 'TokenV1', token_id: currency.token_id };
   }
 
   /**
@@ -3665,6 +3670,31 @@ class Client {
       throw new Error(`${context}: ${label} must be a non-negative integer expressed in atoms (got "${atoms}")`);
     }
     return atomsStr;
+  }
+
+  /**
+   * Validates a transaction id (64-character hex, case-insensitive) before it
+   * is interpolated into API paths or parsed into bytes.
+   * @private
+   */
+  private validateTransactionId(transaction_id: string, context: string): string {
+    if (typeof transaction_id !== 'string' || !/^[0-9a-fA-F]{64}$/.test(transaction_id)) {
+      throw new Error(`${context}: transaction_id must be a 64-character hex string`);
+    }
+    return transaction_id;
+  }
+
+  /**
+   * Validates a token number_of_decimals value (integer 0–18). Shared by raw
+   * issuance outputs and token-details lookup so both paths enforce the same
+   * bound.
+   * @private
+   */
+  private validateTokenDecimals(value: unknown, context: string): number {
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 18) {
+      throw new Error(`${context}: number_of_decimals must be an integer between 0 and 18 (got ${String(value)})`);
+    }
+    return value;
   }
 
   /**
@@ -3838,21 +3868,20 @@ class Client {
       throw new Error(`Token ${token_id} not found or returned unexpected data`);
     }
 
-    const { number_of_decimals, authority } = raw as Partial<TokenDetails>;
+    const { number_of_decimals, authority, next_nonce } = raw as Partial<TokenDetails>;
 
-    if (
-      typeof number_of_decimals !== 'number' ||
-      !Number.isInteger(number_of_decimals) ||
-      number_of_decimals < 0 ||
-      number_of_decimals > 18
-    ) {
-      throw new Error(
-        `Token ${token_id} returned an invalid number_of_decimals: ${String(number_of_decimals)}`,
-      );
-    }
+    this.validateTokenDecimals(number_of_decimals, `Token ${token_id}`);
 
     if (typeof authority !== 'string' || authority.length === 0) {
       throw new Error(`Token ${token_id} returned an invalid authority`);
+    }
+
+    // A string next_nonce ('7') would corrupt nonce arithmetic via concatenation
+    if (
+      next_nonce !== undefined &&
+      (typeof next_nonce !== 'number' || !Number.isInteger(next_nonce) || next_nonce < 0)
+    ) {
+      throw new Error(`Token ${token_id} returned an invalid next_nonce: ${String(next_nonce)}`);
     }
 
     return raw as TokenDetails;
@@ -4999,6 +5028,7 @@ class Client {
     let useHtlcUtxo: any[] = [];
 
     if (transaction_id) {
+      this.validateTransactionId(transaction_id, 'HTLC lookup');
       const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
       // @ts-ignore
       const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
@@ -5051,6 +5081,7 @@ class Client {
     let useHtlcUtxo: any[] = [];
 
     if (transaction_id) {
+      this.validateTransactionId(transaction_id, 'HTLC lookup');
       const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
       // @ts-ignore
       const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
@@ -5107,6 +5138,7 @@ class Client {
       format = 'Uint8Array', // 'bytes' or 'hex'
     } = arg;
 
+    this.validateTransactionId(transaction_id, 'HTLC secret extraction');
     const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
 
     const transaction_signed = hexToUint8Array(transaction_hex);
