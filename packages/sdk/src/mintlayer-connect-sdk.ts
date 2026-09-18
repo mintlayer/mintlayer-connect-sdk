@@ -2175,15 +2175,19 @@ class Client {
       outputs.push({
         authority: params.authority,
         is_freezable: params.is_freezable,
-        metadata_uri: {
-          hex: this.stringToHex(params.metadata_uri!),
-          string: params.metadata_uri,
-        },
+        metadata_uri: this.normalizeRawStringField(
+          params.metadata_uri!,
+          'params',
+          'metadata_uri',
+          MAX_RAW_URI_LENGTH,
+        ),
         number_of_decimals: params.number_of_decimals,
-        token_ticker: {
-          hex: this.stringToHex(params.token_ticker!),
-          string: params.token_ticker,
-        },
+        token_ticker: this.normalizeRawStringField(
+          params.token_ticker!,
+          'params',
+          'token_ticker',
+          MAX_RAW_TICKER_LENGTH,
+        ),
         total_supply,
         type: 'IssueFungibleToken',
       });
@@ -2196,34 +2200,28 @@ class Client {
         token_id: '',
         data: {
           creator: params.creator || '', // Todo: Get the creator address
-          additional_metadata_uri: {
-            hex: this.stringToHex(params.additional_metadata_uri!),
-            string: params.additional_metadata_uri,
-          },
-          description: {
-            hex: this.stringToHex(params.description!),
-            string: params.description,
-          },
-          icon_uri: {
-            hex: this.stringToHex(params.icon_uri!),
-            string: params.icon_uri,
-          },
-          media_hash: {
-            hex: this.stringToHex(params.media_hash!),
-            string: params.media_hash,
-          },
-          media_uri: {
-            hex: this.stringToHex(params.media_uri!),
-            string: params.media_uri,
-          },
-          name: {
-            hex: this.stringToHex(params.name!),
-            string: params.name,
-          },
-          ticker: {
-            hex: this.stringToHex(params.ticker!),
-            string: params.ticker,
-          },
+          additional_metadata_uri: this.normalizeRawStringField(
+            params.additional_metadata_uri!,
+            'params',
+            'additional_metadata_uri',
+            MAX_RAW_URI_LENGTH,
+          ),
+          description: this.normalizeRawStringField(
+            params.description!,
+            'params',
+            'description',
+            MAX_RAW_NFT_DESCRIPTION_LENGTH,
+          ),
+          icon_uri: this.normalizeRawStringField(params.icon_uri!, 'params', 'icon_uri', MAX_RAW_URI_LENGTH),
+          media_hash: this.normalizeRawStringField(
+            params.media_hash!,
+            'params',
+            'media_hash',
+            MAX_RAW_HASH_LENGTH,
+          ),
+          media_uri: this.normalizeRawStringField(params.media_uri!, 'params', 'media_uri', MAX_RAW_URI_LENGTH),
+          name: this.normalizeRawStringField(params.name!, 'params', 'name', MAX_RAW_NFT_NAME_LENGTH),
+          ticker: this.normalizeRawStringField(params.ticker!, 'params', 'ticker', MAX_RAW_TICKER_LENGTH),
         },
       });
     }
