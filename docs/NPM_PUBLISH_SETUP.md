@@ -40,6 +40,12 @@ The workflow publishes on GitHub Releases:
    - The `Publish SDK` workflow runs the SDK test suite, then publishes
      `@mintlayer/sdk` with `--access public` and npm provenance.
 
+> **Tag protection:** protect release tags (GitHub *tag protection rules* /
+> rulesets, e.g. `v*`). The workflow checks out the tagged commit and asserts
+> the tag matches `packages/sdk/package.json`; if a tag could be mutated or
+> deleted between release creation and the workflow run, that binding could be
+> defeated. Protected tags close that TOCTOU window.
+
 Do **not** publish manually from a local machine unless the workflow is
 unavailable; the workflow keeps provenance and runs the test gate.
 
