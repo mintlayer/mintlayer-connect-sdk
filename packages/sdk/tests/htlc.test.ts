@@ -8,6 +8,7 @@ import {
   MOCK_TOKEN_11_DECIMALS,
   MOCK_TOKEN_11_DECIMALS_ID,
   MOCK_TOKEN_ID,
+  expectRejectionWithoutProviderCalls,
   setupApiMocks,
 } from './helpers/api-mocks';
 
@@ -323,4 +324,17 @@ test('extract Htlc from transaction', async () => {
   const secret_original = new Uint8Array([47, 236, 147, 140, 26, 135, 53, 164, 102, 152, 202, 10, 164, 83, 156, 186, 199, 3, 110, 204, 10, 144, 10, 244, 63, 197, 236, 4, 89, 26, 72, 4]);
 
   expect(Array.from(secret)).toEqual(Array.from(secret_original));
+});
+
+test('rejects a malformed transaction id before any provider call', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  await expectRejectionWithoutProviderCalls(
+    client.extractHtlcSecret({
+      transaction_id: 'not-a-txid',
+      transaction_hex: '00',
+    }),
+    'transaction_id must be a 64-character hex string',
+  );
 });

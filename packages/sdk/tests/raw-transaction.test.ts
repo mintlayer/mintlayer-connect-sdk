@@ -15,9 +15,7 @@ import {
   nft_issuance_fee,
   token_supply_change_fee,
 } from '../src/mintlayer-connect-sdk';
-import fetchMock from 'jest-fetch-mock';
-
-import { MOCK_TOKEN, MOCK_TOKEN_AUTHORITY, MOCK_TOKEN_ID, setupApiMocks } from './helpers/api-mocks';
+import { MOCK_TOKEN, MOCK_TOKEN_AUTHORITY, MOCK_TOKEN_ID, createConnectedClient, expectRejectionWithoutProviderCalls, setupApiMocks } from './helpers/api-mocks';
 
 import { addresses } from './__mocks__/accounts/account_01';
 
@@ -52,20 +50,6 @@ type LooseBuiltTransaction = Omit<BuiltTransaction, 'JSONRepresentation'> & {
     fee: { atoms: string; decimal: string };
   };
 };
-
-/** A client with `network: 'testnet'`, `autoRestore: false`, already connected. */
-async function createConnectedClient(): Promise<Client> {
-  const client = await Client.create({ network: 'testnet', autoRestore: false });
-  await client.connect();
-  return client;
-}
-
-/** Asserts `p` rejects with `expected` and that no fetch went out to the provider. */
-async function expectRejectionWithoutProviderCalls(p: Promise<unknown>, expected: string) {
-  const callsBefore = fetchMock.mock.calls.length;
-  await expect(p).rejects.toThrow(expected);
-  expect(fetchMock.mock.calls).toHaveLength(callsBefore);
-}
 
 /** Sum of the Coin value carried by UTXO inputs of a transaction (token inputs excluded). */
 function coinInputSum(tx: BuiltTransaction): bigint {
@@ -751,6 +735,70 @@ describe('buildRawTransaction normalization rejections', () => {
         outputs: [{ type: 'DataDeposit', data: 'a'.repeat(4097) }], // cap is 4096
       }),
     ).rejects.toThrow('data must be at most 4096 characters');
+  });
+
+  test('rejects a token details payload with a non-numeric next_nonce', async () => {
+    setupApiMocks({ tokens: { [TOKEN_ID]: { ...MOCK_TOKEN, next_nonce: '7' } } });
+    const client = await createConnectedClient();
+
+    // A string next_nonce ('7') would corrupt nonce arithmetic via concatenation
+    await expect(
+      client.buildRawTransaction({
+        outputs: [
+          {
+            type: 'Transfer',
+            destination: USER_ADDRESS,
+            value: { type: 'TokenV1', token_id: TOKEN_ID, amount: { atoms: TOKEN_ATOMS(10n), decimal: '10' } },
+          },
+        ],
+        inputs: [
+          {
+            input: {
+              input_type: 'AccountCommand',
+              command: 'MintTokens',
+              token_id: TOKEN_ID,
+              amount: { atoms: TOKEN_ATOMS(10n), decimal: '10' },
+            },
+          },
+        ],
+      }),
+    ).rejects.toThrow('returned an invalid next_nonce: 7');
+  });
+
+  test('rejects a garbage token details payload', async () => {
+    setupApiMocks({ tokens: { [TOKEN_ID]: { garbage: true } } });
+    const client = await createConnectedClient();
+
+    await expect(
+      client.buildRawTransaction({
+        outputs: [
+          {
+            type: 'Transfer',
+            destination: USER_ADDRESS,
+            value: { type: 'TokenV1', token_id: TOKEN_ID, amount: { atoms: TOKEN_ATOMS(10n), decimal: '10' } },
+          },
+        ],
+      }),
+    ).rejects.toThrow('number_of_decimals must be an integer between 0 and 18');
+  });
+
+  test('rejects an IssueNft output whose caller token_id differs from the derived one', async () => {
+    const client = await createConnectedClient();
+
+    // passes validateRawId (bech32-like charset/length) but differs from the id
+    // derived from the transaction inputs; rejected instead of overwritten
+    await expect(
+      client.buildRawTransaction({
+        outputs: [
+          {
+            type: 'IssueNft',
+            destination: USER_ADDRESS,
+            token_id: 'tmltk1zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz',
+            data: NFT_DATA,
+          },
+        ],
+      }),
+    ).rejects.toThrow('IssueNft token_id mismatch');
   });
 });
 

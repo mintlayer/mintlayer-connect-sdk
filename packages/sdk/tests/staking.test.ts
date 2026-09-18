@@ -6,6 +6,7 @@ import {
   MOCK_TOKEN_11_DECIMALS,
   MOCK_TOKEN_11_DECIMALS_ID,
   MOCK_TOKEN_ID,
+  expectRejectionWithoutProviderCalls,
   setupApiMocks,
 } from './helpers/api-mocks';
 
@@ -185,3 +186,26 @@ test('staking withdraw - snapshot', async () => {
   expect(result).toMatchSnapshot();
   spy.mockRestore();
 })
+
+test('delegation withdraw with an amount smaller than the fee is rejected', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  // 1e-9 ML = 100 atoms, far below the size-based transaction fee
+  await expect(
+    client.delegationWithdraw({
+      delegation_id: 'tdelg1d57nmkp24k0rh0fgsjnjy78wxql8wvgr420ncdsesvssvdgfcg6sx6262w',
+      amount: 1e-9,
+    }),
+  ).rejects.toThrow('DelegationWithdraw amount is smaller than the transaction fee');
+});
+
+test('delegation stake with a malformed pool id is rejected before any provider call', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  await expectRejectionWithoutProviderCalls(
+    client.delegationStake({ pool_id: 'bad_id', amount: 10 }),
+    'pool_id has an invalid format',
+  );
+});

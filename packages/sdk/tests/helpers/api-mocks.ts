@@ -1,5 +1,7 @@
 import fetchMock, { MockResponseInitFunction } from 'jest-fetch-mock';
 
+import { Client } from '../../src/mintlayer-connect-sdk';
+
 import { addresses, utxos } from '../__mocks__/accounts/account_01';
 
 export const MOCK_TOKEN_ID = 'tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq';
@@ -53,6 +55,8 @@ export interface ApiMockOptions {
   tokens?: Record<string, any>;
   /** UTXOs served by the `/batch` endpoint; defaults to the account_01 fixtures. */
   utxos?: any[];
+  /** Addresses resolved by the `window.mojito` stubs (defaults to account_01). */
+  addresses?: any;
   /** Value resolved by `window.mojito.request` (default 'signed-transaction'). */
   signedResponse?: any;
 }
@@ -128,13 +132,14 @@ export function setupApiMocks(options: ApiMockOptions = {}): ApiMocks {
     chainTipHeight = 200000,
     tokens = { [MOCK_TOKEN_ID]: MOCK_TOKEN },
     utxos: utxoList = utxos,
+    addresses: addressList = addresses,
     signedResponse = 'signed-transaction',
   } = options;
 
   const mojito: ApiMocks['mojito'] = {
     isExtension: true,
-    connect: jest.fn().mockResolvedValue(addresses),
-    restore: jest.fn().mockResolvedValue(addresses),
+    connect: jest.fn().mockResolvedValue(addressList),
+    restore: jest.fn().mockResolvedValue(addressList),
     disconnect: jest.fn().mockResolvedValue(undefined),
     request: jest.fn().mockResolvedValue(signedResponse),
   };
@@ -147,5 +152,19 @@ export function setupApiMocks(options: ApiMockOptions = {}): ApiMocks {
 
   fetchMock.mockResponse(defaultRouter);
 
-  return { mojito, addresses, utxos: utxoList, tokens, defaultRouter };
+  return { mojito, addresses: addressList, utxos: utxoList, tokens, defaultRouter };
+}
+
+/** A client with `network: 'testnet'`, `autoRestore: false`, already connected. */
+export async function createConnectedClient(): Promise<Client> {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+  return client;
+}
+
+/** Asserts `p` rejects with `expected` and that no fetch went out to the provider. */
+export async function expectRejectionWithoutProviderCalls(p: Promise<unknown>, expected: string) {
+  const callsBefore = fetchMock.mock.calls.length;
+  await expect(p).rejects.toThrow(expected);
+  expect(fetchMock.mock.calls).toHaveLength(callsBefore);
 }
