@@ -1,8 +1,14 @@
-import fetchMock from 'jest-fetch-mock';
+import fetchMock, { MockResponseInitFunction } from 'jest-fetch-mock';
 
 import { addresses, utxos } from '../__mocks__/accounts/account_01';
 
 export const MOCK_TOKEN_ID = 'tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq';
+
+/**
+ * Id of the secondary shared token fixture — identical to `MOCK_TOKEN` but
+ * with 11 decimals. Several suites mock both decimals variants.
+ */
+export const MOCK_TOKEN_11_DECIMALS_ID = 'tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l';
 export const MOCK_TOKEN_AUTHORITY = 'tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx';
 
 /**
@@ -37,6 +43,9 @@ export const MOCK_TOKEN = {
   },
 };
 
+/** `MOCK_TOKEN` with 11 decimals (key order preserved for snapshot parity). */
+export const MOCK_TOKEN_11_DECIMALS = { ...MOCK_TOKEN, number_of_decimals: 11 };
+
 export interface ApiMockOptions {
   /** Height served by `GET /chain/tip` (default 200000). */
   chainTipHeight?: number;
@@ -60,6 +69,48 @@ export interface ApiMocks {
   addresses: any;
   utxos: any[];
   tokens: Record<string, any>;
+  /**
+   * The shared routing rules (chain tip, token details, UTXO batch). Suites
+   * with extra endpoints register their own `fetchMock.mockResponse` router
+   * (the last registration wins) and delegate all unmatched URLs to this
+   * function.
+   */
+  defaultRouter: MockResponseInitFunction;
+}
+
+/** The shared fetch routing rules shared by transaction-building suites. */
+function createDefaultRouter(options: {
+  chainTipHeight: number;
+  tokens: Record<string, any>;
+  utxoList: any[];
+}): MockResponseInitFunction {
+  return async req => {
+    const url = req.url;
+
+    if (url.endsWith('/chain/tip')) {
+      return JSON.stringify({ height: options.chainTipHeight });
+    }
+
+    if (url.includes('/token/')) {
+      const tokenId = url.split('/token/').pop()!;
+      const details = options.tokens[tokenId];
+      if (details) {
+        return JSON.stringify(details);
+      }
+      return JSON.stringify({ a: 'b' });
+    }
+
+    if (url.endsWith('/batch')) {
+      return {
+        body: JSON.stringify({
+          results: [options.utxoList],
+        }),
+      };
+    }
+
+    console.warn('No mock for:', url);
+    return JSON.stringify({ error: 'No mock defined' });
+  };
 }
 
 /**
@@ -67,6 +118,10 @@ export interface ApiMocks {
  * a `fetch` router (chain tip, token details, UTXO batch) plus a
  * `window.mojito` wallet stub. Call it from `beforeEach` for a deterministic,
  * network-free setup; the returned object exposes the stubs for assertions.
+ *
+ * Note: `fetchMock.mockResponse` replaces the previously registered router,
+ * so a suite needing extra endpoints must register its own router AFTER this
+ * call and delegate unmatched URLs to the returned `defaultRouter`.
  */
 export function setupApiMocks(options: ApiMockOptions = {}): ApiMocks {
   const {
@@ -88,33 +143,9 @@ export function setupApiMocks(options: ApiMockOptions = {}): ApiMocks {
   fetchMock.resetMocks();
   fetchMock.doMock();
 
-  fetchMock.mockResponse(async req => {
-    const url = req.url;
+  const defaultRouter = createDefaultRouter({ chainTipHeight, tokens, utxoList });
 
-    if (url.endsWith('/chain/tip')) {
-      return JSON.stringify({ height: chainTipHeight });
-    }
+  fetchMock.mockResponse(defaultRouter);
 
-    if (url.includes('/token/')) {
-      const tokenId = url.split('/token/').pop()!;
-      const details = tokens[tokenId];
-      if (details) {
-        return JSON.stringify(details);
-      }
-      return JSON.stringify({ a: 'b' });
-    }
-
-    if (url.endsWith('/batch')) {
-      return {
-        body: JSON.stringify({
-          results: [utxoList],
-        }),
-      };
-    }
-
-    console.warn('No mock for:', url);
-    return JSON.stringify({ error: 'No mock defined' });
-  });
-
-  return { mojito, addresses, utxos: utxoList, tokens };
+  return { mojito, addresses, utxos: utxoList, tokens, defaultRouter };
 }

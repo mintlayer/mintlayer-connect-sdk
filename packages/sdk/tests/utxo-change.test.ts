@@ -1,40 +1,10 @@
 import { Client } from '../src/mintlayer-connect-sdk';
-import fetchMock from 'jest-fetch-mock';
 
-import { addresses, utxos } from './__mocks__/accounts/account_01'
+import { setupApiMocks } from './helpers/api-mocks';
 import { makeLogger } from 'ts-loader/dist/logger';
 
 beforeEach(() => {
-  fetchMock.resetMocks();
-
-  (window as any).mojito = {
-    isExtension: true,
-    connect: jest.fn().mockResolvedValue(addresses),
-    restore: jest.fn().mockResolvedValue(addresses),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-    request: jest.fn().mockResolvedValue('signed-transaction'),
-  };
-
-  fetchMock.doMock();
-
-  fetchMock.mockResponse(async req => {
-    const url = req.url;
-
-    if (url.endsWith('/chain/tip')) {
-      return JSON.stringify({ height: 200000 });
-    }
-
-    if(url.endsWith('/batch')) {
-      return {
-        body: JSON.stringify({
-          results: [utxos],
-        }),
-      };
-    }
-
-    console.warn('No mock for:', url);
-    return JSON.stringify({ error: 'No mock defined' });
-  });
+  setupApiMocks();
 });
 
 test('preview utxo after transfer', async () => {

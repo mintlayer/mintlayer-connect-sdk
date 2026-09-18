@@ -2,28 +2,58 @@ import { Client } from '../src/mintlayer-connect-sdk';
 import fetchMock from 'jest-fetch-mock';
 import { createHash } from 'crypto'
 
-import { addresses, utxos } from './__mocks__/accounts/account_02'
+import { utxos } from './__mocks__/accounts/account_02'
+import {
+  MOCK_TOKEN,
+  MOCK_TOKEN_11_DECIMALS,
+  MOCK_TOKEN_11_DECIMALS_ID,
+  MOCK_TOKEN_ID,
+  setupApiMocks,
+} from './helpers/api-mocks';
+
+const HUG_TOKEN_ID = 'tmltk18wg2xa7qxflwmcjpcd7nepsrsjj0gcrqyc7k5ej4cq5q3lf7ry7qtm2l6z';
+
+const HUG_TOKEN = {
+  authority: 'tmt1q9874wgx6enm2mzfu0yxhzleu84pp00l95l7er5z',
+  circulating_supply: {
+    atoms: '1000000000000000',
+    decimal: '10000',
+  },
+  frozen: false,
+  is_locked: false,
+  is_token_freezable: false,
+  is_token_unfreezable: null,
+  metadata_uri: {
+    hex: '697066733a2f2f6261667962656965706a746a34653271736b7a7561366763777173767267633362377164363777326d757132687a716333766f67656c666b7377652f746f6b656e5f6d657461646174612e6a736f6e',
+    string: 'ipfs://bafybeiepjtj4e2qskzua6gcwqsvrgc3b7qd67w2muq2hzqc3vogelfkswe/token_metadata.json',
+  },
+  next_nonce: 1,
+  number_of_decimals: 11,
+  token_ticker: {
+    hex: '485547',
+    string: 'HUG',
+  },
+  total_supply: {
+    Fixed: {
+      atoms: '100000000000000000',
+    },
+  },
+};
+
+let mocks: ReturnType<typeof setupApiMocks>;
 
 beforeEach(() => {
-  fetchMock.resetMocks();
-
-  // эмуляция window.mojito
-  (window as any).mojito = {
-    isExtension: true,
-    connect: jest.fn().mockResolvedValue(addresses),
-    restore: jest.fn().mockResolvedValue(addresses),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-    request: jest.fn().mockResolvedValue('signed-transaction'),
-  };
-
-  fetchMock.doMock();
+  mocks = setupApiMocks({
+    utxos,
+    tokens: {
+      [MOCK_TOKEN_ID]: MOCK_TOKEN,
+      [MOCK_TOKEN_11_DECIMALS_ID]: MOCK_TOKEN_11_DECIMALS,
+      [HUG_TOKEN_ID]: HUG_TOKEN,
+    },
+  });
 
   fetchMock.mockResponse(async req => {
     const url = req.url;
-
-    if (url.endsWith('/chain/tip')) {
-      return JSON.stringify({ height: 200000 });
-    }
 
     if (url.includes('/transaction/')) {
       const txId = url.split('/transaction/').pop();
@@ -190,105 +220,7 @@ beforeEach(() => {
       }
     }
 
-    if (url.includes('/token/')) {
-      const tokenId = url.split('/token/').pop();
-      if (tokenId === 'tmltk1jzgup986mh3x9n5024svm4wtuf2qp5vedlgy5632wah0pjffwhpqgsvmuq') {
-        return JSON.stringify({
-          "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
-          "circulating_supply": {
-            "atoms": "209000000000",
-            "decimal": "2090"
-          },
-          "frozen": false,
-          "is_locked": false,
-          "is_token_freezable": true,
-          "is_token_unfreezable": null,
-          "metadata_uri": {
-            "hex": "697066733a2f2f516d4578616d706c6548617368313233",
-            "string": "ipfs://QmExampleHash123"
-          },
-          "next_nonce": 7,
-          "number_of_decimals": 8,
-          "token_ticker": {
-            "hex": "58595a32",
-            "string": "XYZ2"
-          },
-          "total_supply": {
-            "Fixed": {
-              "atoms": "100000000000000"
-            }
-          }
-        });
-      }
-      if (tokenId === 'tmltk17jgtcm3gc8fne3su8s96gwj0yw8k2khx3fglfe8mz72jhygemgnqm57l7l') {
-        return JSON.stringify({
-          "authority": "tmt1qyjlh9w9t7qwx7cawlqz6rqwapflsvm3dulgmxyx",
-          "circulating_supply": {
-            "atoms": "209000000000",
-            "decimal": "2090"
-          },
-          "frozen": false,
-          "is_locked": false,
-          "is_token_freezable": true,
-          "is_token_unfreezable": null,
-          "metadata_uri": {
-            "hex": "697066733a2f2f516d4578616d706c6548617368313233",
-            "string": "ipfs://QmExampleHash123"
-          },
-          "next_nonce": 7,
-          "number_of_decimals": 11,
-          "token_ticker": {
-            "hex": "58595a32",
-            "string": "XYZ2"
-          },
-          "total_supply": {
-            "Fixed": {
-              "atoms": "100000000000000"
-            }
-          }
-        });
-      }
-      if (tokenId === 'tmltk18wg2xa7qxflwmcjpcd7nepsrsjj0gcrqyc7k5ej4cq5q3lf7ry7qtm2l6z') {
-        return JSON.stringify({
-          "authority": "tmt1q9874wgx6enm2mzfu0yxhzleu84pp00l95l7er5z",
-          "circulating_supply": {
-            "atoms": "1000000000000000",
-            "decimal": "10000"
-          },
-          "frozen": false,
-          "is_locked": false,
-          "is_token_freezable": false,
-          "is_token_unfreezable": null,
-          "metadata_uri": {
-            "hex": "697066733a2f2f6261667962656965706a746a34653271736b7a7561366763777173767267633362377164363777326d757132687a716333766f67656c666b7377652f746f6b656e5f6d657461646174612e6a736f6e",
-            "string": "ipfs://bafybeiepjtj4e2qskzua6gcwqsvrgc3b7qd67w2muq2hzqc3vogelfkswe/token_metadata.json"
-          },
-          "next_nonce": 1,
-          "number_of_decimals": 11,
-          "token_ticker": {
-            "hex": "485547",
-            "string": "HUG"
-          },
-          "total_supply": {
-            "Fixed": {
-              "atoms": "100000000000000000"
-            }
-          }
-        });
-      }
-      return JSON.stringify({ a: 'b' });
-    }
-
-    if(url.endsWith('/batch')) {
-      return {
-        body: JSON.stringify({
-          results: [utxos],
-        }),
-      };
-    }
-
-    console.warn('No mock for:', url);
-    return JSON.stringify({ error: 'No mock defined' });
+    return mocks.defaultRouter(req);
   });
 });
 

@@ -1,6 +1,8 @@
-import { Client } from '../src/mintlayer-connect-sdk';
 import {
   Amount,
+  BuiltTransaction,
+  Client,
+  FEE_BLOCK_HEIGHT,
   Network,
   SourceId,
   data_deposit_fee,
@@ -37,33 +39,49 @@ const LARGEST_COIN_UTXO = {
   atoms: '1703205604300000',
 };
 
-type AnyTx = {
-  JSONRepresentation: {
+/**
+ * Assertion view of the public build result. Derived from the exported
+ * `BuiltTransaction` (no shape duplicated here) with the `inputs`/`outputs`
+ * unions loosened to `any[]` and `fee` narrowed — the tests index into
+ * discriminated fields of specific union members directly.
+ */
+type LooseBuiltTransaction = Omit<BuiltTransaction, 'JSONRepresentation'> & {
+  JSONRepresentation: Omit<BuiltTransaction['JSONRepresentation'], 'inputs' | 'outputs' | 'fee'> & {
     inputs: any[];
     outputs: any[];
     fee: { atoms: string; decimal: string };
-    id: string;
   };
-  BINRepresentation: { inputs: Uint8Array[]; outputs: Uint8Array[]; transactionsize: number };
-  HEXRepresentation_unsigned: string;
-  transaction_id: string;
 };
 
+/** A client with `network: 'testnet'`, `autoRestore: false`, already connected. */
+async function createConnectedClient(): Promise<Client> {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+  return client;
+}
+
+/** Asserts `p` rejects with `expected` and that no fetch went out to the provider. */
+async function expectRejectionWithoutProviderCalls(p: Promise<unknown>, expected: string) {
+  const callsBefore = fetchMock.mock.calls.length;
+  await expect(p).rejects.toThrow(expected);
+  expect(fetchMock.mock.calls).toHaveLength(callsBefore);
+}
+
 /** Sum of the Coin value carried by UTXO inputs of a transaction (token inputs excluded). */
-function coinInputSum(tx: AnyTx): bigint {
+function coinInputSum(tx: BuiltTransaction): bigint {
   return tx.JSONRepresentation.inputs
     .filter((i: any) => i.input.input_type === 'UTXO' && i.utxo.value.type === 'Coin')
     .reduce((acc: bigint, i: any) => acc + BigInt(i.utxo.value.amount.atoms), 0n);
 }
 
-function coinTransferSum(tx: AnyTx): bigint {
+function coinTransferSum(tx: BuiltTransaction): bigint {
   return tx.JSONRepresentation.outputs
     .filter((o: any) => o.type === 'Transfer' && o.value.type === 'Coin')
     .reduce((acc: bigint, o: any) => acc + BigInt(o.value.amount.atoms), 0n);
 }
 
 /** Sum of TokenV1 UTXO input values for a given token id. */
-function tokenInputSum(tx: AnyTx, tokenId: string): bigint {
+function tokenInputSum(tx: BuiltTransaction, tokenId: string): bigint {
   return tx.JSONRepresentation.inputs
     .filter(
       (i: any) =>
@@ -75,7 +93,7 @@ function tokenInputSum(tx: AnyTx, tokenId: string): bigint {
 }
 
 /** Sum of token amounts in outputs matching `match` for a given token id. */
-function tokenOutputSum(tx: AnyTx, tokenId: string, match: (o: any) => boolean = () => true): bigint {
+function tokenOutputSum(tx: BuiltTransaction, tokenId: string, match: (o: any) => boolean = () => true): bigint {
   return tx.JSONRepresentation.outputs
     .filter((o: any) => o.value?.type === 'TokenV1' && o.value.token_id === tokenId && match(o))
     .reduce((acc: bigint, o: any) => acc + BigInt(o.value.amount.atoms), 0n);
@@ -110,8 +128,7 @@ beforeEach(() => {
 
 describe('buildRawTransaction', () => {
   test('issuance + transfers + fee output in one transaction', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const FEE_ATOMS = '1000000000000'; // 10 ML
     const USER_ATOMS = '50000000000000'; // 500 ML
@@ -138,7 +155,7 @@ describe('buildRawTransaction', () => {
           value: { type: 'Coin', amount: { atoms: USER_ATOMS, decimal: '500' } },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const { JSONRepresentation } = tx;
 
@@ -159,7 +176,7 @@ describe('buildRawTransaction', () => {
     expect(JSONRepresentation.outputs[2].value.amount.atoms).toBe(USER_ATOMS);
 
     // issuance fee enters the accounting
-    const issuanceFee = BigInt(fungible_token_issuance_fee(200000n, Network.Testnet).atoms());
+    const issuanceFee = BigInt(fungible_token_issuance_fee(FEE_BLOCK_HEIGHT, Network.Testnet).atoms());
     expect(issuanceFee).toBeGreaterThan(0n);
 
     // coin conservation: inputs = caller coin outputs + change + tx fee + issuance fee
@@ -180,8 +197,7 @@ describe('buildRawTransaction', () => {
   });
 
   test('multi transfer selects UTXOs automatically and returns change to the change address', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const amounts = ['5000000000', '25000000000', '7000000000']; // 50 + 250 + 70 ML
 
@@ -191,7 +207,7 @@ describe('buildRawTransaction', () => {
         destination: receiving[i],
         value: { type: 'Coin' as const, amount: { atoms, decimal: (Number(atoms) / 1e11).toString() } },
       })),
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const outs = tx.JSONRepresentation.outputs;
     expect(outs).toHaveLength(4);
@@ -220,8 +236,7 @@ describe('buildRawTransaction', () => {
   });
 
   test('mint inputs without nonce get sequential auto nonces and inferred authority', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const tx = (await client.buildRawTransaction({
       outputs: [
@@ -249,7 +264,7 @@ describe('buildRawTransaction', () => {
           },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const mints = tx.JSONRepresentation.inputs.filter((i: any) => i.input.command === 'MintTokens');
     expect(mints).toHaveLength(2);
@@ -265,15 +280,14 @@ describe('buildRawTransaction', () => {
     expect(mints[1].input.authority).toBe(TOKEN_AUTHORITY);
 
     // coin conservation including per-mint token supply change fee
-    const supplyFee = BigInt(token_supply_change_fee(200000n, Network.Testnet).atoms());
+    const supplyFee = BigInt(token_supply_change_fee(FEE_BLOCK_HEIGHT, Network.Testnet).atoms());
     const inputSum = coinInputSum(tx);
     const fee = BigInt(tx.JSONRepresentation.fee.atoms);
     expect(inputSum).toBe(coinTransferSum(tx) + fee + 2n * supplyFee);
   });
 
   test('explicit nonce overrides the auto lookup', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const tx = (await client.buildRawTransaction({
       outputs: [
@@ -294,7 +308,7 @@ describe('buildRawTransaction', () => {
           },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const mints = tx.JSONRepresentation.inputs.filter((i: any) => i.input.command === 'MintTokens');
     expect(mints).toHaveLength(1);
@@ -306,40 +320,32 @@ describe('buildRawTransaction', () => {
 
 describe('buildRawTransaction rejections', () => {
   test('rejects empty outputs array without provider calls', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
-    const callsBefore = fetchMock.mock.calls.length;
+    const client = await createConnectedClient();
 
-    await expect(client.buildRawTransaction({ outputs: [] })).rejects.toThrow(
+    await expectRejectionWithoutProviderCalls(
+      client.buildRawTransaction({ outputs: [] }),
       'At least one output is required',
     );
-
-    expect(fetchMock.mock.calls).toHaveLength(callsBefore);
   });
 
   test('rejects unknown output type without provider calls', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
-    const callsBefore = fetchMock.mock.calls.length;
+    const client = await createConnectedClient();
 
-    await expect(
+    await expectRejectionWithoutProviderCalls(
       client.buildRawTransaction({
         outputs: [
           { type: 'NotAnOutput', destination: USER_ADDRESS } as any,
         ],
       }),
-    ).rejects.toThrow('unknown output type');
-
-    expect(fetchMock.mock.calls).toHaveLength(callsBefore);
+      'unknown output type',
+    );
   });
 
   test('rejects malformed atoms without provider calls', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
-    const callsBefore = fetchMock.mock.calls.length;
+    const client = await createConnectedClient();
 
     for (const atoms of ['-100', '1.5', 'abc', '']) {
-      await expect(
+      await expectRejectionWithoutProviderCalls(
         client.buildRawTransaction({
           outputs: [
             {
@@ -349,18 +355,15 @@ describe('buildRawTransaction rejections', () => {
             },
           ],
         }),
-      ).rejects.toThrow('amount.atoms must be a non-negative integer');
+        'amount.atoms must be a non-negative integer',
+      );
     }
-
-    expect(fetchMock.mock.calls).toHaveLength(callsBefore);
   });
 
   test('rejects UTXO-style input passed in inputs without provider calls', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
-    const callsBefore = fetchMock.mock.calls.length;
+    const client = await createConnectedClient();
 
-    await expect(
+    await expectRejectionWithoutProviderCalls(
       client.buildRawTransaction({
         outputs: [
           {
@@ -380,9 +383,8 @@ describe('buildRawTransaction rejections', () => {
           } as any,
         ],
       }),
-    ).rejects.toThrow('unsupported input_type');
-
-    expect(fetchMock.mock.calls).toHaveLength(callsBefore);
+      'unsupported input_type',
+    );
   });
 });
 
@@ -413,8 +415,7 @@ describe('wasm re-exports', () => {
 
 describe('RawStringField normalization', () => {
   test('plain strings are auto-wrapped into hex/string pairs', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const tx = (await client.buildRawTransaction({
       outputs: [
@@ -428,7 +429,7 @@ describe('RawStringField normalization', () => {
           total_supply: { type: 'Unlimited' },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const issuance = tx.JSONRepresentation.outputs[0];
     expect(issuance.type).toBe('IssueFungibleToken');
@@ -439,8 +440,7 @@ describe('RawStringField normalization', () => {
 
 describe('buildRawTransaction extended coverage', () => {
   test('TokenV1 transfer + burnToken select token UTXOs, return token change and respect decimals', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     // 10 tokens each at the fixture's 8 decimals
     const TRANSFER_ATOMS = TOKEN_ATOMS(10n);
@@ -458,7 +458,7 @@ describe('buildRawTransaction extended coverage', () => {
           value: { type: 'TokenV1', token_id: TOKEN_ID, amount: { atoms: BURN_ATOMS, decimal: '10' } },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     // exactly one token UTXO selected: the largest one (1000 tokens)
     const tokenInputs = tx.JSONRepresentation.inputs.filter(
@@ -493,8 +493,7 @@ describe('buildRawTransaction extended coverage', () => {
   });
 
   test('IssueFungibleToken + IssueNft in one tx pre-encodes the IssueNft token id and backfills the JSON', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const tx = (await client.buildRawTransaction({
       outputs: [
@@ -513,7 +512,7 @@ describe('buildRawTransaction extended coverage', () => {
           data: NFT_DATA,
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const nft = tx.JSONRepresentation.outputs.find((o: any) => o.type === 'IssueNft');
     expect(nft).toBeDefined();
@@ -528,16 +527,15 @@ describe('buildRawTransaction extended coverage', () => {
     expect(tx.BINRepresentation.outputs).toHaveLength(tx.JSONRepresentation.outputs.length);
 
     // both issuance protocol fees enter the accounting
-    const nftFee = BigInt(nft_issuance_fee(200000n, Network.Testnet).atoms());
-    const ftaFee = BigInt(fungible_token_issuance_fee(200000n, Network.Testnet).atoms());
+    const nftFee = BigInt(nft_issuance_fee(FEE_BLOCK_HEIGHT, Network.Testnet).atoms());
+    const ftaFee = BigInt(fungible_token_issuance_fee(FEE_BLOCK_HEIGHT, Network.Testnet).atoms());
     expect(coinInputSum(tx)).toBe(
       coinTransferSum(tx) + BigInt(tx.JSONRepresentation.fee.atoms) + nftFee + ftaFee,
     );
   });
 
   test('two IssueNft outputs in one tx are rejected with a clear message', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     await expect(
       client.buildRawTransaction({
@@ -550,17 +548,16 @@ describe('buildRawTransaction extended coverage', () => {
   });
 
   test('DataDeposit includes data_deposit_fee in the coin requirement', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const tx = (await client.buildRawTransaction({
       outputs: [{ type: 'DataDeposit', data: 'hello-raw' }],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     // output preserved
     expect(tx.JSONRepresentation.outputs[0]).toMatchObject({ type: 'DataDeposit', data: 'hello-raw' });
 
-    const depositFee = BigInt(data_deposit_fee(200000n, Network.Testnet).atoms());
+    const depositFee = BigInt(data_deposit_fee(FEE_BLOCK_HEIGHT, Network.Testnet).atoms());
     expect(depositFee).toBeGreaterThan(0n);
 
     // coin conservation: inputs = change + tx fee + data deposit fee
@@ -570,8 +567,7 @@ describe('buildRawTransaction extended coverage', () => {
   });
 
   test('DelegateStaking counts the stake amount in the coin requirement', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const STAKE_ATOMS = '10000000000000'; // 100 ML
 
@@ -579,7 +575,7 @@ describe('buildRawTransaction extended coverage', () => {
       outputs: [
         { type: 'DelegateStaking', delegation_id: DELEGATION_ID, amount: { atoms: STAKE_ATOMS, decimal: '100' } },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const stake = tx.JSONRepresentation.outputs.find((o: any) => o.type === 'DelegateStaking');
     expect(stake).toMatchObject({ delegation_id: DELEGATION_ID, amount: { atoms: STAKE_ATOMS, decimal: '100' } });
@@ -591,8 +587,7 @@ describe('buildRawTransaction extended coverage', () => {
   });
 
   test('CreateOrder counts the give side in the coin and token requirements', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     // (a) coin give side → coin requirement
     const GIVE_ATOMS = '100000000000000'; // 1000 ML
@@ -611,7 +606,7 @@ describe('buildRawTransaction extended coverage', () => {
           initially_given: { atoms: GIVE_ATOMS, decimal: '1000' },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const order = txCoinGive.JSONRepresentation.outputs.find((o: any) => o.type === 'CreateOrder');
     expect(order.ask_currency).toEqual({ type: 'TokenV1', token_id: TOKEN_ID });
@@ -643,7 +638,7 @@ describe('buildRawTransaction extended coverage', () => {
           initially_given: { atoms: GIVE_TOKEN_ATOMS, decimal: '10' },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     // token UTXOs selected for the give side; token conservation holds
     // (inputs = give_balance + token change; CreateOrder carries amounts outside `value`)
@@ -659,8 +654,7 @@ describe('buildRawTransaction extended coverage', () => {
   });
 
   test('forgeTransaction signs the built transaction via the wallet request', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const args = {
       outputs: [coinTransferOutput(USER_ADDRESS, '1000000000000')],
@@ -674,17 +668,31 @@ describe('buildRawTransaction extended coverage', () => {
     expect(method).toBe('signTransaction');
 
     // the tx handed to the wallet is exactly the one buildRawTransaction produces
-    const built = (await client.buildRawTransaction(args)) as AnyTx;
+    const built = (await client.buildRawTransaction(args)) as LooseBuiltTransaction;
     expect(params.txData.JSONRepresentation).toEqual(built.JSONRepresentation);
     expect(params.txData.transaction_id).toBe(built.transaction_id);
     expect(params.txData.HEXRepresentation_unsigned).toBe(built.HEXRepresentation_unsigned);
+  });
+
+  test('accepts zero amounts: the decimal is recomputed as "0"', async () => {
+    const client = await createConnectedClient();
+
+    const tx = (await client.buildRawTransaction({
+      outputs: [coinTransferOutput(USER_ADDRESS, '0')],
+    })) as LooseBuiltTransaction;
+
+    const zeroOutput = tx.JSONRepresentation.outputs.find(
+      (o: any) => o.type === 'Transfer' && o.destination === USER_ADDRESS,
+    );
+    expect(zeroOutput.value.amount.atoms).toBe('0');
+    // atomsToDecimal('0', 11) used to return '0.' (dead fallback), rejecting legitimate zero amounts
+    expect(zeroOutput.value.amount.decimal).toBe('0');
   });
 });
 
 describe('buildRawTransaction normalization rejections', () => {
   test('rejects decimal spoofing: decimal must equal atoms / 1e11 for Coin', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     await expect(
       client.buildRawTransaction({
@@ -700,8 +708,7 @@ describe('buildRawTransaction normalization rejections', () => {
   });
 
   test('rejects hex/string mismatch on metadata_uri', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     await expect(
       client.buildRawTransaction({
@@ -721,8 +728,7 @@ describe('buildRawTransaction normalization rejections', () => {
   });
 
   test('rejects oversized ticker and DataDeposit data with length-cap messages', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     await expect(
       client.buildRawTransaction({
@@ -750,8 +756,7 @@ describe('buildRawTransaction normalization rejections', () => {
 
 describe('mint netting and nonce sequencing', () => {
   test('mints are netted against same-token outputs: only the surplus comes from token UTXOs', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     const MINT_ATOMS = TOKEN_ATOMS(100n); // mint 100
     const OUT_ATOMS = TOKEN_ATOMS(150n); // transfer 150
@@ -774,7 +779,7 @@ describe('mint netting and nonce sequencing', () => {
           },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     // mint input preserved with auto nonce from token details
     const mint = tx.JSONRepresentation.inputs.find((i: any) => i.input.command === 'MintTokens');
@@ -789,13 +794,12 @@ describe('mint netting and nonce sequencing', () => {
     expect(tokenInputSum(tx, TOKEN_ID) + BigInt(MINT_ATOMS)).toBe(tokenOutputSum(tx, TOKEN_ID));
 
     // coin side: mint supply-change fee enters the coin requirement
-    const supplyFee = BigInt(token_supply_change_fee(200000n, Network.Testnet).atoms());
+    const supplyFee = BigInt(token_supply_change_fee(FEE_BLOCK_HEIGHT, Network.Testnet).atoms());
     expect(coinInputSum(tx)).toBe(coinTransferSum(tx) + BigInt(tx.JSONRepresentation.fee.atoms) + supplyFee);
   });
 
   test('explicit nonce below next_nonce throws and explicit nonces advance the per-token counter', async () => {
-    const client = await Client.create({ network: 'testnet', autoRestore: false });
-    await client.connect();
+    const client = await createConnectedClient();
 
     // next_nonce of the mocked token is 7 → nonce 3 is stale
     await expect(
@@ -837,7 +841,7 @@ describe('mint netting and nonce sequencing', () => {
           },
         },
       ],
-    })) as AnyTx;
+    })) as LooseBuiltTransaction;
 
     const mints = tx.JSONRepresentation.inputs.filter((i: any) => i.input.command === 'MintTokens');
     expect(mints).toHaveLength(2);
