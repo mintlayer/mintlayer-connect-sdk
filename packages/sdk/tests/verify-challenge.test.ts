@@ -1,40 +1,18 @@
 import { Client } from '../src/mintlayer-connect-sdk';
-import fetchMock from 'jest-fetch-mock';
+
+import { setupApiMocks } from './helpers/api-mocks';
+
+const VERIFY_ADDRESSES = {
+  addressesByChain: {
+    mintlayer: {
+      receiving: ['tmt1q9cz2dkuqqrdv2g3kl8zqvjvqtu3u6j3j8z9z9z9'],
+      change: ['tmt1q9cz2dkuqqrdv2g3kl8zqvjvqtu3u6j3j8z9z9z8'],
+    },
+  },
+};
 
 beforeEach(() => {
-  fetchMock.resetMocks();
-
-  (window as any).mojito = {
-    isExtension: true,
-    connect: jest.fn().mockResolvedValue({
-      addressesByChain: {
-        mintlayer: {
-          receiving: ['tmt1q9cz2dkuqqrdv2g3kl8zqvjvqtu3u6j3j8z9z9z9'],
-          change: ['tmt1q9cz2dkuqqrdv2g3kl8zqvjvqtu3u6j3j8z9z9z8'],
-        },
-      },
-    }),
-    restore: jest.fn().mockResolvedValue({
-      testnet: {
-        receiving: ['tmt1q9cz2dkuqqrdv2g3kl8zqvjvqtu3u6j3j8z9z9z9'],
-      },
-    }),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-    request: jest.fn().mockResolvedValue('signed-transaction'),
-  };
-
-  fetchMock.doMock();
-
-  fetchMock.mockResponse(async req => {
-    const url = req.url;
-
-    if (url.endsWith('/chain/tip')) {
-      return JSON.stringify({ height: 200000 });
-    }
-
-    console.warn('No mock for:', url);
-    return JSON.stringify({ error: 'No mock defined' });
-  });
+  setupApiMocks({ addresses: VERIFY_ADDRESSES });
 });
 
 test('verifyChallenge should verify a valid signature', async () => {
