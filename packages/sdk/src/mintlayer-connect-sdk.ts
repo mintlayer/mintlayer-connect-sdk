@@ -76,6 +76,13 @@ const MAX_RAW_CREATOR_LENGTH = 128;
  */
 const DISPLAY_STRING_SANITIZE_RE = /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
 
+/**
+ * Block height used for fee estimation, token id derivation, order input
+ * encoding and witness signing, shared by the Client and the Signer.
+ * TODO: Get the current block height from the API provider.
+ */
+export const FEE_BLOCK_HEIGHT = 200000n;
+
 function mergeUint8Arrays(arrays: Uint8Array[]) {
   const totalLength = arrays.reduce((sum: number, arr: Uint8Array) => sum + arr.length, 0);
 
@@ -1404,16 +1411,6 @@ class Client {
   /** Placeholder HTLC creation fee in atoms, shared by legacy and raw builders. */
   private static readonly HTLC_FEE_ATOMS = BigInt(1 * Math.pow(10, 11)); // TODO: 0n
 
-  /**
-   * Block height used for fee estimation, token id derivation, order input
-   * encoding and signing.
-   * TODO: Get the current block height from the API provider.
-   * @private
-   */
-  private get feeBlockHeight(): bigint {
-    return 200000n;
-  }
-
   private network: 'mainnet' | 'testnet';
   private connectedAddresses: {
     receiving: string[];
@@ -2074,7 +2071,7 @@ class Client {
    * @private
    */
   private protocolFee(fee: (block_height: bigint, network: Network) => Amount): bigint {
-    const block_height = this.feeBlockHeight;
+    const block_height = FEE_BLOCK_HEIGHT;
     return BigInt(fee(block_height, this.getMLNetwork()).atoms());
   }
 
@@ -2839,7 +2836,7 @@ class Client {
         );
       }
       if (issueNftIndexes.length === 1) {
-        const block_height = this.feeBlockHeight;
+        const block_height = FEE_BLOCK_HEIGHT;
         const token_id = get_token_id(
           mergeUint8Arrays(this.getTransactionInputsBytes(JSONRepresentation, this.network === 'mainnet' ? 0 : 1)),
           block_height,
@@ -3024,9 +3021,14 @@ class Client {
       if (meta.input_type === 'AccountCommand') {
         switch (meta.command) {
           case 'MintTokens': {
-            const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
-            const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
+            const { details, authority, nonce } = await this.resolveRawTokenCommand(
+              meta.command,
+              meta.token_id,
+              meta.authority,
+              meta.nonce,
+              tokenDetailsCache,
+              nonceCounters,
+            );
             const amount = this.normalizeRawAmount(
               meta.amount,
               details.number_of_decimals,
@@ -3046,9 +3048,14 @@ class Client {
             break;
           }
           case 'UnmintTokens': {
-            const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
-            const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
+            const { details, authority, nonce } = await this.resolveRawTokenCommand(
+              meta.command,
+              meta.token_id,
+              meta.authority,
+              meta.nonce,
+              tokenDetailsCache,
+              nonceCounters,
+            );
             const amount = this.normalizeRawAmount(
               meta.amount,
               details.number_of_decimals,
@@ -3068,9 +3075,14 @@ class Client {
             break;
           }
           case 'LockTokenSupply': {
-            const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
-            const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
+            const { authority, nonce } = await this.resolveRawTokenCommand(
+              meta.command,
+              meta.token_id,
+              meta.authority,
+              meta.nonce,
+              tokenDetailsCache,
+              nonceCounters,
+            );
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3084,9 +3096,14 @@ class Client {
             break;
           }
           case 'FreezeToken': {
-            const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
-            const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
+            const { authority, nonce } = await this.resolveRawTokenCommand(
+              meta.command,
+              meta.token_id,
+              meta.authority,
+              meta.nonce,
+              tokenDetailsCache,
+              nonceCounters,
+            );
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3101,9 +3118,14 @@ class Client {
             break;
           }
           case 'UnfreezeToken': {
-            const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
-            const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
+            const { authority, nonce } = await this.resolveRawTokenCommand(
+              meta.command,
+              meta.token_id,
+              meta.authority,
+              meta.nonce,
+              tokenDetailsCache,
+              nonceCounters,
+            );
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3120,9 +3142,14 @@ class Client {
             if (!meta.new_authority) {
               throw new Error('inputs (ChangeTokenAuthority): new_authority is required');
             }
-            const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
-            const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
+            const { authority, nonce } = await this.resolveRawTokenCommand(
+              meta.command,
+              meta.token_id,
+              meta.authority,
+              meta.nonce,
+              tokenDetailsCache,
+              nonceCounters,
+            );
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3140,9 +3167,14 @@ class Client {
             if (!meta.new_metadata_uri) {
               throw new Error('inputs (ChangeMetadataUri): new_metadata_uri is required');
             }
-            const details = await this.getRawTokenDetails(meta.token_id, tokenDetailsCache);
-            const authority = this.getRawAuthority(meta.authority, details, meta.command);
-            const nonce = this.nextRawNonce(meta.token_id, details.next_nonce ?? 0, meta.nonce, nonceCounters);
+            const { authority, nonce } = await this.resolveRawTokenCommand(
+              meta.command,
+              meta.token_id,
+              meta.authority,
+              meta.nonce,
+              tokenDetailsCache,
+              nonceCounters,
+            );
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -3266,6 +3298,9 @@ class Client {
       }
     }
 
+    const addCoinRequirement = (atoms: bigint) => {
+      requiredCoin += atoms;
+    };
     const addTokenOutput = (token_id: string, atoms: bigint) => {
       outputTokenTotals.set(token_id, (outputTokenTotals.get(token_id) ?? 0n) + atoms);
     };
@@ -3277,43 +3312,43 @@ class Client {
         case 'LockThenTransfer':
         case 'BurnToken': {
           if (output.value.type === 'Coin') {
-            requiredCoin += BigInt(output.value.amount.atoms);
+            addCoinRequirement(BigInt(output.value.amount.atoms));
           } else {
             addTokenOutput(output.value.token_id, BigInt(output.value.amount.atoms));
           }
           break;
         }
         case 'Htlc': {
-          requiredCoin += Client.HTLC_FEE_ATOMS;
+          addCoinRequirement(Client.HTLC_FEE_ATOMS);
           if (output.value.type === 'Coin') {
-            requiredCoin += BigInt(output.value.amount.atoms);
+            addCoinRequirement(BigInt(output.value.amount.atoms));
           } else if (output.value.token_id) {
             addTokenOutput(output.value.token_id, BigInt(output.value.amount.atoms));
           }
           break;
         }
         case 'DelegateStaking': {
-          requiredCoin += BigInt(output.amount.atoms);
+          addCoinRequirement(BigInt(output.amount.atoms));
           break;
         }
         case 'CreateOrder': {
           if (output.give_currency.type === 'Coin') {
-            requiredCoin += BigInt(output.give_balance.atoms);
+            addCoinRequirement(BigInt(output.give_balance.atoms));
           } else {
             addTokenOutput(output.give_currency.token_id, BigInt(output.give_balance.atoms));
           }
           break;
         }
         case 'IssueFungibleToken': {
-          requiredCoin += this.protocolFee(fungible_token_issuance_fee);
+          addCoinRequirement(this.protocolFee(fungible_token_issuance_fee));
           break;
         }
         case 'IssueNft': {
-          requiredCoin += this.protocolFee(nft_issuance_fee);
+          addCoinRequirement(this.protocolFee(nft_issuance_fee));
           break;
         }
         case 'DataDeposit': {
-          requiredCoin += this.protocolFee(data_deposit_fee);
+          addCoinRequirement(this.protocolFee(data_deposit_fee));
           break;
         }
         case 'CreateDelegationId':
@@ -3333,7 +3368,7 @@ class Client {
     }
 
     for (const input of inputs) {
-      requiredCoin += this.getFeeForRawInput(input);
+      addCoinRequirement(this.getFeeForRawInput(input));
     }
 
     if (tokenRequirements.size > 1) {
@@ -3497,8 +3532,8 @@ class Client {
         if (!raw.conclude_destination) {
           throw new Error(`${context}: conclude_destination is required`);
         }
-        const ask_currency = this.normalizeRawCurrency(raw.ask_currency, context, 'ask_currency');
-        const give_currency = this.normalizeRawCurrency(raw.give_currency, context, 'give_currency');
+        const ask_currency = this.validateRawCurrency(raw.ask_currency, context, 'ask_currency');
+        const give_currency = this.validateRawCurrency(raw.give_currency, context, 'give_currency');
         const askDecimals =
           ask_currency.type === 'Coin'
             ? 11
@@ -3557,6 +3592,25 @@ class Client {
   }
 
   /**
+   * Validates a Coin/TokenV1 currency discriminant, shared by value and
+   * CreateOrder currency normalization.
+   * @private
+   */
+  private validateRawCurrency(
+    currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string },
+    context: string,
+    name: string,
+  ): { type: 'Coin' } | { type: 'TokenV1'; token_id: string } {
+    if (!currency || (currency.type !== 'Coin' && currency.type !== 'TokenV1')) {
+      throw new Error(`${context}: ${name}.type must be "Coin" or "TokenV1"`);
+    }
+    if (currency.type === 'TokenV1' && !currency.token_id) {
+      throw new Error(`${context}: ${name} TokenV1 requires token_id`);
+    }
+    return currency;
+  }
+
+  /**
    * Normalizes a developer-forged value (Coin or TokenV1). The decimal amount
    * is always recomputed from the validated atoms (11 decimals for Coin, the
    * token's number_of_decimals for TokenV1) so wallets can trust the display
@@ -3571,19 +3625,14 @@ class Client {
     if (!value || typeof value !== 'object') {
       throw new Error(`${context}: value is required`);
     }
-    if (value.type !== 'Coin' && value.type !== 'TokenV1') {
-      throw new Error(`${context}: value.type must be "Coin" or "TokenV1"`);
-    }
-    if (value.type === 'TokenV1' && !value.token_id) {
-      throw new Error(`${context}: TokenV1 value requires token_id`);
-    }
-    if (value.type === 'Coin') {
+    const currency = this.validateRawCurrency(value, context, 'value');
+    if (currency.type === 'Coin') {
       return { type: 'Coin', amount: this.normalizeRawAmount(value.amount, 11, context) };
     }
-    const details = await this.getRawTokenDetails(value.token_id, tokenDetailsCache);
+    const details = await this.getRawTokenDetails(currency.token_id, tokenDetailsCache);
     return {
       type: 'TokenV1',
-      token_id: value.token_id,
+      token_id: currency.token_id,
       amount: this.normalizeRawAmount(value.amount, details.number_of_decimals, context),
     };
   }
@@ -3723,15 +3772,7 @@ class Client {
     lock: { type: 'ForBlockCount'; content: string | number } | { type: 'UntilTime'; content: string | number | { timestamp: string | number } },
     context: string,
   ): { type: 'ForBlockCount' | 'UntilTime'; content: string | { timestamp: string } } {
-    if (!lock || (lock.type !== 'ForBlockCount' && lock.type !== 'UntilTime')) {
-      throw new Error(`${context}: lock.type must be "ForBlockCount" or "UntilTime"`);
-    }
-    if (lock.type === 'ForBlockCount') {
-      return { type: 'ForBlockCount', content: this.rawAtomsString(lock.content, context, 'lock.content') };
-    }
-    const timestamp =
-      typeof lock.content === 'object' && lock.content !== null ? lock.content.timestamp : lock.content;
-    return { type: 'UntilTime', content: { timestamp: this.rawAtomsString(timestamp, context, 'timestamp') } };
+    return this.normalizeRawTimelockContent(lock, context, 'lock.content', 'lock.type');
   }
 
   /**
@@ -3743,37 +3784,30 @@ class Client {
     timelock: { type: 'UntilTime'; content: { timestamp: string | number } } | { type: 'ForBlockCount'; content: string | number },
     context: string,
   ): Timelock {
-    if (!timelock || (timelock.type !== 'ForBlockCount' && timelock.type !== 'UntilTime')) {
-      throw new Error(`${context}: htlc.refund_timelock.type must be "ForBlockCount" or "UntilTime"`);
-    }
-    if (timelock.type === 'ForBlockCount') {
-      return { type: 'ForBlockCount', content: this.rawAtomsString(timelock.content, context, 'content') };
-    }
-    if (!timelock.content || typeof timelock.content !== 'object' || timelock.content.timestamp === undefined) {
-      throw new Error(`${context}: htlc.refund_timelock.content.timestamp is required`);
-    }
-    return {
-      type: 'UntilTime',
-      content: { timestamp: this.rawAtomsString(timelock.content.timestamp, context, 'timestamp') },
-    };
+    return this.normalizeRawTimelockContent(timelock, context, 'content', 'htlc.refund_timelock.type');
   }
 
   /**
-   * Normalizes a CreateOrder currency side.
+   * Shared implementation for LockThenTransfer locks and HTLC refund timelocks:
+   * validates the discriminant and the numeric content (as ^\d+$ strings) and
+   * returns the canonical shape used by the encoders.
    * @private
    */
-  private normalizeRawCurrency(
-    currency: { type: 'Coin' } | { type: 'TokenV1'; token_id: string },
+  private normalizeRawTimelockContent(
+    lock: { type: 'ForBlockCount'; content: string | number } | { type: 'UntilTime'; content: string | number | { timestamp: string | number } },
     context: string,
-    name: string,
-  ): { type: 'Coin' } | { type: 'TokenV1'; token_id: string } {
-    if (!currency || (currency.type !== 'Coin' && currency.type !== 'TokenV1')) {
-      throw new Error(`${context}: ${name}.type must be "Coin" or "TokenV1"`);
+    contentLabel: string,
+    typeLabel: string,
+  ): { type: 'ForBlockCount'; content: string } | { type: 'UntilTime'; content: { timestamp: string } } {
+    if (!lock || (lock.type !== 'ForBlockCount' && lock.type !== 'UntilTime')) {
+      throw new Error(`${context}: ${typeLabel} must be "ForBlockCount" or "UntilTime"`);
     }
-    if (currency.type === 'TokenV1' && !currency.token_id) {
-      throw new Error(`${context}: ${name} TokenV1 requires token_id`);
+    if (lock.type === 'ForBlockCount') {
+      return { type: 'ForBlockCount', content: this.rawAtomsString(lock.content, context, contentLabel) };
     }
-    return currency.type === 'Coin' ? { type: 'Coin' } : { type: 'TokenV1', token_id: currency.token_id };
+    const timestamp =
+      typeof lock.content === 'object' && lock.content !== null ? lock.content.timestamp : lock.content;
+    return { type: 'UntilTime', content: { timestamp: this.rawAtomsString(timestamp, context, 'timestamp') } };
   }
 
   /**
@@ -3824,6 +3858,26 @@ class Client {
     }
 
     return raw as TokenDetails;
+  }
+
+  /**
+   * Resolves the shared preamble of a token-command input: token details,
+   * the authority (inferred from token details when omitted) and the next
+   * nonce for the token.
+   * @private
+   */
+  private async resolveRawTokenCommand(
+    command: string,
+    token_id: string,
+    authorityOverride: string | undefined,
+    explicitNonce: number | undefined,
+    tokenDetailsCache: Map<string, Promise<TokenDetails>>,
+    nonceCounters: Map<string, number>,
+  ): Promise<{ details: TokenDetails; authority: string; nonce: number }> {
+    const details = await this.getRawTokenDetails(token_id, tokenDetailsCache);
+    const authority = this.getRawAuthority(authorityOverride, details, command);
+    const nonce = this.nextRawNonce(token_id, details.next_nonce ?? 0, explicitNonce, nonceCounters);
+    return { details, authority, nonce };
   }
 
   /**
@@ -3894,11 +3948,11 @@ class Client {
       .filter(({ input }) => input.input_type === 'AccountCommand' || input.input_type === 'Account')
       .map(({ input }) => {
         if (input.command === 'ConcludeOrder') {
-          const block_height = this.feeBlockHeight;
+          const block_height = FEE_BLOCK_HEIGHT;
           return encode_input_for_conclude_order(input.order_id, BigInt(input.nonce.toString()), block_height, network);
         }
         if (input.command === 'FillOrder') {
-          const block_height = this.feeBlockHeight;
+          const block_height = FEE_BLOCK_HEIGHT;
           return encode_input_for_fill_order(
             input.order_id,
             Amount.from_atoms(input.fill_atoms.toString()),
@@ -4053,7 +4107,7 @@ class Client {
 
         const { destination: address, token_id } = output;
 
-        const chainTip = this.feeBlockHeight;
+        const chainTip = FEE_BLOCK_HEIGHT;
 
         return encode_output_issue_nft(
           token_id as string,
@@ -4073,7 +4127,7 @@ class Client {
       if (output.type === 'IssueFungibleToken') {
         const { authority, is_freezable, metadata_uri, number_of_decimals, token_ticker, total_supply } = output;
 
-        const chainTip = this.feeBlockHeight;
+        const chainTip = FEE_BLOCK_HEIGHT;
 
         const is_token_freezable = is_freezable ? FreezableToken.Yes : FreezableToken.No;
 
@@ -5331,15 +5385,6 @@ class Signer {
   private keys: Record<string, Uint8Array>;
   private network: Network;
 
-  /**
-   * Block height used for witness encoding.
-   * TODO: Get the current block height from the API provider.
-   * @private
-   */
-  private get feeBlockHeight(): bigint {
-    return 200000n;
-  }
-
   constructor(privateKeys: Record<string, Uint8Array>, network: Network = Network.Testnet) {
     this.keys = privateKeys;
     this.network = network;
@@ -5432,7 +5477,7 @@ class Signer {
 
         const transaction = this.hexToUint8Array(tx.HEXRepresentation_unsigned);
 
-        const block_height = this.feeBlockHeight;
+        const block_height = FEE_BLOCK_HEIGHT;
         const additional_info = {
           pool_info: {},
           order_info: {}
