@@ -69,7 +69,7 @@ jobs:
       - name: Test
         run: pnpm --filter "$PKG" test --if-present
 
-      - name: Replace workspace: dependencies with concrete versions
+      - name: Replace workspace dependencies with concrete versions
         shell: node {0}
         run: |
           const fs = require('fs');
