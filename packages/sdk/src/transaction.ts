@@ -1023,11 +1023,13 @@ export class Transaction {
           return (entry as any).utxo.destination;
         }
         if ((entry as any)?.utxo?.htlc) {
+          // HTLC inputs are owned by BOTH keys — they must count toward the
+          // witness-size estimate or the fee underprices the transaction
           return [(entry as any).utxo.htlc.spend_key, (entry as any).utxo.htlc.refund_key]; // TODO: need to handle spend too
         }
         return undefined;
       })
-      .filter((x): x is string => typeof x === 'string')
+      .filter((x): x is string | string[] => x !== undefined)
       .flat();
 
     const firstInput = transactionJSONrepresentation.inputs[0]?.input as any;

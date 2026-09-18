@@ -683,4 +683,51 @@ describe('Review-round regression pins', () => {
       expect(inputAtoms - outputAtoms).toBe(BigInt(tx.JSONRepresentation.fee.atoms));
     }
   });
+
+  test('HTLC input keys count toward the transaction size estimate', () => {
+    const clientless = new Transaction({ network: 'testnet' });
+    const makeJson = (utxo: any) => ({
+      inputs: [
+        { input: { index: 0, input_type: 'UTXO', source_id: 'a'.repeat(64), source_type: 'Transaction' }, utxo },
+      ],
+      outputs: [
+        {
+          type: 'Transfer',
+          destination: USER_ADDRESS,
+          value: { type: 'Coin', amount: { atoms: '1000', decimal: '0.00001' } },
+        },
+      ],
+      id: 'to_be_filled_in',
+    });
+    const htlcUtxo = {
+      type: 'Htlc',
+      value: { type: 'Coin', amount: { atoms: '900', decimal: '0.000009' } },
+      htlc: {
+        secret_hash: '0000000000000000000000000000000000000000',
+        spend_key: USER_ADDRESS,
+        refund_key: FEE_ADDRESS,
+        refund_timelock: { type: 'ForBlockCount', content: 10 },
+      },
+    };
+    const plainUtxo = {
+      type: 'Transfer',
+      value: { type: 'Coin', amount: { atoms: '900', decimal: '0.000009' } },
+      destination: USER_ADDRESS,
+    };
+
+    const sizeHtlc = clientless.getTransactionBINrepresentation(
+      makeJson(htlcUtxo) as any,
+      1,
+      Number(FEE_BLOCK_HEIGHT),
+    ).transactionsize;
+    const sizePlain = clientless.getTransactionBINrepresentation(
+      makeJson(plainUtxo) as any,
+      1,
+      Number(FEE_BLOCK_HEIGHT),
+    ).transactionsize;
+
+    // HTLC contributes TWO long addresses vs ONE for a plain transfer —
+    // dropping the keys (the regression) under-estimates and this pin fails
+    expect(sizeHtlc).toBeGreaterThan(sizePlain);
+  });
 });
