@@ -439,3 +439,240 @@ describe('Transaction.fromHEX decode + re-encode round-trip', () => {
     expect(fluent.getFee().atoms).toBe(rawTx.JSONRepresentation.fee.atoms);
   });
 });
+
+describe('Review-round regression pins', () => {
+  test('UnmintTokens decodes the bare token-id payload with auto nonce and round-trips', async () => {
+    const { tx, rt, json } = await buildAndDecode(
+      [
+        {
+          type: 'Transfer',
+          destination: FEE_ADDRESS,
+          value: { type: 'Coin', amount: { atoms: '1000', decimal: atomsToDecimal('1000', 11) } },
+        },
+      ],
+      {
+        inputs: [
+          {
+            input: {
+              input_type: 'AccountCommand',
+              command: 'UnmintTokens',
+              token_id: TOKEN_ID,
+              amount: { atoms: TOKEN_ATOMS(2n) },
+            },
+          },
+        ],
+      },
+    );
+
+    const command = json.inputs.find((entry: any) => entry.input?.input_type === 'AccountCommand');
+    expect(command).toBeDefined();
+    expect(command.input.command).toBe('UnmintTokens');
+    // regression: the wasm decode payload for UnmintTokens is a BARE token-id
+    // string (no [token_id, amount] pair) — the old `second.atoms` accessor
+    // used to crash here
+    expect(command.input.token_id).toBe(TOKEN_ID);
+    // mock token next_nonce is 7 → auto nonce 7
+    expect(command.input.nonce).toBe(7);
+    // The amount never enters the bytes in either direction:
+    // `encode_input_for_unmint_tokens` encodes only (token_id, nonce) and the
+    // decode payload has no amount — so the round-trip stays byte-identical.
+    expect(reencodeHex(rt)).toBe(tx.HEXRepresentation_unsigned);
+  });
+
+  test('assembleRaw guards: UTXOs and change address are required', () => {
+    // no withUTXO at all → hard guard (previously crashed deep in selection)
+    expect(() =>
+      Transaction.assembleRaw(
+        { outputs: [], inputs: [], requiredCoin: 0n, requiredToken: 0n, baseFee: 0n } as any,
+        { network: 'testnet', changeAddress: changeAddresses[0] },
+      ),
+    ).toThrow('UTXOs are required');
+
+    // same guard with an actual coin requirement (empty UTXO plan)
+    expect(() =>
+      Transaction.assembleRaw(
+        {
+          outputs: [
+            { type: 'Transfer', destination: USER_ADDRESS, value: { type: 'Coin', amount: { atoms: '1' } } },
+          ],
+          inputs: [],
+          requiredCoin: 1n,
+          requiredToken: 0n,
+          baseFee: 0n,
+        } as any,
+        { network: 'testnet', changeAddress: changeAddresses[0] },
+      ),
+    ).toThrow('UTXOs are required');
+
+    // missing change address → guard fires before any assembly work
+    expect(() =>
+      Transaction.assembleRaw(
+        {
+          outputs: [],
+          inputs: [],
+          requiredCoin: 0n,
+          requiredToken: 0n,
+          baseFee: 0n,
+          withUTXO: [],
+        } as any,
+        { network: 'testnet', changeAddress: '' },
+      ),
+    ).toThrow('change address');
+  });
+
+  test('forceSpendUtxo spends the given outpoint exactly once (no double spend vs auto-selection)', async () => {
+    const client = await createConnectedClient();
+
+    // the largest coin UTXO of the mocked account — auto-selection would pick
+    // it for any transfer, so forcing it MUST evict it from auto-selection
+    const forcedEntry = {
+      outpoint: {
+        index: 1,
+        source_id: 'af3b5fad20f6f97eb210934e942176f7f7d0f70423590659ee0e0217053a7cab',
+        source_type: 'Transaction',
+      },
+      utxo: {
+        destination: 'tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6',
+        type: 'Transfer',
+        value: { type: 'Coin', amount: { atoms: '1703205604300000', decimal: '17032.056043' } },
+      },
+    };
+
+    const outputs = [
+      {
+        type: 'Transfer',
+        destination: USER_ADDRESS,
+        value: { type: 'Coin', amount: { atoms: '1000', decimal: atomsToDecimal('1000', 11) } },
+      },
+    ];
+
+    // baseline: without force, auto-selection spends the outpoint once
+    const plain = (await client.buildRawTransaction({ outputs: outputs as any })) as LooseBuiltTransaction;
+    const plainSpent = plain.JSONRepresentation.inputs.filter(
+      (i: any) => i.input?.input_type === 'UTXO' && i.input.source_id === forcedEntry.outpoint.source_id && i.input.index === 1,
+    );
+    expect(plainSpent).toHaveLength(1);
+
+    // forced build must not crash …
+    const forced = (await client.buildRawTransaction({
+      outputs: outputs as any,
+      opts: { forceSpendUtxo: [forcedEntry as any] },
+    })) as LooseBuiltTransaction;
+
+    const spent = forced.JSONRepresentation.inputs.filter(
+      (i: any) =>
+        i.input?.input_type === 'UTXO' && i.input.source_id === forcedEntry.outpoint.source_id && i.input.index === 1,
+    );
+    // … and the forced outpoint appears EXACTLY ONCE — a duplicate entry would
+    // be a double spend inside one transaction plus double-counted change math
+    expect(spent).toHaveLength(1);
+    expect(spent[0].utxo.value.amount.atoms).toBe('1703205604300000');
+  });
+
+  test('forceSpendUtxo accepts an HTLC-shaped entry alongside a plain transfer', async () => {
+    const client = await createConnectedClient();
+
+    // HTLC UTXOs are never auto-selected; a forced HTLC entry must assemble
+    // with just its outpoint (witness handling is the signer's job)
+    const htlcOutpoint = {
+      index: 0,
+      source_id: '1111111111111111111111111111111111111111111111111111111111111111',
+      source_type: 'Transaction',
+    };
+    const tx = (await client.buildRawTransaction({
+      outputs: [
+        {
+          type: 'Transfer',
+          destination: USER_ADDRESS,
+          value: { type: 'Coin', amount: { atoms: '1000', decimal: atomsToDecimal('1000', 11) } },
+        },
+      ],
+      opts: {
+        forceSpendUtxo: [
+          {
+            outpoint: htlcOutpoint,
+            utxo: {
+              type: 'Htlc',
+              value: { type: 'Coin', amount: { atoms: '1000000000000', decimal: '10' } },
+              htlc: {
+                secret_hash: '0000000000000000000000000000000000000000',
+                spend_key: USER_ADDRESS,
+                refund_key: USER_ADDRESS,
+                refund_timelock: { type: 'ForBlockCount', content: 10 },
+              },
+            },
+          } as any,
+        ],
+      },
+    })) as LooseBuiltTransaction;
+
+    const htlcInput = tx.JSONRepresentation.inputs.find(
+      (i: any) => i.input?.input_type === 'UTXO' && i.input.source_id === htlcOutpoint.source_id && i.input.index === 0,
+    );
+    expect(htlcInput).toBeDefined();
+    expect(htlcInput.utxo.type).toBe('Htlc');
+  });
+
+  test('DelegationWithdraw-style fee deduction does not compound across fee iterations', () => {
+    const AMOUNT = '1099511627777'; // 2^40 + 1 — varint-boundary scale amount
+    const assembled = Transaction.assembleRaw(
+      {
+        outputs: [
+          {
+            type: 'LockThenTransfer',
+            destination: USER_ADDRESS,
+            value: { type: 'Coin', amount: { atoms: AMOUNT, decimal: atomsToDecimal(AMOUNT, 11) } },
+            lock: { type: 'ForBlockCount', content: 10 },
+          },
+        ],
+        inputs: [],
+        requiredCoin: 0n, // withdraw: funds come from the delegation input, not coin UTXOs
+        requiredToken: 0n,
+        baseFee: 0n,
+        deductFeeFromFirstOutput: true,
+        withUTXO: [],
+      } as any,
+      { network: 'testnet', changeAddress: changeAddresses[0] },
+    );
+
+    const j = assembled.JSONRepresentation as any;
+    const outAtoms = BigInt(j.outputs[0].value.amount.atoms);
+    const feeAtoms = BigInt(j.fee.atoms);
+    // THE invariant: output + embedded fee === original amount (no compounding,
+    // no silent burn) — the deduction must be relative to the ORIGINAL amount
+    // in every fee iteration, never applied onto the previous iteration's
+    // mutated output value
+    expect(outAtoms + feeAtoms).toBe(BigInt(AMOUNT));
+  });
+
+  test('fee conservation across varint-boundary amounts on the normal path', async () => {
+    const client = await createConnectedClient();
+    // 2^32+1, 2^40+1, 2^48+1 — amount encodings flip varint length at these
+    // scales, which is exactly where the fee loop can change its mind (the
+    // mocked account holds ~3.8e15 coin atoms, so 2^48 is the largest sweep
+    // entry that still fits)
+    const boundaryAmounts = ['4294967297', '1099511627777', '281474976710657'];
+
+    for (const AMOUNT of boundaryAmounts) {
+      const tx = (await client.buildRawTransaction({
+        outputs: [
+          {
+            type: 'Transfer',
+            destination: USER_ADDRESS,
+            value: { type: 'Coin', amount: { atoms: AMOUNT, decimal: atomsToDecimal(AMOUNT, 11) } },
+          },
+        ],
+      })) as LooseBuiltTransaction;
+
+      const inputAtoms = tx.JSONRepresentation.inputs
+        .filter((i: any) => i.input?.input_type === 'UTXO')
+        .reduce((acc: bigint, i: any) => acc + BigInt(i.utxo.value.amount.atoms), 0n);
+      const outputAtoms = tx.JSONRepresentation.outputs.reduce(
+        (acc: bigint, o: any) => acc + BigInt(o.value.amount.atoms),
+        0n,
+      );
+      // inputs − outputs === fee: no atoms lost or invented
+      expect(inputAtoms - outputAtoms).toBe(BigInt(tx.JSONRepresentation.fee.atoms));
+    }
+  });
+});
