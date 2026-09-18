@@ -7,6 +7,16 @@
   "files": [
     "dist"
   ],
+  "author": "Mintlayer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mintlayer/mintlayer-connect-sdk.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "tsc",
     "serve": "npx http-server . -p 8080",
@@ -19,8 +29,6 @@
     "@mintlayer/wasm-lib": "workspace:*"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node":"^20.4.2",
