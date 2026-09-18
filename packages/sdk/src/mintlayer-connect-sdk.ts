@@ -1,50 +1,24 @@
 import initWasm, {
-  get_transaction_id,
   nft_issuance_fee,
   token_supply_change_fee,
-  get_token_id,
   fungible_token_issuance_fee,
   Network,
   token_freeze_fee,
   token_change_authority_fee,
   encode_outpoint_source_id,
   SourceId,
-  encode_input_for_utxo,
-  encode_input_for_conclude_order,
-  encode_input_for_fill_order,
-  encode_input_for_mint_tokens,
-  encode_input_for_unmint_tokens,
-  encode_input_for_lock_token_supply,
-  encode_input_for_change_token_authority,
-  encode_input_for_freeze_token,
-  encode_input_for_unfreeze_token,
-  encode_input_for_withdraw_from_delegation,
   encode_output_transfer,
   encode_output_token_transfer,
-  estimate_transaction_size,
   Amount,
   encode_lock_until_time,
   encode_lock_for_block_count,
   encode_output_token_lock_then_transfer,
   encode_output_lock_then_transfer,
-  encode_output_issue_nft,
   data_deposit_fee,
-  encode_input_for_change_token_metadata_uri,
-  TokenUnfreezable,
-  encode_create_order_output,
-  encode_output_token_burn,
-  encode_transaction,
-  encode_output_coin_burn,
-  FreezableToken,
   TotalSupply,
-  encode_output_issue_fungible_token,
-  encode_output_data_deposit,
-  encode_output_create_delegation,
-  encode_output_delegate_staking,
   encode_signed_transaction,
   encode_witness,
   SignatureHashType,
-  encode_output_htlc,
   extract_htlc_secret,
   verify_challenge,
   make_default_account_privkey,
@@ -55,23 +29,31 @@ import initWasm, {
   sign_challenge,
 } from '@mintlayer/wasm-lib';
 import { Transaction, FEE_BLOCK_HEIGHT } from './transaction';
+import {
+  mergeUint8Arrays,
+  stringToUint8Array,
+  hexToUint8Array,
+  uint8ArrayToHex,
+  BASE58_ALPHABET,
+  atomsToDecimal,
+  decimalsToAtoms,
+  decimals,
+} from './utils';
+
+// Public numeric-format helpers — single-sourced in ./utils.
+export { atomsToDecimal, decimalsToAtoms, decimals } from './utils';
+import type { AssembledTransactionData, PreparedTransaction } from './transaction';
 import type {
   AmountFields,
-  Coin,
-  Token,
   Value,
-  Utxo,
   UtxoInput,
   UtxoEntry,
-  Outpoint,
-  UtxoOutpoint,
   Input,
   Output,
   Timelock,
   TotalSupplyValue,
+  TransactionJSONRepresentation,
 } from './types/transaction';
-
-const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 /**
  * SDK-level sanity caps for developer-forged raw transactions (generous bounds,
@@ -98,81 +80,6 @@ const DISPLAY_STRING_SANITIZE_RE = /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202
  * TODO: Get the current block height from the API provider.
  */
 export { FEE_BLOCK_HEIGHT } from './transaction';
-
-function mergeUint8Arrays(arrays: Uint8Array[]) {
-  const totalLength = arrays.reduce((sum: number, arr: Uint8Array) => sum + arr.length, 0);
-
-  const result = new Uint8Array(totalLength);
-
-  let offset = 0;
-  for (const arr of arrays) {
-    result.set(arr, offset);
-    offset += arr.length;
-  }
-
-  return result;
-}
-
-function stringToUint8Array(str: string): Uint8Array {
-  return new TextEncoder().encode(str);
-}
-
-function hexToUint8Array(hex: any) {
-  if (hex.length % 2 !== 0) {
-    throw new Error("Invalid hex string");
-  }
-
-  const array = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < array.length; i++) {
-    array[i] = parseInt(hex.substr(i * 2, 2), 16);
-  }
-
-  return array;
-}
-
-function uint8ArrayToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-export function atomsToDecimal(atoms: string | number, decimals: number): string {
-  const atomsStr = atoms.toString();
-  const atomsLength = atomsStr.length;
-
-  if (decimals === 0) {
-    return atomsStr;
-  }
-
-  if (atomsLength <= decimals) {
-    // Pad with leading zeros
-    const padded = atomsStr.padStart(decimals, '0');
-    const fractionalPart = padded.replace(/0+$/, '');
-    return fractionalPart === '' ? '0' : `0.${fractionalPart}`;
-  }
-
-  // Insert decimal point
-  const integerPart = atomsStr.slice(0, atomsLength - decimals);
-  const fractionalPart = atomsStr.slice(atomsLength - decimals).replace(/0+$/, '');
-
-  return fractionalPart === '' ? integerPart : `${integerPart}.${fractionalPart}`;
-}
-
-export function decimalsToAtoms(value: string | number, decimals: number): bigint {
-  const v = Number(value);
-  const [intPart, fracPart = ""] = v.toFixed(decimals).split(".");
-  const paddedFrac = (fracPart + "0".repeat(decimals)).slice(0, decimals);
-  const full = intPart + paddedFrac;
-  return BigInt(full);
-}
-
-export function decimals(value: string | number, decimals: number): string {
-  const v = Number(value);
-  if (isNaN(v)) return '0';
-  return v
-    .toFixed(decimals)
-    .replace(/\.?0+$/, '');
-}
 
 type Address = {
   addressesByChain: {
@@ -206,10 +113,7 @@ export class MintlayerApiProvider implements ApiProvider {
   private readonly baseUrl: string;
   private readonly batchUrl: string;
 
-  constructor(
-    baseUrl: string,
-    batchUrl: string,
-  ) {
+  constructor(baseUrl: string, batchUrl: string) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.batchUrl = batchUrl.replace(/\/$/, '');
   }
@@ -269,10 +173,7 @@ export class MintlayerApiProvider implements ApiProvider {
   async broadcastTransaction(tx: string | { hex: string; json: any }): Promise<any> {
     const response = await fetch(`${this.baseUrl}/transaction`, {
       method: 'POST',
-      headers:
-        typeof tx === 'string'
-          ? { 'Content-Type': 'text/plain' }
-          : { 'Content-Type': 'application/json' },
+      headers: typeof tx === 'string' ? { 'Content-Type': 'text/plain' } : { 'Content-Type': 'application/json' },
       body: typeof tx === 'string' ? tx : JSON.stringify({ transaction: tx.hex, json: tx.json }),
     });
     if (!response.ok) {
@@ -553,14 +454,12 @@ type CreateHtlcArgs = {
   refund_timelock: Timelock;
 };
 
-
 type SignedTransaction = string;
 
 type SignedIntentTransaction = {
   transactionHex: string;
   intentEncode: string;
-}
-
+};
 
 /**
  * Developer-facing amount. `atoms` must be a non-negative integer (string or
@@ -571,9 +470,7 @@ export type RawAmount = { atoms: string | number; decimal: string | number };
 /**
  * Developer-facing value. Tokens carry their `token_id`.
  */
-export type RawValue =
-  | { type: 'Coin'; amount: RawAmount }
-  | { type: 'TokenV1'; token_id: string; amount: RawAmount };
+export type RawValue = { type: 'Coin'; amount: RawAmount } | { type: 'TokenV1'; token_id: string; amount: RawAmount };
 
 /**
  * Strings are accepted wherever the canonical format requires a `{hex, string}`
@@ -682,16 +579,102 @@ export type RawOutput =
  * automatically to cover amounts and fees.
  */
 export type RawInput =
-  | { input: { input_type: 'AccountCommand'; command: 'MintTokens'; token_id: string; authority?: string; amount: RawAmount; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'UnmintTokens'; token_id: string; authority?: string; amount: RawAmount; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'LockTokenSupply'; token_id: string; authority?: string; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'FreezeToken'; token_id: string; authority?: string; is_unfreezable: boolean; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'UnfreezeToken'; token_id: string; authority?: string; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'ChangeTokenAuthority'; token_id: string; authority?: string; new_authority: string; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'ChangeMetadataUri'; token_id: string; authority?: string; new_metadata_uri: string; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'FillOrder'; order_id: string; fill_atoms: string | number; destination: string; nonce?: number } }
-  | { input: { input_type: 'AccountCommand'; command: 'ConcludeOrder'; order_id: string; destination: string; nonce?: number } }
-  | { input: { input_type: 'Account'; account_type: 'DelegationBalance'; delegation_id: string; amount: RawAmount; nonce?: number } };
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'MintTokens';
+        token_id: string;
+        authority?: string;
+        amount: RawAmount;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'UnmintTokens';
+        token_id: string;
+        authority?: string;
+        amount: RawAmount;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'LockTokenSupply';
+        token_id: string;
+        authority?: string;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'FreezeToken';
+        token_id: string;
+        authority?: string;
+        is_unfreezable: boolean;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'UnfreezeToken';
+        token_id: string;
+        authority?: string;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'ChangeTokenAuthority';
+        token_id: string;
+        authority?: string;
+        new_authority: string;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'ChangeMetadataUri';
+        token_id: string;
+        authority?: string;
+        new_metadata_uri: string;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'FillOrder';
+        order_id: string;
+        fill_atoms: string | number;
+        destination: string;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'AccountCommand';
+        command: 'ConcludeOrder';
+        order_id: string;
+        destination: string;
+        nonce?: number;
+      };
+    }
+  | {
+      input: {
+        input_type: 'Account';
+        account_type: 'DelegationBalance';
+        delegation_id: string;
+        amount: RawAmount;
+        nonce?: number;
+      };
+    };
 
 /**
  * Arguments for {@link Client.buildRawTransaction} / {@link Client.forgeTransaction}.
@@ -702,26 +685,17 @@ export type RawTransactionArgs = {
   opts?: TransactionOpts;
 };
 
-export interface TransactionJSONRepresentation {
-  inputs: Input[];
-  outputs: Output[];
-  fee?: AmountFields;
-  id: string;
-}
+export type { TransactionJSONRepresentation } from './types/transaction';
 
 /**
  * Plain assembled-transaction data — exactly what the wallet bridge receives
  * as `txData` and what the Signer consumes. `Transaction.assembleRaw`
- * returns this shape directly.
+ * returns this shape directly; `intent`/`htlc` are attached by intent flows.
  */
-interface AssembledTransaction {
-  JSONRepresentation: TransactionJSONRepresentation;
-  BINRepresentation: Record<string, any>;
-  HEXRepresentation_unsigned: string;
+type AssembledTransaction = AssembledTransactionData & {
   intent?: string;
   htlc?: { spend_pubkey: string };
-  transaction_id: string;
-}
+};
 
 /**
  * Public type alias for the result of the build* methods (buildTransaction,
@@ -763,18 +737,6 @@ type TransferParams =
 type TransactionOpts = {
   withUTXO?: UtxoEntry[];
   forceSpendUtxo?: UtxoEntry[];
-};
-
-type AssembleTransactionArgs = {
-  outputs: Output[];
-  inputs?: Input[];
-  requiredCoin: bigint;
-  requiredToken: bigint;
-  sendToken?: { token_id: string; number_of_decimals: number };
-  baseFee: bigint;
-  /** Take the fee from the first output instead of the coin inputs (DelegationWithdraw semantics). */
-  deductFeeFromFirstOutput?: boolean;
-  opts?: TransactionOpts;
 };
 
 type BuildTransactionParams =
@@ -988,8 +950,7 @@ interface ClientOptions {
  * If `token_id` is provided, the corresponding token will be sent.
  */
 export type TransferArgs =
-  | { to: string; amount: number; token_id: string }
-  | { to: string; amount: number; token_id?: undefined };
+  { to: string; amount: number; token_id: string } | { to: string; amount: number; token_id?: undefined };
 
 export type TransferNftArgs = {
   to: string;
@@ -1143,7 +1104,8 @@ class Client {
     this.publicKeys = { receiving: [], change: [] };
     this.isInitialized = false;
     this.accountProvider = options.accountProvider || new MojitoAccountProvider();
-    this.apiProvider = options.apiProvider || new MintlayerApiProvider(this.getDefaultApiServer(), this.getDefaultBatchServer());
+    this.apiProvider =
+      options.apiProvider || new MintlayerApiProvider(this.getDefaultApiServer(), this.getDefaultBatchServer());
   }
 
   /**
@@ -1646,7 +1608,13 @@ class Client {
     const typeToCommand: Partial<
       Record<
         string,
-        'MintTokens' | 'UnmintTokens' | 'LockTokenSupply' | 'FreezeToken' | 'UnfreezeToken' | 'ChangeTokenAuthority' | 'ChangeMetadataUri'
+        | 'MintTokens'
+        | 'UnmintTokens'
+        | 'LockTokenSupply'
+        | 'FreezeToken'
+        | 'UnfreezeToken'
+        | 'ChangeTokenAuthority'
+        | 'ChangeMetadataUri'
       >
     > = {
       MintToken: 'MintTokens',
@@ -1717,7 +1685,7 @@ class Client {
       const { token_id, token_details } = params;
 
       if (token_details) {
-        input_amount_token_req += decimalsToAtoms(params.amount!,token_details.number_of_decimals);
+        input_amount_token_req += decimalsToAtoms(params.amount!, token_details.number_of_decimals);
         send_token = {
           token_id,
           number_of_decimals: token_details.number_of_decimals,
@@ -1762,7 +1730,7 @@ class Client {
           number_of_decimals: token_details.number_of_decimals,
         };
       } else {
-        input_amount_coin_req += decimalsToAtoms(params.amount!,11);
+        input_amount_coin_req += decimalsToAtoms(params.amount!, 11);
       }
 
       outputs.push({
@@ -1804,12 +1772,7 @@ class Client {
       outputs.push({
         authority: params.authority,
         is_freezable: params.is_freezable,
-        metadata_uri: this.normalizeRawStringField(
-          params.metadata_uri!,
-          'params',
-          'metadata_uri',
-          MAX_RAW_URI_LENGTH,
-        ),
+        metadata_uri: this.normalizeRawStringField(params.metadata_uri!, 'params', 'metadata_uri', MAX_RAW_URI_LENGTH),
         number_of_decimals: params.number_of_decimals,
         token_ticker: this.normalizeRawStringField(
           params.token_ticker!,
@@ -1842,12 +1805,7 @@ class Client {
             MAX_RAW_NFT_DESCRIPTION_LENGTH,
           ),
           icon_uri: this.normalizeRawStringField(params.icon_uri!, 'params', 'icon_uri', MAX_RAW_URI_LENGTH),
-          media_hash: this.normalizeRawStringField(
-            params.media_hash!,
-            'params',
-            'media_hash',
-            MAX_RAW_HASH_LENGTH,
-          ),
+          media_hash: this.normalizeRawStringField(params.media_hash!, 'params', 'media_hash', MAX_RAW_HASH_LENGTH),
           media_uri: this.normalizeRawStringField(params.media_uri!, 'params', 'media_uri', MAX_RAW_URI_LENGTH),
           name: this.normalizeRawStringField(params.name!, 'params', 'name', MAX_RAW_NFT_NAME_LENGTH),
           ticker: this.normalizeRawStringField(params.ticker!, 'params', 'ticker', MAX_RAW_TICKER_LENGTH),
@@ -2096,14 +2054,14 @@ class Client {
         initially_asked: {
           atoms: ask_token_details
             ? decimalsToAtoms(ask_amount!, ask_token_details.number_of_decimals).toString()
-            : decimalsToAtoms(ask_amount!,  11).toString(),
+            : decimalsToAtoms(ask_amount!, 11).toString(),
           decimal: ask_amount!.toString(),
         },
         give_currency: give_token === 'Coin' ? { type: 'Coin' } : { token_id: give_token, type: 'TokenV1' },
         give_balance: {
           atoms: give_token_details
             ? decimalsToAtoms(give_amount!, give_token_details.number_of_decimals).toString()
-            : decimalsToAtoms(give_amount!,  11).toString(),
+            : decimalsToAtoms(give_amount!, 11).toString(),
           decimal: give_amount!.toString(),
         },
         initially_given: {
@@ -2260,34 +2218,33 @@ class Client {
           },
           spend_key: params.spend_address,
         },
-        value:
-          {
-            ...(token_details
-              ? {
+        value: {
+          ...(token_details
+            ? {
                 amount: {
                   decimal: params.amount!.toString(),
                   atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
                 },
               }
-              : {
+            : {
                 amount: {
                   decimal: params.amount!.toString(),
                   atoms: (params.amount! * Math.pow(10, 11)).toString(),
                 },
               }),
-            ...(token_details
-              ? { type: 'TokenV1', token_id }
-              : {
+          ...(token_details
+            ? { type: 'TokenV1', token_id }
+            : {
                 type: 'Coin',
               }),
-          },
+        },
       });
     }
 
     return { inputs, outputs, send_token, input_amount_coin_req, input_amount_token_req };
   }
 
-    /**
+  /**
    * Resolves the UTXO set for assembly: explicit `opts.withUTXO` wins,
    * otherwise the connected addresses' UTXOs are fetched from the API.
    * @private
@@ -2309,8 +2266,6 @@ class Client {
 
     this.ensureInitialized();
     if (!params) throw new Error('Missing params');
-
-    console.log('[Mintlayer Connect SDK] Building transaction:', type, params);
 
     const { inputs, outputs, input_amount_coin_req, input_amount_token_req, send_token } =
       this.getRequiredInputsOutputs({ type, params } as BuildTransactionParams);
@@ -2375,8 +2330,8 @@ class Client {
         sendToken: prepared.sendToken,
         baseFee: prepared.baseFee,
         deductFeeFromFirstOutput: prepared.deductFeeFromFirstOutput,
-        withUTXO: await this.getAssembleUtxos(prepared.opts),
-        forceSpendUtxo: prepared.opts?.forceSpendUtxo,
+        withUTXO: await this.getAssembleUtxos(args.opts),
+        forceSpendUtxo: args.opts?.forceSpendUtxo,
       },
       { network: this.network, changeAddress: this.connectedAddresses.change[0] },
     );
@@ -2398,7 +2353,7 @@ class Client {
    * coin/token requirements for the assembler.
    * @private
    */
-  private async prepareRawTransaction(args: RawTransactionArgs): Promise<AssembleTransactionArgs> {
+  private async prepareRawTransaction(args: RawTransactionArgs): Promise<PreparedTransaction> {
     const tokenDetailsCache = new Map<string, Promise<TokenDetails>>();
 
     const outputs = await Promise.all(
@@ -2411,7 +2366,7 @@ class Client {
       tokenDetailsCache,
     );
 
-    return { outputs, inputs, requiredCoin, requiredToken, sendToken, baseFee: 0n, opts: args.opts };
+    return { outputs, inputs, requiredCoin, requiredToken, sendToken, baseFee: 0n };
   }
 
   /**
@@ -2612,17 +2567,14 @@ class Client {
           case 'FillOrder': {
             const order_id = this.validateRawId(meta.order_id, 'inputs (FillOrder)', 'order_id');
             const order: OrderData = await this.apiProvider.getOrder(order_id);
-            const nonce = this.nextRawNonce(`order:${order_id}`, order.nonce, meta.nonce, nonceCounters);
+            const orderNonce = this.validateNextNonce(order.nonce, `order ${order_id}`);
+            const nonce = this.nextRawNonce(`order:${order_id}`, orderNonce, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
                 command: 'FillOrder',
                 order_id,
-                fill_atoms: this.rawAtomsString(
-                  meta.fill_atoms,
-                  `inputs (FillOrder ${order_id})`,
-                  'fill_atoms',
-                ),
+                fill_atoms: this.rawAtomsString(meta.fill_atoms, `inputs (FillOrder ${order_id})`, 'fill_atoms'),
                 destination: meta.destination,
                 nonce: String(nonce),
               },
@@ -2633,7 +2585,8 @@ class Client {
           case 'ConcludeOrder': {
             const order_id = this.validateRawId(meta.order_id, 'inputs (ConcludeOrder)', 'order_id');
             const order: OrderData = await this.apiProvider.getOrder(order_id);
-            const nonce = this.nextRawNonce(`order:${order_id}`, order.nonce, meta.nonce, nonceCounters);
+            const orderNonce = this.validateNextNonce(order.nonce, `order ${order_id}`);
+            const nonce = this.nextRawNonce(`order:${order_id}`, orderNonce, meta.nonce, nonceCounters);
             inputs.push({
               input: {
                 input_type: 'AccountCommand',
@@ -2652,21 +2605,13 @@ class Client {
       } else if (meta.account_type === 'DelegationBalance') {
         const delegation_id = this.validateRawId(meta.delegation_id, 'inputs (DelegationBalance)', 'delegation_id');
         const delegation: DelegationDetails = await this.apiProvider.getDelegation(delegation_id);
-        const nonce = this.nextRawNonce(
-          `delegation:${delegation_id}`,
-          delegation.next_nonce,
-          meta.nonce,
-          nonceCounters,
-        );
+        const delegationNonce = this.validateNextNonce(delegation.next_nonce, `delegation ${delegation_id}`);
+        const nonce = this.nextRawNonce(`delegation:${delegation_id}`, delegationNonce, meta.nonce, nonceCounters);
         inputs.push({
           input: {
             input_type: 'Account',
             account_type: 'DelegationBalance',
-            amount: this.normalizeRawAmount(
-              meta.amount,
-              11,
-              `inputs (DelegationBalance ${delegation_id})`,
-            ),
+            amount: this.normalizeRawAmount(meta.amount, 11, `inputs (DelegationBalance ${delegation_id})`),
             delegation_id,
             nonce,
           },
@@ -2902,12 +2847,7 @@ class Client {
           is_freezable: raw.is_freezable === true,
           metadata_uri: this.normalizeRawStringField(raw.metadata_uri, context, 'metadata_uri', MAX_RAW_URI_LENGTH),
           number_of_decimals: raw.number_of_decimals,
-          token_ticker: this.normalizeRawStringField(
-            raw.token_ticker,
-            context,
-            'token_ticker',
-            MAX_RAW_TICKER_LENGTH,
-          ),
+          token_ticker: this.normalizeRawStringField(raw.token_ticker, context, 'token_ticker', MAX_RAW_TICKER_LENGTH),
           total_supply,
         };
       }
@@ -3214,7 +3154,9 @@ class Client {
    * @private
    */
   private normalizeRawLock(
-    lock: { type: 'ForBlockCount'; content: string | number } | { type: 'UntilTime'; content: string | number | { timestamp: string | number } },
+    lock:
+      | { type: 'ForBlockCount'; content: string | number }
+      | { type: 'UntilTime'; content: string | number | { timestamp: string | number } },
     context: string,
   ): { type: 'ForBlockCount' | 'UntilTime'; content: string | { timestamp: string } } {
     return this.normalizeRawTimelockContent(lock, context, 'lock.content', 'lock.type');
@@ -3226,7 +3168,9 @@ class Client {
    * @private
    */
   private normalizeRawTimelock(
-    timelock: { type: 'UntilTime'; content: { timestamp: string | number } } | { type: 'ForBlockCount'; content: string | number },
+    timelock:
+      | { type: 'UntilTime'; content: { timestamp: string | number } }
+      | { type: 'ForBlockCount'; content: string | number },
     context: string,
   ): Timelock {
     return this.normalizeRawTimelockContent(timelock, context, 'content', 'htlc.refund_timelock.type');
@@ -3239,7 +3183,9 @@ class Client {
    * @private
    */
   private normalizeRawTimelockContent(
-    lock: { type: 'ForBlockCount'; content: string | number } | { type: 'UntilTime'; content: string | number | { timestamp: string | number } },
+    lock:
+      | { type: 'ForBlockCount'; content: string | number }
+      | { type: 'UntilTime'; content: string | number | { timestamp: string | number } },
     context: string,
     contentLabel: string,
     typeLabel: string,
@@ -3250,8 +3196,7 @@ class Client {
     if (lock.type === 'ForBlockCount') {
       return { type: 'ForBlockCount', content: this.rawAtomsString(lock.content, context, contentLabel) };
     }
-    const timestamp =
-      typeof lock.content === 'object' && lock.content !== null ? lock.content.timestamp : lock.content;
+    const timestamp = typeof lock.content === 'object' && lock.content !== null ? lock.content.timestamp : lock.content;
     return { type: 'UntilTime', content: { timestamp: this.rawAtomsString(timestamp, context, 'timestamp') } };
   }
 
@@ -3260,10 +3205,7 @@ class Client {
    * The cache stores the promise so concurrent lookups share one request.
    * @private
    */
-  private async getRawTokenDetails(
-    token_id: string,
-    cache: Map<string, Promise<TokenDetails>>,
-  ): Promise<TokenDetails> {
+  private async getRawTokenDetails(token_id: string, cache: Map<string, Promise<TokenDetails>>): Promise<TokenDetails> {
     this.validateRawId(token_id, 'token_id lookup', 'token_id');
     let details = cache.get(token_id);
     if (!details) {
@@ -3337,6 +3279,19 @@ class Client {
   }
 
   /**
+   * Runtime-validates a nonce served by the API before it feeds nonce
+   * arithmetic — a string ('7') would corrupt `base + offset` via
+   * concatenation (same contract as the token next_nonce validation).
+   * @private
+   */
+  private validateNextNonce(nonce: unknown, context: string): number {
+    if (typeof nonce !== 'number' || !Number.isInteger(nonce) || nonce < 0) {
+      throw new Error(`${context} returned an invalid next_nonce: ${String(nonce)}`);
+    }
+    return nonce;
+  }
+
+  /**
    * Assigns the next nonce for a logical sequence (a token, order or
    * delegation, identified by `key`): explicit nonces win and must not fall
    * below the already-assigned ones; auto nonces continue sequentially from
@@ -3366,7 +3321,6 @@ class Client {
     counters.set(key, offset + 1);
     return base + offset;
   }
-
 
   /**
    * Builds a transfer transaction without signing it.
@@ -3439,7 +3393,13 @@ class Client {
   /**
    * Builds a delegation creation transaction without signing it.
    */
-  async buildDelegate({ pool_id, destination }: { pool_id: string; destination: string }): Promise<AssembledTransaction> {
+  async buildDelegate({
+    pool_id,
+    destination,
+  }: {
+    pool_id: string;
+    destination: string;
+  }): Promise<AssembledTransaction> {
     this.ensureInitialized();
     return this.buildTransaction({ type: 'CreateDelegationId', params: { pool_id, destination } });
   }
@@ -3612,7 +3572,10 @@ class Client {
   /**
    * Builds a token authority change transaction without signing it.
    */
-  async buildChangeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<AssembledTransaction> {
+  async buildChangeTokenAuthority({
+    token_id,
+    new_authority,
+  }: ChangeTokenAuthorityArgs): Promise<AssembledTransaction> {
     this.ensureInitialized();
     this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
@@ -3854,7 +3817,12 @@ class Client {
   /**
    * Builds a bridge request transaction without signing it.
    */
-  async buildBridgeRequest({ destination, amount, token_id, intent }: BridgeRequestArgs): Promise<AssembledTransaction> {
+  async buildBridgeRequest({
+    destination,
+    amount,
+    token_id,
+    intent,
+  }: BridgeRequestArgs): Promise<AssembledTransaction> {
     this.ensureInitialized();
 
     if (!token_id) {
@@ -4079,7 +4047,7 @@ class Client {
 
     let token_details: TokenDetails | undefined = undefined;
 
-    if(params.token_id){
+    if (params.token_id) {
       this.validateRawId(params.token_id, 'create htlc', 'token_id');
       const token = await this.apiProvider.getToken(params.token_id);
       token_details = token;
@@ -4116,43 +4084,43 @@ class Client {
   /**
    * Builds an HTLC refund transaction without signing it.
    */
-  async buildRefundHtlc(params: any): Promise<AssembledTransaction> {
+  /**
+   * Builds an HTLC claim transaction (refund after timelock, or spend with
+   * the secret) without signing it. The two flows differ only in which HTLC
+   * key receives the funds.
+   * @private
+   */
+  private async buildHtlcClaim(params: any, keyField: 'refund_key' | 'spend_key'): Promise<AssembledTransaction> {
     this.ensureInitialized();
 
-    const { transaction_id, utxo } = params;
+    const { transaction_id } = params;
 
     let useHtlcUtxo: any[] = [];
 
     if (transaction_id) {
       this.validateTransactionId(transaction_id, 'HTLC lookup');
       const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
-      // @ts-ignore
-      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
-      // @ts-ignore
-      useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
+      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as AssembledTransaction);
+      useHtlcUtxo = created.filter(({ utxo }) => utxo.type === 'Htlc');
     }
 
     let token_details = undefined;
 
-    if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
+    if (useHtlcUtxo[0].utxo.value.type === 'TokenV1') {
       token_details = await this.apiProvider.getToken(useHtlcUtxo[0].utxo.value.token_id);
     }
 
     return this.buildTransaction({
       type: 'Transfer',
       params: {
-        to: useHtlcUtxo[0].utxo.htlc.refund_key,
+        to: useHtlcUtxo[0].utxo.htlc[keyField],
         amount: useHtlcUtxo[0].utxo.value.amount.decimal,
-        ...(
-          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
-            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
-            : {}
-        ),
+        ...(useHtlcUtxo[0].utxo.value.type === 'TokenV1' ? { token_id: useHtlcUtxo[0].utxo.value.token_id } : {}),
         token_details,
       },
       opts: {
         forceSpendUtxo: useHtlcUtxo,
-      }
+      },
     });
   }
 
@@ -4167,46 +4135,17 @@ class Client {
   }
 
   /**
+   * Builds an HTLC refund transaction without signing it.
+   */
+  async buildRefundHtlc(params: any): Promise<AssembledTransaction> {
+    return this.buildHtlcClaim(params, 'refund_key');
+  }
+
+  /**
    * Builds an HTLC spend transaction without signing it.
    */
   async buildSpendHtlc(params: any): Promise<AssembledTransaction> {
-    this.ensureInitialized();
-
-    const { transaction_id, utxo } = params;
-
-    let useHtlcUtxo: any[] = [];
-
-    if (transaction_id) {
-      this.validateTransactionId(transaction_id, 'HTLC lookup');
-      const transaction: TransactionJSONRepresentation = await this.apiProvider.getTransaction(transaction_id);
-      // @ts-ignore
-      const { created } = this.previewUtxoChange({ JSONRepresentation: { ...transaction } } as Transaction);
-      // @ts-ignore
-      useHtlcUtxo = created.filter(({utxo}) => utxo.type === 'Htlc') || null;
-    }
-
-    let token_details = undefined;
-
-    if(useHtlcUtxo[0].utxo.value.type === 'TokenV1'){
-      token_details = await this.apiProvider.getToken(useHtlcUtxo[0].utxo.value.token_id);
-    }
-
-    return this.buildTransaction({
-      type: 'Transfer',
-      params: {
-        to: useHtlcUtxo[0].utxo.htlc.spend_key,
-        amount: useHtlcUtxo[0].utxo.value.amount.decimal,
-        ...(
-          useHtlcUtxo[0].utxo.value.type === 'TokenV1'
-            ? { token_id: useHtlcUtxo[0].utxo.value.token_id }
-            : {}
-        ),
-        token_details,
-      },
-      opts: {
-        forceSpendUtxo: useHtlcUtxo,
-      }
-    });
+    return this.buildHtlcClaim(params, 'spend_key');
   }
 
   /**
@@ -4239,7 +4178,7 @@ class Client {
 
     const transaction_signed = hexToUint8Array(transaction_hex);
 
-    const inputs = transaction.inputs.filter(({utxo}: any) => utxo && utxo.type === 'Htlc');
+    const inputs = transaction.inputs.filter(({ utxo }: any) => utxo && utxo.type === 'Htlc');
 
     const outpointedSourceIds: any[] = (inputs as any[])
       .filter(({ input }) => input.input_type === 'UTXO')
@@ -4254,14 +4193,9 @@ class Client {
     const htlc_outpoint_source_id: any = outpointedSourceIds[0].source_id;
     const htlc_output_index: any = outpointedSourceIds[0].index;
 
-    const secret = extract_htlc_secret(
-      transaction_signed,
-      true,
-      htlc_outpoint_source_id,
-      htlc_output_index
-    );
+    const secret = extract_htlc_secret(transaction_signed, true, htlc_outpoint_source_id, htlc_output_index);
 
-    if(format === 'hex') {
+    if (format === 'hex') {
       return uint8ArrayToHex(secret);
     }
 
@@ -4352,7 +4286,7 @@ class Client {
     const spent: UtxoEntry[] = [];
     const created: UtxoEntry[] = [];
 
-    tx.JSONRepresentation.inputs.forEach((input) => {
+    tx.JSONRepresentation.inputs.forEach((input: any) => {
       if (input.input.input_type === 'UTXO' && (input as UtxoInput).utxo) {
         spent.push({
           outpoint: {
@@ -4365,7 +4299,7 @@ class Client {
       }
     });
 
-    tx.JSONRepresentation.outputs.forEach((output, index) => {
+    tx.JSONRepresentation.outputs.forEach((output: any, index: number) => {
       if (output.type === 'Transfer') {
         created.push({
           outpoint: {
@@ -4448,10 +4382,10 @@ class Client {
 
     const originalBuildTransaction = this.buildTransaction;
 
-    let txresult: Transaction | undefined = undefined;
+    let txresult: AssembledTransaction | undefined = undefined;
     this.buildTransaction = new Proxy(this.buildTransaction, {
       apply: async (target, thisArg, args) => {
-        const result = (await Reflect.apply(target, thisArg, args)) as Transaction;
+        const result = (await Reflect.apply(target, thisArg, args)) as AssembledTransaction;
         txresult = result; // pull the result of the buildTransaction
         return result;
       },
@@ -4497,7 +4431,7 @@ class Client {
    * @param tx - The transaction to broadcast (hex string or object with hex and json)
    * @returns Promise that resolves to the broadcast response
    */
-  async broadcastTx(tx: string | { hex: string, json: TransactionJSONRepresentation }): Promise<any> {
+  async broadcastTx(tx: string | { hex: string; json: TransactionJSONRepresentation }): Promise<any> {
     this.ensureInitialized();
     return this.apiProvider.broadcastTransaction(tx);
   }
@@ -4541,15 +4475,20 @@ class Signer {
 
   private createSignature(tx: AssembledTransaction) {
     const network = this.network;
-    const optUtxos_ = tx.JSONRepresentation.inputs.map((input) => {
+    const optUtxos_ = tx.JSONRepresentation.inputs.map((input: any) => {
       if (input.input.input_type !== 'UTXO') {
-        return 0
+        return 0;
       }
       const { utxo }: UtxoInput = input as UtxoInput;
       if (input.input.input_type === 'UTXO') {
         if (utxo.type === 'Transfer') {
           if (utxo.value.type === 'TokenV1') {
-            return encode_output_token_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, utxo.value.token_id, network);
+            return encode_output_token_transfer(
+              Amount.from_atoms(utxo.value.amount.atoms),
+              utxo.destination,
+              utxo.value.token_id,
+              network,
+            );
           } else {
             return encode_output_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, network);
           }
@@ -4566,14 +4505,25 @@ class Signer {
             lockEncoded = encode_lock_for_block_count(BigInt(lockContent as string | number));
           }
           if (utxo.value.type === 'TokenV1') {
-            return encode_output_token_lock_then_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, utxo.value.token_id, lockEncoded, network);
+            return encode_output_token_lock_then_transfer(
+              Amount.from_atoms(utxo.value.amount.atoms),
+              utxo.destination,
+              utxo.value.token_id,
+              lockEncoded,
+              network,
+            );
           } else {
-            return encode_output_lock_then_transfer(Amount.from_atoms(utxo.value.amount.atoms), utxo.destination, lockEncoded, network);
+            return encode_output_lock_then_transfer(
+              Amount.from_atoms(utxo.value.amount.atoms),
+              utxo.destination,
+              lockEncoded,
+              network,
+            );
           }
         }
-        return null
+        return null;
       }
-    })
+    });
 
     const optUtxosArray: number[] = [];
 
@@ -4592,79 +4542,65 @@ class Signer {
 
     const optUtxos = new Uint8Array(optUtxosArray);
 
-    const encodedWitnesses = tx.JSONRepresentation.inputs.map(
-      (input, index) => {
-        let address: string | undefined = undefined;
+    const encodedWitnesses = tx.JSONRepresentation.inputs.map((input: any, index: number) => {
+      let address: string | undefined = undefined;
 
-        if (input.input.input_type === 'UTXO') {
-          const utxoInput = input as UtxoInput;
-          address = utxoInput.utxo.destination;
-        }
+      if (input.input.input_type === 'UTXO') {
+        const utxoInput = input as UtxoInput;
+        address = utxoInput.utxo.destination;
+      }
 
-        if (input.input.input_type === 'AccountCommand') {
-          // @ts-ignore
-          address = input.input.authority;
-        }
+      if (input.input.input_type === 'AccountCommand') {
+        // @ts-ignore
+        address = input.input.authority;
+      }
 
-        if (input.input.input_type === 'AccountCommand' && input.input.command === 'FillOrder') {
-          address = input.input.destination;
-        }
+      if (input.input.input_type === 'AccountCommand' && input.input.command === 'FillOrder') {
+        address = input.input.destination;
+      }
 
-        if (address === undefined) {
-          throw new Error(`Address not found for input at index ${index}`);
-        }
+      if (address === undefined) {
+        throw new Error(`Address not found for input at index ${index}`);
+      }
 
-        const addressPrivateKey = this.getPrivateKey(address);
+      const addressPrivateKey = this.getPrivateKey(address);
 
-        if (!addressPrivateKey) {
-          throw new Error(`Private key not found for address: ${address}`);
-        }
+      if (!addressPrivateKey) {
+        throw new Error(`Private key not found for address: ${address}`);
+      }
 
-        const transaction = this.hexToUint8Array(tx.HEXRepresentation_unsigned);
+      const transaction = hexToUint8Array(tx.HEXRepresentation_unsigned);
 
-        const block_height = FEE_BLOCK_HEIGHT;
-        const additional_info = {
-          pool_info: {},
-          order_info: {}
-        };
+      const block_height = FEE_BLOCK_HEIGHT;
+      const additional_info = {
+        pool_info: {},
+        order_info: {},
+      };
 
-        const witness = encode_witness(
-          SignatureHashType.ALL,
-          addressPrivateKey,
-          address,
-          transaction,
-          optUtxos,
-          index,
-          additional_info,
-          block_height,
-          network,
-        );
-        return witness;
-      },
-    )
+      const witness = encode_witness(
+        SignatureHashType.ALL,
+        addressPrivateKey,
+        address,
+        transaction,
+        optUtxos,
+        index,
+        additional_info,
+        block_height,
+        network,
+      );
+      return witness;
+    });
 
     const signature = mergeUint8Arrays(encodedWitnesses);
     return signature;
   }
 
-  private hexToUint8Array(hex: string): Uint8Array {
-    if (hex.length % 2 !== 0) {
-      throw new Error("Hex string must have an even length");
-    }
-
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-      bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16);
-    }
-    return bytes;
-  }
-
   private encodeSignedTransaction(tx: AssembledTransaction, signature: Uint8Array): string {
-    const transaction_signed = encode_signed_transaction(
-      this.hexToUint8Array(tx.HEXRepresentation_unsigned),
-      signature
+    const transaction_signed = encode_signed_transaction(hexToUint8Array(tx.HEXRepresentation_unsigned), signature);
+    const transaction_signed_hex = transaction_signed.reduce(
+      (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
+      '',
     );
-    const transaction_signed_hex = transaction_signed.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '');
     return transaction_signed_hex;
   }
 
@@ -4677,12 +4613,4 @@ class Signer {
 export { Transaction } from './transaction';
 export * from './wallet-state';
 
-export {
-  Client,
-  Signer,
-  PrivateKeyAccountProvider,
-  MnemonicAccountProvider,
-  MnemonicAccountProviderOptions,
-};
-
-console.log('[Mintlayer Connect SDK] Loaded');
+export { Client, Signer, PrivateKeyAccountProvider, MnemonicAccountProvider, MnemonicAccountProviderOptions };

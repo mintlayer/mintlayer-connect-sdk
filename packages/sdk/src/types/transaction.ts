@@ -199,12 +199,12 @@ export type DataDepositOutput = {
 
 export type TotalSupplyValue =
   | {
-  type: 'Unlimited' | 'Lockable';
-}
+      type: 'Unlimited' | 'Lockable';
+    }
   | {
-  type: 'Fixed';
-  amount: AmountFields;
-};
+      type: 'Fixed';
+      amount: AmountFields;
+    };
 
 export type IssueFungibleTokenOutput = {
   type: 'IssueFungibleToken';
@@ -218,15 +218,15 @@ export type IssueFungibleTokenOutput = {
 
 export type Timelock =
   | {
-  type: 'UntilTime';
-  content: {
-    timestamp: string | number;
-  };
-}
+      type: 'UntilTime';
+      content: {
+        timestamp: string | number;
+      };
+    }
   | {
-  type: 'ForBlockCount';
-  content: string | number;
-};
+      type: 'ForBlockCount';
+      content: string | number;
+    };
 
 export type HtlcOutput = {
   type: 'Htlc';
@@ -234,18 +234,18 @@ export type HtlcOutput = {
     token_id?: string;
     type: 'Coin' | 'TokenV1';
     amount: AmountFields;
-  }
+  };
   token_id?: string;
   htlc: {
     refund_key: string;
     secret_hash: {
       hex: string;
       string: string | null;
-    },
+    };
     spend_key: string;
     refund_timelock: Timelock;
-  }
-}
+  };
+};
 
 export type IssueNftOutput = {
   type: 'IssueNft';
@@ -310,7 +310,6 @@ export interface TransactionJSONRepresentation {
   fee?: AmountFields;
   id: string;
 }
-
 
 export interface Outpoint {
   id: string;

@@ -36,28 +36,19 @@ import {
   Network,
   TokenUnfreezable,
   TotalSupply,
-  decode_signed_transaction_to_js,
 } from '@mintlayer/wasm-lib';
 
 import * as wasmLib from '@mintlayer/wasm-lib';
 
-import { mergeUint8Arrays, atomsToDecimal, stringToUint8Array } from './utils';
+import { mergeUint8Arrays, atomsToDecimal, stringToUint8Array, uint8ArrayToHex } from './utils';
 import { UtxoEntry, UtxoInput } from './types/transaction';
-import type {
-  LockThenTransferOutput,
-  IssueNftOutput,
-  Input,
-  Output,
-  TotalSupplyValue,
-} from './types/transaction';
+import type { LockThenTransferOutput, IssueNftOutput, Input, Output } from './types/transaction';
 
 // Internal working state: `id`/`fee` are attached progressively during
 // build/fromHEX, so the class works with the loose shape internally.
 type TransactionJSON = any;
 
 type Utxo = any;
-
-type Client = any;
 
 /**
  * The single fee-rate constant used by every build path. There is no live
@@ -125,7 +116,9 @@ const MAX_FEE_ATTEMPTS = 10;
  * the fee can still grow during convergence.
  */
 function selectUTXOsFor(utxos: UtxoEntry[], amount: bigint, token_id: string | null): UtxoInput[] {
-  const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft', 'Htlc'];
+  // HTLC outputs are excluded: spending them requires the preimage (secret),
+  // so they must be claimed explicitly via forceSpendUtxo, never auto-selected.
+  const transferableUtxoTypes = ['Transfer', 'LockThenTransfer', 'IssueNft'];
   const filteredUtxos: any[] = utxos
     .map((utxo) => {
       if (utxo.utxo.type === 'IssueNft') {
@@ -161,9 +154,7 @@ function selectUTXOsFor(utxos: UtxoEntry[], amount: bigint, token_id: string | n
   const utxosToSpend: UtxoEntry[] = [];
   let lastIndex = 0;
 
-  filteredUtxos.sort(
-    (a, b) => Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms)),
-  );
+  filteredUtxos.sort((a, b) => Number(BigInt(b.utxo.value.amount.atoms) - BigInt(a.utxo.value.amount.atoms)));
 
   for (let i = 0; i < filteredUtxos.length; i++) {
     lastIndex = i;
@@ -222,7 +213,12 @@ function getTransactionInputsBytesFor(
         );
       }
       if (input.command === 'MintTokens') {
-        return encode_input_for_mint_tokens(input.token_id, Amount.from_atoms(input.amount.atoms), BigInt(input.nonce), network);
+        return encode_input_for_mint_tokens(
+          input.token_id,
+          Amount.from_atoms(input.amount.atoms),
+          BigInt(input.nonce),
+          network,
+        );
       }
       if (input.command === 'UnmintTokens') {
         return encode_input_for_unmint_tokens(input.token_id, BigInt(input.nonce), network);
@@ -231,10 +227,20 @@ function getTransactionInputsBytesFor(
         return encode_input_for_lock_token_supply(input.token_id, BigInt(input.nonce), network);
       }
       if (input.command === 'ChangeTokenAuthority') {
-        return encode_input_for_change_token_authority(input.token_id, input.new_authority, BigInt(input.nonce), network);
+        return encode_input_for_change_token_authority(
+          input.token_id,
+          input.new_authority,
+          BigInt(input.nonce),
+          network,
+        );
       }
       if (input.command === 'ChangeMetadataUri') {
-        return encode_input_for_change_token_metadata_uri(input.token_id, input.new_metadata_uri, BigInt(input.nonce), network);
+        return encode_input_for_change_token_metadata_uri(
+          input.token_id,
+          input.new_metadata_uri,
+          BigInt(input.nonce),
+          network,
+        );
       }
       if (input.command === 'FreezeToken') {
         return encode_input_for_freeze_token(
@@ -288,24 +294,21 @@ function convergeFeeAndEncode(
 }
 
 export class Transaction {
-  private outputs: Output[]
-  private fee: bigint
-  private utxos: Utxo[]
-  private transactionId: string
-  private hexRepresentation: string
-  private binRepresentation: { inputs: Uint8Array[]; outputs: Uint8Array[]; transactionsize: number } | null
-  private jsonRepresentation: TransactionJSON
-  private currentBlockHeight: number
-  private client: Client
-  private network: 'mainnet' | 'testnet'
-  private changeAddress: string
+  private outputs: Output[];
+  private fee: bigint;
+  private utxos: Utxo[];
+  private transactionId: string;
+  private hexRepresentation: string;
+  private binRepresentation: { inputs: Uint8Array[]; outputs: Uint8Array[]; transactionsize: number } | null;
+  private jsonRepresentation: TransactionJSON;
+  private currentBlockHeight: number;
+  private network: 'mainnet' | 'testnet';
+  private changeAddress: string;
 
   constructor({
-    client,
     network,
     currentBlockHeight,
   }: {
-    client?: Client;
     network?: 'mainnet' | 'testnet';
     currentBlockHeight?: number | string | bigint;
   } = {}) {
@@ -319,10 +322,6 @@ export class Transaction {
     this.network = network ?? 'testnet';
     this.fee = BigInt(0);
     this.changeAddress = '';
-
-    if (client) {
-      this.client = client;
-    }
   }
 
   setChangeAddress(address: string) {
@@ -372,11 +371,6 @@ export class Transaction {
 
   setNetwork(network: 'mainnet' | 'testnet') {
     this.network = network;
-    return this;
-  }
-
-  setCurrentBlockHeight(height: number | string | bigint) {
-    this.currentBlockHeight = Number(height);
     return this;
   }
 
@@ -432,10 +426,6 @@ export class Transaction {
     return transaction.fromHEX(hex);
   }
 
-  getTransactionId() {
-    return this.transactionId;
-  }
-
   // Signer-compatibility getters (match the shape used by Signer.sign())
   get JSONRepresentation(): TransactionJSON {
     return this.jsonRepresentation;
@@ -450,12 +440,17 @@ export class Transaction {
     return this.transactionId;
   }
 
+  /**
+   * Fluent builder: assembles from previously added outputs and UTXOs and
+   * returns `this` for in-process fluent use. For transport-safe plain data
+   * (wallet bridge / JSON), use the static {@link assembleRaw} instead.
+   */
   build() {
-    if (!this.client && !this.utxos.length) {
-      throw new Error('Client or UTXOs are required to build transaction');
+    if (!this.utxos.length) {
+      throw new Error('UTXOs are required to build transaction');
     }
-    if (!this.client && !this.changeAddress) {
-      throw new Error('Client or Change Address are required to build transaction');
+    if (!this.changeAddress) {
+      throw new Error('A change address is required to build transaction');
     }
 
     const declaredOutputs: Output[] = [...this.outputs];
@@ -469,10 +464,7 @@ export class Transaction {
       if (val.type === 'Coin') {
         input_amount_coin_req += BigInt(val.amount.atoms);
       } else if (val.type === 'TokenV1') {
-        token_reqs.set(
-          val.token_id,
-          (token_reqs.get(val.token_id) ?? 0n) + BigInt(val.amount.atoms),
-        );
+        token_reqs.set(val.token_id, (token_reqs.get(val.token_id) ?? 0n) + BigInt(val.amount.atoms));
       }
     }
 
@@ -486,10 +478,7 @@ export class Transaction {
       const coin_req_w_fee = input_amount_coin_req + totalFee;
 
       const coinInputs = selectUTXOsFor(this.utxos as UtxoEntry[], coin_req_w_fee, null);
-      const totalCoinIn = coinInputs.reduce(
-        (acc, item) => acc + BigInt(item.utxo!.value.amount.atoms),
-        0n,
-      );
+      const totalCoinIn = coinInputs.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
       if (totalCoinIn < coin_req_w_fee) {
         throw new Error('Not enough coin UTXOs');
       }
@@ -498,10 +487,7 @@ export class Transaction {
       const tokenChanges: Array<{ token_id: string; amount: bigint }> = [];
       for (const [token_id, req] of token_reqs.entries()) {
         const tInputs = selectUTXOsFor(this.utxos as UtxoEntry[], req, token_id);
-        const totalIn = tInputs.reduce(
-          (acc, item) => acc + BigInt(item.utxo!.value.amount.atoms),
-          0n,
-        );
+        const totalIn = tInputs.reduce((acc, item) => acc + BigInt(item.utxo!.value.amount.atoms), 0n);
         if (totalIn < req) {
           throw new Error(`Not enough token UTXOs for ${token_id}`);
         }
@@ -569,10 +555,7 @@ export class Transaction {
         this.fee = totalFee;
         this.transactionId = transaction_id;
         this.binRepresentation = BINRepresentation;
-        this.hexRepresentation = transaction.reduce(
-          (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
-          '',
-        );
+        this.hexRepresentation = transaction.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), '');
         this.jsonRepresentation = { ...JSONRepresentation, id: transaction_id };
         return this;
       }
@@ -618,7 +601,9 @@ export class Transaction {
     }
 
     const networkId = env.network === 'mainnet' ? 0 : 1;
-    const blockHeight = BigInt(env.currentBlockHeight ?? FEE_BLOCK_HEIGHT);
+    // `||` on purpose: an explicit 0 is as unusable as unset (the chain
+    // rejects stale fee heights), matching the fluent builder's fallback.
+    const blockHeight = BigInt(env.currentBlockHeight || FEE_BLOCK_HEIGHT);
 
     let data_utxos: UtxoEntry[];
     if (withUTXO) {
@@ -638,13 +623,27 @@ export class Transaction {
       return true;
     });
 
-    const forcedUtxos: UtxoEntry[] = (forceSpendUtxo ?? []).map((item: UtxoEntry) => ({
-      outpoint: { ...item.outpoint, input_type: 'UTXO' },
+    // Forced entries in the SAME shape the selector emits ({input, utxo}) —
+    // mixing shapes here used to crash input encoding downstream.
+    const forcedUtxos: UtxoInput[] = (forceSpendUtxo ?? []).map((item: UtxoEntry) => ({
+      input: { ...item.outpoint, input_type: 'UTXO' },
       utxo: item.utxo,
     }));
+    // An outpoint listed as forced must not also be auto-selected (double
+    // spend inside one transaction + double-counted change math).
+    const forcedOutpointKeys = new Set(forcedUtxos.map(({ input }) => `${input.source_id}:${input.index}`));
+    const isForced = (entry: UtxoInput) => forcedOutpointKeys.has(`${entry.input.source_id}:${entry.input.index}`);
 
     let preciseFee = BigInt(0);
     let previousFee = BigInt(-1);
+
+    // Snapshot the pre-loop amount of the fee-deducted output: the deduction
+    // must be relative to the original value in every fee iteration, not
+    // compounded onto the value mutated by the previous iteration. (Amount
+    // encoding is variable-length, so the fee CAN change between iterations.)
+    const firstOutputOriginalAtoms = deductFeeFromFirstOutput
+      ? BigInt((outputs[0] as LockThenTransferOutput).value.amount.atoms)
+      : 0n;
 
     for (let attempt = 0; attempt < MAX_FEE_ATTEMPTS; attempt++) {
       const totalFee = baseFee + preciseFee;
@@ -652,9 +651,9 @@ export class Transaction {
 
       const inputObjCoin = deductFeeFromFirstOutput
         ? []
-        : selectUTXOsFor(utxos, input_amount_coin_req_w_fee, null);
+        : selectUTXOsFor(utxos, input_amount_coin_req_w_fee, null).filter((entry) => !isForced(entry));
       const inputObjToken = sendToken?.token_id
-        ? selectUTXOsFor(utxos, requiredToken, sendToken.token_id)
+        ? selectUTXOsFor(utxos, requiredToken, sendToken.token_id).filter((entry) => !isForced(entry))
         : [];
 
       if (forcedUtxos.length > 0) {
@@ -663,10 +662,10 @@ export class Transaction {
           (utxo) => utxo.utxo.value.type === 'TokenV1' && utxo.utxo.value.token_id === sendToken?.token_id,
         );
         if (forceCoinUtxos.length > 0) {
-          (inputObjCoin as any[]).unshift(...forceCoinUtxos);
+          inputObjCoin.unshift(...forceCoinUtxos);
         }
         if (forceTokenUtxos.length > 0) {
-          (inputObjToken as any[]).unshift(...forceTokenUtxos);
+          inputObjToken.unshift(...forceTokenUtxos);
         }
       }
 
@@ -683,14 +682,11 @@ export class Transaction {
       const changeAmountCoin = totalInputValueCoin - input_amount_coin_req_w_fee;
       const changeAmountToken = totalInputValueToken - requiredToken;
 
-      // Snapshot the pre-loop amount of the fee-deducted output: the deduction
-      // must be relative to the original value in every fee iteration, not
-      // compounded onto the value mutated by the previous iteration.
-      const finalOutputs: Output[] = [...outputs];
+      // Fresh object — never mutate the caller's prepared outputs.
+      const finalOutputs: Output[] = outputs.map((output) => ({ ...output }));
       if (deductFeeFromFirstOutput) {
         const out = finalOutputs[0] as LockThenTransferOutput;
-        const originalAtoms = BigInt(out.value.amount.atoms);
-        const netAtoms = originalAtoms - totalFee;
+        const netAtoms = firstOutputOriginalAtoms - totalFee;
         if (netAtoms < 0n) {
           throw new Error('DelegationWithdraw amount is smaller than the transaction fee');
         }
@@ -791,10 +787,7 @@ export class Transaction {
             id: transaction_id,
           },
           BINRepresentation,
-          HEXRepresentation_unsigned: transaction.reduce(
-            (acc, byte) => acc + byte.toString(16).padStart(2, '0'),
-            '',
-          ),
+          HEXRepresentation_unsigned: transaction.reduce((acc, byte) => acc + byte.toString(16).padStart(2, '0'), ''),
           transaction_id,
         };
       }
@@ -818,9 +811,12 @@ export class Transaction {
   }
 
   /**
-   * Returns the transaction binary representation.
-   * @param transactionJSONrepresentation
-   * @param _network
+   * Returns the transaction binary representation (encoded inputs/outputs
+   * plus the size estimate used for fee computation).
+   * @param transactionJSONrepresentation - explorer-style JSON
+   * @param _network - wasm Network enum value (0 mainnet / 1 testnet)
+   * @param blockHeight - height for height-dependent encodings; defaults to
+   *   the instance value or FEE_BLOCK_HEIGHT when unset
    */
   getTransactionBINrepresentation(
     transactionJSONrepresentation: TransactionJSON,
@@ -833,11 +829,7 @@ export class Transaction {
   } {
     const network = _network;
     // Binarisation: account commands first, then UTXO inputs (shared core).
-    const inputsArray = getTransactionInputsBytesFor(
-      transactionJSONrepresentation,
-      network,
-      BigInt(blockHeight),
-    );
+    const inputsArray = getTransactionInputsBytesFor(transactionJSONrepresentation, network, BigInt(blockHeight));
 
     const outputsArrayItems = transactionJSONrepresentation.outputs.map((output: any) => {
       if (output.type === 'Transfer') {
@@ -1081,17 +1073,6 @@ export class Transaction {
   transferNft(destination: string, token_id: string): Output {
     return this.transferToken(destination, '1', token_id);
   }
-
-  // actions
-  stakingWithdraw() {
-    return {
-      type: 'StakingWithdraw',
-      params: {
-        delegation_id: '',
-        amount: 0,
-      },
-    };
-  }
 }
 
 // ── wasm decode → explorer-style JSON ─────────────────────────────────────────
@@ -1099,13 +1080,10 @@ export class Transaction {
 // decode_transaction_to_js returns canonical chain types as tagged unions with
 // untyped payloads (its TS declaration is `any`), so this mapper is pinned by
 // fixtures generated from the real wasm output — see tests/transaction-decode
-// .test.ts and the round-trip property test. Shapes were captured with
+// .test.ts (byte-identical round-trips per type). Shapes were captured with
 // encode_* → decode_transaction_to_js probes against @mintlayer/wasm-lib 1.4.0.
 
-const decodedBytesToHex = (bytes: number[] | Uint8Array): string =>
-  Array.from(bytes)
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
+const decodedBytesToHex = (bytes: number[] | Uint8Array): string => uint8ArrayToHex(new Uint8Array(bytes));
 
 /**
  * Amounts decode as `{atoms}`; the explorer-style shape wants
@@ -1170,15 +1148,17 @@ const decodedInput = (input: any, index: number): any => {
     const base: any = {
       input_type: 'AccountCommand',
       command: tag === 'ChangeTokenMetadataUri' ? 'ChangeMetadataUri' : tag,
-      token_id: undefined,
       nonce: Number(nonce),
     };
 
     switch (tag) {
       case 'MintTokens':
-      case 'UnmintTokens':
         base.token_id = first;
         base.amount = decodedTokenAmount(second.atoms);
+        break;
+      case 'UnmintTokens':
+        // decodes as a bare token-id string (no amount payload)
+        base.token_id = payload;
         break;
       case 'LockTokenSupply':
       case 'UnfreezeToken':
@@ -1269,7 +1249,10 @@ const decodedOutput = (output: any): any => {
         const [supplyType, supplyData] = Object.entries(v1.total_supply)[0] as [string, any];
         total_supply =
           supplyType === 'Fixed'
-            ? { type: 'Fixed', amount: { atoms: supplyData.atoms, decimal: atomsToDecimal(supplyData.atoms, v1.number_of_decimals) } }
+            ? {
+                type: 'Fixed',
+                amount: { atoms: supplyData.atoms, decimal: atomsToDecimal(supplyData.atoms, v1.number_of_decimals) },
+              }
             : { type: supplyType };
       }
       return {

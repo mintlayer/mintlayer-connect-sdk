@@ -15,12 +15,7 @@ import { encode_transaction } from '@mintlayer/wasm-lib';
 import { BuiltTransaction } from '../src/mintlayer-connect-sdk';
 import { FEE_BLOCK_HEIGHT, Transaction } from '../src/transaction';
 import { atomsToDecimal, mergeUint8Arrays } from '../src/utils';
-import {
-  createConnectedClient,
-  MOCK_TOKEN_AUTHORITY,
-  MOCK_TOKEN_ID,
-  setupApiMocks,
-} from './helpers/api-mocks';
+import { createConnectedClient, MOCK_TOKEN_AUTHORITY, MOCK_TOKEN_ID, setupApiMocks } from './helpers/api-mocks';
 
 import { addresses, utxos as ACCOUNT_UTXOS } from './__mocks__/accounts/account_01';
 
