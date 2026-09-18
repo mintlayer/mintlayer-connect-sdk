@@ -124,7 +124,8 @@ export function atomsToDecimal(atoms: string | number, decimals: number): string
   if (atomsLength <= decimals) {
     // Pad with leading zeros
     const padded = atomsStr.padStart(decimals, '0');
-    return '0.' + padded.replace(/0+$/, '') || '0';
+    const fractionalPart = padded.replace(/0+$/, '');
+    return fractionalPart === '' ? '0' : `0.${fractionalPart}`;
   }
 
   // Insert decimal point
@@ -2774,9 +2775,12 @@ class Client {
       if (deductFeeFromFirstOutput) {
         const out = finalOutputs[0] as LockThenTransferOutput;
         const netAtoms = firstOutputOriginalAtoms - totalFee;
+        if (netAtoms < 0n) {
+          throw new Error('DelegationWithdraw amount is smaller than the transaction fee');
+        }
         out.value.amount = {
           atoms: netAtoms.toString(),
-          decimal: (Number(netAtoms) / 1e11).toString(),
+          decimal: atomsToDecimal(netAtoms.toString(), 11),
         };
       }
 
@@ -2843,6 +2847,11 @@ class Client {
         );
         const index = issueNftIndexes[0];
         const output = finalOutputs[index] as IssueNftOutput;
+        if (output.token_id && output.token_id !== token_id) {
+          throw new Error(
+            `IssueNft token_id mismatch: the transaction inputs derive ${token_id}, but the caller supplied ${output.token_id}`,
+          );
+        }
         finalOutputs[index] = {
           ...output,
           token_id,
@@ -3779,10 +3788,42 @@ class Client {
     this.validateRawId(token_id, 'token_id lookup', 'token_id');
     let details = cache.get(token_id);
     if (!details) {
-      details = this.apiProvider.getToken(token_id) as Promise<TokenDetails>;
+      details = this.fetchRawTokenDetails(token_id);
       cache.set(token_id, details);
     }
     return details;
+  }
+
+  /**
+   * Fetches token details and validates their shape before they feed decimal
+   * recomputation, nonce assignment and authority inference.
+   * @private
+   */
+  private async fetchRawTokenDetails(token_id: string): Promise<TokenDetails> {
+    const raw = await this.apiProvider.getToken(token_id);
+
+    if (!raw || typeof raw !== 'object') {
+      throw new Error(`Token ${token_id} not found or returned unexpected data`);
+    }
+
+    const { number_of_decimals, authority } = raw as Partial<TokenDetails>;
+
+    if (
+      typeof number_of_decimals !== 'number' ||
+      !Number.isInteger(number_of_decimals) ||
+      number_of_decimals < 0 ||
+      number_of_decimals > 18
+    ) {
+      throw new Error(
+        `Token ${token_id} returned an invalid number_of_decimals: ${String(number_of_decimals)}`,
+      );
+    }
+
+    if (typeof authority !== 'string' || authority.length === 0) {
+      throw new Error(`Token ${token_id} returned an invalid authority`);
+    }
+
+    return raw as TokenDetails;
   }
 
   /**
