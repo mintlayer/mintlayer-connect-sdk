@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.1.0)'
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -14,11 +19,11 @@ jobs:
 
     steps:
       # Release events fire on the default branch by default; check out the
-      # tagged commit that is being released.
+      # tagged commit that is being released (explicit input on manual runs).
       - name: Checkout repo
         uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
@@ -33,12 +38,17 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Verify package version matches release tag
-        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
+          if [ -z "$RELEASE_TAG" ]; then
+            echo "No release tag to publish" >&2
+            exit 1
+          fi
           PKG_VERSION="$(node -p "require('./packages/sdk/package.json').version")"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAG_VERSION="${RELEASE_TAG#v}"
           if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
-            echo "Version mismatch: packages/sdk/package.json is $PKG_VERSION but release tag is $GITHUB_REF_NAME" >&2
+            echo "Version mismatch: packages/sdk/package.json is $PKG_VERSION but release tag is $RELEASE_TAG" >&2
             exit 1
           fi
 
