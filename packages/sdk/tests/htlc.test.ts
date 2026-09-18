@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 
 import { utxos } from './__mocks__/accounts/account_02'
 import {
+  createConnectedClient,
   MOCK_TOKEN,
   MOCK_TOKEN_11_DECIMALS,
   MOCK_TOKEN_11_DECIMALS_ID,
@@ -327,8 +328,7 @@ test('extract Htlc from transaction', async () => {
 });
 
 test('rejects a malformed transaction id before any provider call', async () => {
-  const client = await Client.create({ network: 'testnet', autoRestore: false });
-  await client.connect();
+  const client = await createConnectedClient();
 
   await expectRejectionWithoutProviderCalls(
     client.extractHtlcSecret({

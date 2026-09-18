@@ -2,6 +2,7 @@ import { Client } from '../src/mintlayer-connect-sdk';
 import fetchMock from 'jest-fetch-mock';
 
 import {
+  createConnectedClient,
   MOCK_TOKEN,
   MOCK_TOKEN_11_DECIMALS,
   MOCK_TOKEN_11_DECIMALS_ID,
@@ -188,8 +189,7 @@ test('staking withdraw - snapshot', async () => {
 })
 
 test('delegation withdraw with an amount smaller than the fee is rejected', async () => {
-  const client = await Client.create({ network: 'testnet', autoRestore: false });
-  await client.connect();
+  const client = await createConnectedClient();
 
   // 1e-9 ML = 100 atoms, far below the size-based transaction fee
   await expect(
@@ -201,8 +201,7 @@ test('delegation withdraw with an amount smaller than the fee is rejected', asyn
 });
 
 test('delegation stake with a malformed pool id is rejected before any provider call', async () => {
-  const client = await Client.create({ network: 'testnet', autoRestore: false });
-  await client.connect();
+  const client = await createConnectedClient();
 
   await expectRejectionWithoutProviderCalls(
     client.delegationStake({ pool_id: 'bad_id', amount: 10 }),

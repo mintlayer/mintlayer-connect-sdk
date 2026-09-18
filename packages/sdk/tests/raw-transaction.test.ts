@@ -15,7 +15,14 @@ import {
   nft_issuance_fee,
   token_supply_change_fee,
 } from '../src/mintlayer-connect-sdk';
-import { MOCK_TOKEN, MOCK_TOKEN_AUTHORITY, MOCK_TOKEN_ID, createConnectedClient, expectRejectionWithoutProviderCalls, setupApiMocks } from './helpers/api-mocks';
+import {
+  createConnectedClient,
+  expectRejectionWithoutProviderCalls,
+  MOCK_TOKEN,
+  MOCK_TOKEN_AUTHORITY,
+  MOCK_TOKEN_ID,
+  setupApiMocks,
+} from './helpers/api-mocks';
 
 import { addresses } from './__mocks__/accounts/account_01';
 
@@ -741,7 +748,7 @@ describe('buildRawTransaction normalization rejections', () => {
     setupApiMocks({ tokens: { [TOKEN_ID]: { ...MOCK_TOKEN, next_nonce: '7' } } });
     const client = await createConnectedClient();
 
-    // A string next_nonce ('7') would corrupt nonce arithmetic via concatenation
+    // string next_nonce must be rejected
     await expect(
       client.buildRawTransaction({
         outputs: [
