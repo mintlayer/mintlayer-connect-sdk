@@ -4255,6 +4255,7 @@ class Client {
   async buildTransfer({ to, amount, token_id }: TransferArgs): Promise<Transaction> {
     this.ensureInitialized();
     if (token_id) {
+      this.validateRawId(token_id, 'transfer', 'token_id');
       const token = await this.apiProvider.getToken(token_id);
       const token_details: TokenDetails = token;
       return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
@@ -4291,6 +4292,7 @@ class Client {
     }
 
     const amount = 1;
+    this.validateRawId(token_id, 'nft lookup', 'token_id');
     const token = await this.apiProvider.getNft(token_id);
     const token_details: TokenDetails = token;
     token_details.number_of_decimals = 0; // that's NFT
@@ -4415,6 +4417,7 @@ class Client {
    */
   async buildMintToken({ destination, amount, token_id }: MintTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
@@ -4441,6 +4444,7 @@ class Client {
    */
   async buildUnmintToken({ amount, token_id }: UnmintTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
@@ -4463,6 +4467,7 @@ class Client {
    */
   async buildLockTokenSupply({ token_id }: LockTokenSupplyArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
@@ -4484,6 +4489,7 @@ class Client {
    */
   async buildChangeTokenAuthority({ token_id, new_authority }: ChangeTokenAuthorityArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
@@ -4509,6 +4515,7 @@ class Client {
    */
   async buildChangeMetadataUri({ token_id, new_metadata_uri }: ChangeMetadataUriArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
@@ -4534,6 +4541,7 @@ class Client {
    */
   async buildFreezeToken({ token_id, is_unfreezable }: FreezeTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
@@ -4559,6 +4567,7 @@ class Client {
    */
   async buildUnfreezeToken({ token_id }: UnfreezeTokenArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(token_id, 'token lookup', 'token_id');
     const token = await this.apiProvider.getToken(token_id);
     const token_details = token;
 
@@ -4591,10 +4600,12 @@ class Client {
     let give_token_details = null;
 
     if (ask_token !== 'Coin') {
+      this.validateRawId(ask_token, 'create order', 'ask_token');
       ask_token_details = await this.apiProvider.getToken(ask_token);
     }
 
     if (give_token !== 'Coin') {
+      this.validateRawId(give_token, 'create order', 'give_token');
       give_token_details = await this.apiProvider.getToken(give_token);
     }
 
@@ -4643,6 +4654,7 @@ class Client {
    */
   async buildFillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(order_id, 'fill order', 'order_id');
     const data = await this.apiProvider.getOrder(order_id);
     const order_details: OrderData = data;
 
@@ -4698,6 +4710,7 @@ class Client {
    */
   async buildConcludeOrder({ order_id }: ConcludeOrderArgs): Promise<Transaction> {
     this.ensureInitialized();
+    this.validateRawId(order_id, 'conclude order', 'order_id');
     const order: OrderData = await this.apiProvider.getOrder(order_id);
 
     return this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
@@ -4723,6 +4736,7 @@ class Client {
       throw new Error('Token is mandatory');
     }
 
+    this.validateRawId(token_id, 'bridge request', 'token_id');
     const token_details = await this.apiProvider.getToken(token_id);
 
     const tx = await this.buildTransaction({
@@ -4753,6 +4767,7 @@ class Client {
     let token_details: TokenDetails | undefined = undefined;
 
     if (token_id !== 'Coin' && token_id !== null) {
+      this.validateRawId(token_id, 'burn', 'token_id');
       token_details = await this.apiProvider.getToken(token_id);
     }
 
@@ -4824,6 +4839,7 @@ class Client {
     if (delegation_id) {
       return this.buildTransaction({ type: 'DelegateStaking', params: { delegation_id, amount } });
     } else if (pool_id) {
+      this.validateRawId(pool_id, 'delegation stake', 'pool_id');
       const data: DelegationDetails[] = await this.apiProvider.getPoolDelegations(pool_id).catch(() => {
         throw new Error('Failed to fetch delegation id');
       });
@@ -4881,6 +4897,7 @@ class Client {
     }
 
     if (delegation_id) {
+      this.validateRawId(delegation_id, 'delegation withdraw', 'delegation_id');
       const delegation_details: DelegationDetails = await this.apiProvider.getDelegation(delegation_id);
 
       return this.buildTransaction({
@@ -4888,6 +4905,7 @@ class Client {
         params: { delegation_id, amount, delegation_details },
       });
     } else if (pool_id) {
+      this.validateRawId(pool_id, 'delegation withdraw', 'pool_id');
       const data = await this.apiProvider.getPoolDelegations(pool_id);
 
       const delegationIdMap: Record<string, DelegationDetails> = data.reduce(
@@ -4937,6 +4955,7 @@ class Client {
     let token_details: TokenDetails | undefined = undefined;
 
     if(params.token_id){
+      this.validateRawId(params.token_id, 'create htlc', 'token_id');
       const token = await this.apiProvider.getToken(params.token_id);
       token_details = token;
     }
