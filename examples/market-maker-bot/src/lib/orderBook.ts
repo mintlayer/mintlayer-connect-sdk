@@ -43,6 +43,8 @@ function toBookLevel(order: MarketOrder, baseToken: TokenRef, quoteToken: TokenR
       baseAmount: giveAmount,
       quoteAmount: askAmount,
       ownerAddress: order.conclude_destination,
+      askToken: quoteToken,
+      askBalanceAtoms: String(order.ask_balance.atoms ?? '0'),
     };
   }
 
@@ -54,6 +56,8 @@ function toBookLevel(order: MarketOrder, baseToken: TokenRef, quoteToken: TokenR
       baseAmount: askAmount,
       quoteAmount: giveAmount,
       ownerAddress: order.conclude_destination,
+      askToken: baseToken,
+      askBalanceAtoms: String(order.ask_balance.atoms ?? '0'),
     };
   }
 
@@ -78,6 +82,20 @@ export function buildSyntheticBook(orders: MarketOrder[], baseToken: TokenRef, q
     bestAsk,
     midPrice: bestBid !== null && bestAsk !== null ? (bestBid + bestAsk) / 2 : bestBid ?? bestAsk,
   };
+}
+
+/**
+ * The arithmetic mean of all currently visible prices. This is intentionally
+ * distinct from the best-bid/best-ask mid so manual demo quotes remain useful
+ * for a one-sided or sparse book.
+ */
+export function averageBookPrice(book: SyntheticBook): number | null {
+  const prices = [...book.bids, ...book.asks]
+    .map((level) => level.price)
+    .filter((price) => Number.isFinite(price) && price > 0);
+
+  if (prices.length === 0) return null;
+  return prices.reduce((total, price) => total + price, 0) / prices.length;
 }
 
 export function isOwnOrder(order: MarketOrder, addresses: { receiving: string[]; change: string[] }): boolean {

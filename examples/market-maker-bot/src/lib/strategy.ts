@@ -26,6 +26,13 @@ function stableId(parts: Array<string | number | null>): string {
   return parts.map((part) => String(part ?? 'none')).join(':');
 }
 
+function atomsToDecimalString(atoms: bigint, decimals: number): string {
+  const raw = atoms.toString().padStart(decimals + 1, '0');
+  const whole = raw.slice(0, -decimals);
+  const fraction = raw.slice(-decimals).replace(/0+$/, '');
+  return fraction ? `${whole}.${fraction}` : whole;
+}
+
 export function calculateInventory(snapshot: WalletSnapshot | null, config: MarketMakerConfig, midPrice: number | null) {
   const baseBalance = getTokenBalance(snapshot, config.baseToken);
   const quoteBalance = getTokenBalance(snapshot, config.quoteToken);
@@ -43,6 +50,14 @@ export function calculateInventory(snapshot: WalletSnapshot | null, config: Mark
     baseShare,
     drift: baseShare - config.inventoryTarget,
   };
+}
+
+export function withReferencePrice(book: SyntheticBook, referencePrice: number): SyntheticBook {
+  if (book.midPrice || referencePrice <= 0) {
+    return book;
+  }
+
+  return { ...book, midPrice: referencePrice };
 }
 
 export function planStrategyActions(args: {
@@ -205,6 +220,84 @@ export function planFillActions(args: {
   }
 
   return actions;
+}
+
+/**
+ * Selects one of this wallet's resting orders to take as a synthetic counterparty.
+ * This deliberately lives outside `planAllStrategyActions`: simulator fills are
+ * executed by the running bot, never shown as a proposal for manual approval.
+ */
+export function planSimulatedOwnFill(args: {
+  config: MarketMakerConfig;
+  book: SyntheticBook;
+  wallet: WalletSnapshot | null;
+  alreadyFilledOrderIds: Set<string>;
+  turn: number;
+}): StrategyAction | null {
+  const { config, book, wallet, alreadyFilledOrderIds, turn } = args;
+  if (!wallet?.addresses.receiving[0]) {
+    return null;
+  }
+
+  const ownedAddresses = new Set([...wallet.addresses.receiving, ...wallet.addresses.change]);
+  const inventory = calculateInventory(wallet, config, book.midPrice);
+  // Leave a remainder so the following cycle can exercise ConcludeOrder too.
+  const simulatedPortion = 0.5;
+  const candidates: StrategyAction[] = [];
+
+  for (const level of [...book.asks, ...book.bids]) {
+    if (!ownedAddresses.has(level.ownerAddress) || alreadyFilledOrderIds.has(level.orderId)) {
+      continue;
+    }
+
+    if (level.side === 'ask') {
+      // Taking an ask pays quote currency and receives base currency.
+      // Work from the order's remaining atoms. Floating-point half amounts can
+      // round up by one atom in the SDK and exceed the order balance.
+      const fillAtoms = BigInt(level.askBalanceAtoms) / 2n;
+      if (fillAtoms <= 0n) continue;
+      const exactAmount = atomsToDecimalString(fillAtoms, level.askToken === 'Coin' ? 11 : 11);
+      const fillAmount = Number(exactAmount);
+      if (fillAmount > 0 && inventory.quoteBalance >= fillAmount) {
+        candidates.push({
+          id: stableId(['simulation-fill', level.orderId, 'buy', fillAmount.toFixed(8)]),
+          kind: 'fill-order',
+          side: 'buy',
+          reason: 'Liquidity simulation: self-fill own ask to produce an on-chain trade.',
+          orderId: level.orderId,
+          amount: fillAmount,
+          exactAmount,
+          price: level.price,
+          expectedBaseAmount: Math.min(config.orderSize * simulatedPortion, level.baseAmount * simulatedPortion),
+          expectedQuoteAmount: fillAmount,
+          isOwnOrder: true,
+        });
+      }
+    } else {
+      // Taking a bid pays base currency and receives quote currency.
+      const fillAtoms = BigInt(level.askBalanceAtoms) / 2n;
+      if (fillAtoms <= 0n) continue;
+      const exactAmount = atomsToDecimalString(fillAtoms, level.askToken === 'Coin' ? 11 : 11);
+      const fillAmount = Number(exactAmount);
+      if (fillAmount > 0 && inventory.baseBalance >= fillAmount) {
+        candidates.push({
+          id: stableId(['simulation-fill', level.orderId, 'sell', fillAmount.toFixed(8)]),
+          kind: 'fill-order',
+          side: 'sell',
+          reason: 'Liquidity simulation: self-fill own bid to produce an on-chain trade.',
+          orderId: level.orderId,
+          amount: fillAmount,
+          exactAmount,
+          price: level.price,
+          expectedBaseAmount: fillAmount,
+          expectedQuoteAmount: fillAmount * level.price,
+          isOwnOrder: true,
+        });
+      }
+    }
+  }
+
+  return candidates.length > 0 ? candidates[turn % candidates.length] : null;
 }
 
 export function planAllStrategyActions(args: {

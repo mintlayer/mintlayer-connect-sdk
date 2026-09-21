@@ -71,10 +71,11 @@ test('buildTransaction called with correct params', async () => {
 });
 
 test('fails transfer if not enough utxo', async () => {
-  fetchMock.mockIf('https://mojito-api.mintlayer.org/mintlayer/testnet/batch', async () => {
-    return {
-      body: JSON.stringify({ results: [[]] }), // no utxos
-    };
+  fetchMock.mockResponse(async req => {
+    if (req.url.endsWith('/batch')) {
+      return { body: JSON.stringify({ results: [[]] }) }; // no UTXOs
+    }
+    return mocks.defaultRouter(req);
   });
 
   const client = await Client.create({ network: 'testnet', autoRestore: false });
@@ -87,9 +88,10 @@ test('fails transfer if not enough utxo', async () => {
 });
 
 test('transfer ignores account entries without utxo', async () => {
-  fetchMock.mockIf('https://mojito-api.mintlayer.org/mintlayer/testnet/batch', async () => {
-    return {
-      body: JSON.stringify({
+  fetchMock.mockResponse(async req => {
+    if (req.url.endsWith('/batch')) {
+      return {
+        body: JSON.stringify({
         results: [[
           {
             input: {
@@ -105,8 +107,10 @@ test('transfer ignores account entries without utxo', async () => {
           },
           ...mocks.utxos,
         ]],
-      }),
-    };
+        }),
+      };
+    }
+    return mocks.defaultRouter(req);
   });
 
   const client = await Client.create({ network: 'testnet', autoRestore: false });

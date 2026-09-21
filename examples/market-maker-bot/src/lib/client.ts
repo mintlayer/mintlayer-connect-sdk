@@ -113,12 +113,13 @@ class HeaderApiProvider implements ApiProvider {
 }
 
 function createApiProvider(config: MarketMakerConfig): ApiProvider | undefined {
-  if (!config.apiUrl && !config.apiKey) {
+  if (!config.apiUrl && !config.batchApiUrl && !config.apiKey) {
     return undefined;
   }
 
   const baseUrl = config.apiUrl ?? DEFAULT_API_URLS[config.network];
-  return new HeaderApiProvider(baseUrl, DEFAULT_BATCH_URLS[config.network], config.apiKey);
+  const batchUrl = config.batchApiUrl ?? DEFAULT_BATCH_URLS[config.network];
+  return new HeaderApiProvider(baseUrl, batchUrl, config.apiKey);
 }
 
 export async function createBotClient(config: MarketMakerConfig): Promise<Client> {

@@ -4,9 +4,9 @@ import type { WalletState } from '@mintlayer/sdk';
 import { createBotClient } from '../lib/client';
 import { loadConfigFromEnv, validateConfig } from '../lib/config';
 import { executeRequest, mergeRecords, strategyActionToRequest } from '../lib/execution';
-import { buildSyntheticBook, isOwnOrder } from '../lib/orderBook';
+import { averageBookPrice, buildSyntheticBook, isOwnOrder } from '../lib/orderBook';
 import { fetchPairOrders } from '../lib/orders';
-import { planAllStrategyActions } from '../lib/strategy';
+import { planAllStrategyActions, planSimulatedOwnFill, planStrategyActions, withReferencePrice } from '../lib/strategy';
 import { listTrades } from '../lib/trades';
 import { analyzeBranches, createBranchPreparationPlan } from '../lib/utxoBranches';
 import { collectTokenIds, loadTokenLabels, mergeTokenLabels, type TokenLabelMap } from '../lib/tokens';
@@ -36,6 +36,7 @@ type BotState = {
   orders: MarketOrder[];
   ownOrders: MarketOrder[];
   book: SyntheticBook;
+  manualReferencePrice: number;
   actions: StrategyAction[];
   records: ExecutionRecord[];
   broadcastEnabled: boolean;
@@ -62,6 +63,7 @@ function emptyPreparationPlan(config: MarketMakerConfig): BranchPreparationPlan 
     targetBranchCount: 4,
     perBranchAmount: config.orderSize,
     destination: '',
+    availableBranches: [],
     actions: [],
     warnings: [],
   };
@@ -88,9 +90,23 @@ export function useMarketMakerBot() {
     Coin: { tokenId: 'Coin', ticker: 'ML', decimals: 11 },
   });
   const loopRef = useRef<number | null>(null);
+  const cycleInFlightRef = useRef(false);
+  const simulationTurnRef = useRef(0);
+  const orphanedPendingOutpointsRef = useRef(new Set<string>());
+  const unfillableSimulationOrderIdsRef = useRef(new Set<string>());
 
   const configWarnings = useMemo(() => validateConfig(config), [config]);
   const book = useMemo(() => buildSyntheticBook(orders, config.baseToken, config.quoteToken), [orders, config]);
+  // Keep manual proposals consistent with the loop: an empty book still has
+  // the configured reference price from which to quote.
+  const strategyBook = useMemo(
+    () => withReferencePrice(book, config.referencePrice),
+    [book, config.referencePrice],
+  );
+  const manualReferencePrice = useMemo(
+    () => averageBookPrice(book) ?? config.referencePrice,
+    [book, config.referencePrice],
+  );
   const actions = useMemo(() => {
     const appliedActionIds = new Set(
       records
@@ -98,10 +114,10 @@ export function useMarketMakerBot() {
         .map((record) => record.idempotencyKey),
     );
 
-    return planAllStrategyActions({ config, book, ownOrders, wallet, quoteLevelOffset }).filter(
+    return planAllStrategyActions({ config, book: strategyBook, ownOrders, wallet, quoteLevelOffset }).filter(
       (action) => !appliedActionIds.has(action.id),
     );
-  }, [book, config, ownOrders, quoteLevelOffset, records, wallet]);
+  }, [config, ownOrders, quoteLevelOffset, records, strategyBook, wallet]);
   const trades = useMemo(() => listTrades(records), [records]);
   const branches = useMemo(
     () => analyzeBranches(wallet, config.maxUnconfirmedBranchDepth),
@@ -114,13 +130,14 @@ export function useMarketMakerBot() {
         sourceAsset: config.baseToken,
         targetBranchCount: 4,
         perBranchAmount: config.orderSize,
+        maxUnconfirmedBranchDepth: config.maxUnconfirmedBranchDepth,
       }),
-    [config.baseToken, config.orderSize, wallet],
+    [config.baseToken, config.maxUnconfirmedBranchDepth, config.orderSize, wallet],
   );
 
   const refresh = useCallback(async () => {
     if (!runtime.client || !walletState) {
-      return;
+      return null;
     }
 
     const [pairOrders, accountOrders, walletSnapshot] = await Promise.all([
@@ -129,28 +146,40 @@ export function useMarketMakerBot() {
       loadWalletSnapshot(runtime.client, walletState, config.maxUnconfirmedBranchDepth),
     ]);
 
+    // An API UTXO response does not guarantee the local broadcast node has
+    // accepted the parent into its mempool. Keep an orphaned branch excluded
+    // for this browser session; reinitialize after its parent confirms.
+    const safeWalletSnapshot = {
+      ...walletSnapshot,
+      availableUtxos: walletSnapshot.availableUtxos.filter(
+        (utxo) => !orphanedPendingOutpointsRef.current.has(`${utxo.txId}:${utxo.outputIndex}`),
+      ),
+    };
     const typedOrders = pairOrders as MarketOrder[];
     const typedOwnOrders =
       accountOrders.length > 0
         ? (accountOrders as MarketOrder[]).filter((order) =>
-            typedOrders.some((pairOrder) => pairOrder.order_id === order.order_id),
+          typedOrders.some((pairOrder) => pairOrder.order_id === order.order_id),
           )
-        : typedOrders.filter((order) => isOwnOrder(order, walletSnapshot.addresses));
+        : typedOrders.filter((order) => isOwnOrder(order, safeWalletSnapshot.addresses));
 
     setOrders(typedOrders);
     setOwnOrders(typedOwnOrders);
-    setWallet(walletSnapshot);
+    setWallet(safeWalletSnapshot);
 
-    const branchSnapshot = analyzeBranches(walletSnapshot, config.maxUnconfirmedBranchDepth);
+    const branchSnapshot = analyzeBranches(safeWalletSnapshot, config.maxUnconfirmedBranchDepth);
     const labels = await loadTokenLabels(
       config,
-      collectTokenIds({ config, wallet: walletSnapshot, branches: branchSnapshot }),
+      collectTokenIds({ config, wallet: safeWalletSnapshot, branches: branchSnapshot }),
     );
     setTokenLabels((current) => mergeTokenLabels(current, labels));
+    return { orders: typedOrders, ownOrders: typedOwnOrders, wallet: safeWalletSnapshot };
   }, [config, config.maxUnconfirmedBranchDepth, runtime.client, walletState]);
 
   const initialize = useCallback(async () => {
     setRuntime((current) => ({ ...current, mode: 'initializing', error: null }));
+    orphanedPendingOutpointsRef.current.clear();
+    unfillableSimulationOrderIdsRef.current.clear();
 
     try {
       const client = await createBotClient(config);
@@ -196,7 +225,7 @@ export function useMarketMakerBot() {
   }, [config]);
 
   const execute = useCallback(
-    async (request: ExecutionRequest, forceBroadcast = broadcastEnabled) => {
+    async (request: ExecutionRequest, forceBroadcast = broadcastEnabled, executionWallet = wallet) => {
       if (!runtime.client || !walletState) {
         return;
       }
@@ -212,15 +241,40 @@ export function useMarketMakerBot() {
         request,
         config,
         broadcast: forceBroadcast && !dryRun,
-        availableUtxos: wallet?.availableUtxos ?? [],
+        availableUtxos: executionWallet?.availableUtxos ?? [],
         tradeMeta: request.kind === 'fill-order' ? request.tradeMeta : undefined,
       });
+
+      if (
+        record.status === 'rejected' &&
+        /orphan transaction/i.test(record.error ?? '') &&
+        executionWallet
+      ) {
+        const inputOutpoints = new Set(record.inputOutpoints);
+        for (const utxo of executionWallet.availableUtxos) {
+          const outpoint = `${utxo.txId}:${utxo.outputIndex}`;
+          if (utxo.status === 'unconfirmed' && inputOutpoints.has(outpoint)) {
+            orphanedPendingOutpointsRef.current.add(outpoint);
+          }
+        }
+      }
+      if (
+        request.kind === 'fill-order' &&
+        request.idempotencyKey.startsWith('simulation-fill:') &&
+        record.status === 'rejected' &&
+        /zero amount|not enough (coin|token) UTXOs/i.test(record.error ?? '')
+      ) {
+        // The order book can be one API cycle behind the order fetched by the
+        // builder. Do not repeatedly attempt an exhausted order, or one whose
+        // ask currency is not presently available in this wallet's UTXOs.
+        unfillableSimulationOrderIdsRef.current.add(request.orderId);
+      }
 
       setRecords((current) => mergeRecords(current, record));
       await refresh();
       return record;
     },
-    [broadcastEnabled, config, dryRun, records, refresh, runtime.client, wallet?.availableUtxos, walletState],
+    [broadcastEnabled, config, dryRun, records, refresh, runtime.client, wallet, walletState],
   );
 
   const executeStrategyAction = useCallback(
@@ -239,6 +293,28 @@ export function useMarketMakerBot() {
       }
     },
     [execute, wallet?.addresses.receiving],
+  );
+
+  const createManualOrder = useCallback(
+    async (side: 'bid' | 'ask') => {
+      const destination = wallet?.addresses.receiving[0];
+      if (!destination || !Number.isFinite(manualReferencePrice) || manualReferencePrice <= 0 || config.orderSize <= 0) return;
+
+      const price = manualReferencePrice * (side === 'bid' ? 0.95 : 1.05);
+      const action: StrategyAction = {
+        // Manual creation is repeatable, unlike the stable automatic proposal IDs.
+        id: `manual-${side}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        kind: 'create-order',
+        side,
+        price,
+        reason: `Manual ${side} at ${side === 'bid' ? '-5%' : '+5%'} of the average market price (${manualReferencePrice.toFixed(8)}).`,
+        args: side === 'bid'
+          ? { conclude_destination: destination, ask_token: config.baseToken, ask_amount: config.orderSize, give_token: config.quoteToken, give_amount: config.orderSize * price }
+          : { conclude_destination: destination, ask_token: config.quoteToken, ask_amount: config.orderSize * price, give_token: config.baseToken, give_amount: config.orderSize },
+      };
+      await execute(strategyActionToRequest(action, destination));
+    },
+    [config.baseToken, config.orderSize, config.quoteToken, execute, manualReferencePrice, wallet?.addresses.receiving],
   );
 
   const concludeOrder = useCallback(
@@ -272,9 +348,103 @@ export function useMarketMakerBot() {
   );
 
   const runCycle = useCallback(async () => {
-    await refresh();
-    setLastCycleAt(Date.now());
-  }, [refresh]);
+    if (cycleInFlightRef.current) {
+      return;
+    }
+
+    cycleInFlightRef.current = true;
+    try {
+      const snapshot = await refresh();
+      // A simulation creates real candles only when transactions are broadcast.
+      // Keep dry-run and broadcast-off sessions observational, even while looping.
+      if (!snapshot || !config.simulateOwnFills || dryRun || !broadcastEnabled) {
+        return;
+      }
+
+      const filledOrderIds = new Set(
+        records
+          .filter((record) => record.idempotencyKey.startsWith('simulation-fill:') && record.status !== 'rejected')
+          .map((record) => record.tradeMeta?.orderId)
+          .filter((orderId): orderId is string => Boolean(orderId)),
+      );
+      const concludedOrderIds = new Set(
+        records
+          .filter((record) => record.idempotencyKey.startsWith('simulation-conclude:') && record.status !== 'rejected')
+          .map((record) => record.idempotencyKey.slice('simulation-conclude:'.length)),
+      );
+      const filledOrderToConclude = snapshot.ownOrders.find(
+        (order) => filledOrderIds.has(order.order_id) && !concludedOrderIds.has(order.order_id),
+      );
+
+      if (filledOrderToConclude) {
+        const fillRecord = records.find(
+          (record) =>
+            record.idempotencyKey.startsWith('simulation-fill:') &&
+            record.tradeMeta?.orderId === filledOrderToConclude.order_id &&
+            record.status !== 'rejected',
+        );
+        if (fillRecord && Date.now() - fillRecord.updatedAt < config.simulationTradeTimeoutMs) {
+          return;
+        }
+        await execute(
+          strategyActionToRequest(
+            {
+              id: `simulation-conclude:${filledOrderToConclude.order_id}`,
+              kind: 'conclude-order',
+              orderId: filledOrderToConclude.order_id,
+              reason: 'Liquidity simulation: conclude the partially self-filled order before replacing it.',
+            },
+            snapshot.wallet.addresses.receiving[0],
+          ),
+          true,
+          snapshot.wallet,
+        );
+        return;
+      }
+
+      const simulatedFill = planSimulatedOwnFill({
+        config,
+        book: withReferencePrice(
+          buildSyntheticBook(snapshot.orders, config.baseToken, config.quoteToken),
+          config.referencePrice,
+        ),
+        wallet: snapshot.wallet,
+        alreadyFilledOrderIds: new Set([
+          ...filledOrderIds,
+          ...unfillableSimulationOrderIdsRef.current,
+        ]),
+        turn: simulationTurnRef.current++,
+      });
+      if (simulatedFill) {
+        await execute(strategyActionToRequest(simulatedFill, snapshot.wallet.addresses.receiving[0]), true, snapshot.wallet);
+        return;
+      }
+
+      const lifecycleAction = planStrategyActions({
+        config,
+        book: withReferencePrice(
+          buildSyntheticBook(snapshot.orders, config.baseToken, config.quoteToken),
+          config.referencePrice,
+        ),
+        ownOrders: snapshot.ownOrders,
+        wallet: snapshot.wallet,
+        quoteLevelOffset,
+      })[0];
+      if (lifecycleAction) {
+        const record = await execute(
+          strategyActionToRequest(lifecycleAction, snapshot.wallet.addresses.receiving[0]),
+          true,
+          snapshot.wallet,
+        );
+        if (record?.status !== 'rejected' && lifecycleAction.kind === 'create-order') {
+          setQuoteLevelOffset((current) => current + 1);
+        }
+      }
+    } finally {
+      setLastCycleAt(Date.now());
+      cycleInFlightRef.current = false;
+    }
+  }, [broadcastEnabled, config, dryRun, execute, quoteLevelOffset, records, refresh]);
 
   const startLoop = useCallback(() => {
     if (loopRef.current !== null) {
@@ -303,6 +473,8 @@ export function useMarketMakerBot() {
   const resetLocalState = useCallback(async () => {
     stopLoop();
     clearAllLocalWalletState();
+    orphanedPendingOutpointsRef.current.clear();
+    unfillableSimulationOrderIdsRef.current.clear();
 
     setRecords([]);
     setOrders([]);
@@ -368,6 +540,7 @@ export function useMarketMakerBot() {
     orders,
     ownOrders,
     book,
+    manualReferencePrice,
     actions,
     records,
     broadcastEnabled,
@@ -391,6 +564,7 @@ export function useMarketMakerBot() {
     stopLoop,
     resetLocalState,
     executeStrategyAction,
+    createManualOrder,
     concludeOrder,
     executePreparationAction,
   };

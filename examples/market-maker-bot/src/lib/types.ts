@@ -13,12 +13,16 @@ export type ExecutionKind = 'create-order' | 'fill-order' | 'conclude-order' | '
 export type MarketMakerConfig = {
   network: NetworkName;
   apiUrl?: string;
+  /** Mojito-compatible batch endpoint serving spendable UTXOs for apiUrl's chain. */
+  batchApiUrl?: string;
   apiKey?: string;
   walletSeed?: string;
   pair: string;
   baseToken: TokenRef;
   quoteToken: TokenRef;
   orderSize: number;
+  /** Fallback quote price when the selected pair has no existing book yet. */
+  referencePrice: number;
   spreadBps: number;
   inventoryTarget: number;
   rebalanceThreshold: number;
@@ -29,6 +33,10 @@ export type MarketMakerConfig = {
   allowMainnetBroadcast: boolean;
   enableFillTrading: boolean;
   allowSelfFills: boolean;
+  /** Run a live create → self-fill → conclude/requote lifecycle from the bot loop. */
+  simulateOwnFills: boolean;
+  /** Minimum time to leave a simulated fill open before concluding its remainder. */
+  simulationTradeTimeoutMs: number;
 };
 
 export type WalletSnapshot = {
@@ -81,6 +89,8 @@ export type BookLevel = {
   baseAmount: number;
   quoteAmount: number;
   ownerAddress: string;
+  askToken: TokenRef;
+  askBalanceAtoms: string;
 };
 
 export type SyntheticBook = {
@@ -113,6 +123,7 @@ export type StrategyAction =
       reason: string;
       orderId: string;
       amount: number;
+      exactAmount?: string;
       price: number;
       expectedBaseAmount: number;
       expectedQuoteAmount: number;
@@ -138,7 +149,7 @@ export type ExecutionRequest =
       id: string;
       kind: 'fill-order';
       orderId: string;
-      amount: number;
+      amount: string | number;
       destination: string;
       description: string;
       idempotencyKey: string;
@@ -164,6 +175,8 @@ export type ExecutionRecord = {
   updatedAt: number;
   txId?: string;
   signedHex?: string;
+  /** Wallet UTXO inputs used to assemble this transaction, for retry safety. */
+  inputOutpoints?: string[];
   error?: string;
   broadcastResponse?: unknown;
   tradeMeta?: {
@@ -209,6 +222,8 @@ export type BranchPreparationPlan = {
   targetBranchCount: number;
   perBranchAmount: number;
   destination: string;
+  /** Existing spendable UTXOs that can be used as branches for the source asset. */
+  availableBranches: BranchInfo[];
   actions: ExecutionRequest[];
   warnings: string[];
 };

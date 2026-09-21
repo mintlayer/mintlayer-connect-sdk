@@ -23,10 +23,13 @@ export function analyzeBranches(snapshot: WalletSnapshot | null, maxDepth: numbe
     return [];
   }
 
-  return snapshot.utxos
-    .filter((utxo) => utxo.status === 'confirmed' || utxo.status === 'unconfirmed')
+  // `availableUtxos` is the same de-duplicated, safe-to-spend set supplied to
+  // the transaction builder. In particular, API UTXOs are confirmed with a
+  // depth of zero, so a confirmation ends the old mempool chain rather than
+  // permanently consuming its depth budget.
+  return snapshot.availableUtxos
     .map((utxo, index) => {
-      const depth = utxo.unconfirmedChainDepth;
+      const depth = utxo.status === 'confirmed' ? 0 : utxo.unconfirmedChainDepth;
       const remainingDepth = Math.max(0, maxDepth - depth);
       const warning =
         remainingDepth <= 0
@@ -43,7 +46,7 @@ export function analyzeBranches(snapshot: WalletSnapshot | null, maxDepth: numbe
         amountAtoms: amountAtoms(utxo),
         depth,
         remainingDepth,
-        reserved: utxo.status === 'spent_pending',
+        reserved: false,
         warning,
       };
     })
@@ -59,22 +62,26 @@ export function createBranchPreparationPlan(args: {
   sourceAsset: TokenRef;
   targetBranchCount: number;
   perBranchAmount: number;
+  maxUnconfirmedBranchDepth: number;
 }): BranchPreparationPlan {
-  const { snapshot, sourceAsset, targetBranchCount, perBranchAmount } = args;
+  const { snapshot, sourceAsset, targetBranchCount, perBranchAmount, maxUnconfirmedBranchDepth } = args;
   const destination = snapshot?.addresses.receiving[0] ?? '';
   const warnings: string[] = [];
   const actions: ExecutionRequest[] = [];
 
   if (!snapshot || !destination) {
     warnings.push('Initialize the wallet before preparing branches.');
-    return { sourceAsset, targetBranchCount, perBranchAmount, destination, actions, warnings };
+    return { sourceAsset, targetBranchCount, perBranchAmount, destination, availableBranches: [], actions, warnings };
   }
 
-  const existingBranches = analyzeBranches(snapshot, Number.MAX_SAFE_INTEGER).filter((branch) => branch.asset === sourceAsset);
+  const availableBranches = analyzeBranches(snapshot, maxUnconfirmedBranchDepth).filter(
+    (branch) => branch.asset === sourceAsset && branch.remainingDepth > 0 && !branch.reserved,
+  );
+  const existingBranches = availableBranches;
   const missingBranches = Math.max(0, targetBranchCount - existingBranches.length);
 
   if (missingBranches === 0) {
-    warnings.push('Requested branch count is already available in local wallet state.');
+    warnings.push('Requested branch count is already available from spendable UTXOs.');
   }
 
   if (perBranchAmount <= 0) {
@@ -103,6 +110,7 @@ export function createBranchPreparationPlan(args: {
     targetBranchCount,
     perBranchAmount,
     destination,
+    availableBranches,
     actions,
     warnings,
   };

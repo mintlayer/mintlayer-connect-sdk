@@ -121,8 +121,8 @@ main {
   flex: 1;
   gap: 0.6rem;
   grid-template-areas:
-    "wallet wallet strategy strategy transactions trades"
-    "book book branches branches branches branches";
+    "wallet wallet strategy strategy simulator trades"
+    "book book branches branches transactions transactions";
   grid-template-columns: repeat(6, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   min-height: 0;
@@ -145,6 +145,23 @@ main {
 
 .strategyPanel {
   grid-area: strategy;
+}
+
+.manualQuoteControls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: -0.1rem 0 0.65rem;
+}
+
+.manualQuoteControls .muted {
+  flex-basis: 100%;
+  font-size: 0.78rem;
+}
+
+.fillSimulationPanel {
+  grid-area: simulator;
 }
 
 .transactionPanel {

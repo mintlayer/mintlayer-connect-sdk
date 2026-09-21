@@ -90,6 +90,7 @@ Create a `.env` file:
 VITE_NETWORK=testnet
 
 VITE_API_URL=
+VITE_BATCH_API_URL=
 VITE_API_KEY=
 
 VITE_WALLET_SEED=your-testnet-mnemonic
@@ -98,6 +99,7 @@ VITE_PAIR=HUG/ML
 VITE_BASE_TOKEN=token_id_for_HUG
 VITE_QUOTE_TOKEN=Coin
 VITE_ORDER_SIZE=0.01
+VITE_REFERENCE_PRICE=1
 VITE_SPREAD_BPS=20
 VITE_INVENTORY_TARGET=0.5
 VITE_REBALANCE_THRESHOLD=0.1
@@ -106,11 +108,15 @@ VITE_MAX_POSITION=1.0
 VITE_MAX_ORDERS=10
 VITE_MAX_UNCONFIRMED_BRANCH_DEPTH=24
 VITE_ALLOW_MAINNET_BROADCAST=false
+VITE_SIMULATE_OWN_FILLS=false
+VITE_SIMULATION_TRADE_TIMEOUT_MS=60000
 ```
 
 Important: a `VITE_WALLET_SEED` value is bundled into browser code. Use this only for testnet/demo wallets. Production unattended bots should keep signing keys outside the browser.
 
 Token configuration uses SDK currency ids. Set `VITE_BASE_TOKEN` / `VITE_QUOTE_TOKEN` to `Coin` for ML or to the actual Mintlayer token id for tokens. Tickers such as `HUG` are display labels only and will not match balances returned by `client.getBalances()`.
+
+`VITE_API_URL` supplies balances and market data. `VITE_BATCH_API_URL` must point to the Mojito-compatible `/batch` service for the *same chain/indexer*, because it supplies the UTXOs used to fund transactions. When using a custom API server, set both; otherwise the bot can display a large balance from one source while assembling transactions from another source's small UTXO set.
 
 ---
 
@@ -169,7 +175,8 @@ The bot continuously:
 
 - React SPA scaffold, SDK initialization, and testnet mnemonic mode are implemented.
 - Wallet, balance, local UTXO, orderbook, own order, strategy proposal, transaction queue, and UTXO branch panels are implemented.
-- Strategy proposals run as dry-run by default. Disabling dry-run allows signing and optional broadcasting through the SDK.
+- Strategy proposals run as dry-run by default. Signing a preview does not reserve UTXOs; only a broadcast attempt reserves its selected inputs while it is pending.
+- The Liquidity Simulation panel can drive a testnet lifecycle of quote, self-fill, and conclude/requote. It is disabled by default and runs only while the loop is active, Dry run is off, and broadcasting is enabled.
 - UTXO branch preparation is guarded and warns when multiple branch preparation transactions should be prepared one at a time.
 - Production unattended signing should move out of the browser before mainnet use.
 

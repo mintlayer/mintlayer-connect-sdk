@@ -933,7 +933,7 @@ type BuildTransactionParams =
       type: 'FillOrder';
       params: {
         order_id: string;
-        amount: number;
+        amount: string | number;
         destination: string;
         order_details: OrderData;
         ask_token_details: TokenDetails;
@@ -1083,7 +1083,7 @@ export type CreateOrderArgs = {
 
 export type FillOrderArgs = {
   order_id: string;
-  amount: number;
+  amount: string | number;
   destination: string;
 };
 

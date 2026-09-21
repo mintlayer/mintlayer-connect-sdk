@@ -81,6 +81,17 @@ export function ConfigPanel(props: ConfigPanelProps) {
           />
         </label>
         <label>
+          Reference Price
+          <input
+            type="number"
+            min="0"
+            step="0.00000001"
+            value={config.referencePrice}
+            onChange={(event) => setConfig(setNumber(config, 'referencePrice', event.target.value))}
+          />
+          <small className="fieldHint">Used to seed quotes when the book is empty.</small>
+        </label>
+        <label>
           Spread BPS
           <input
             type="number"
@@ -416,6 +427,9 @@ export function StrategyPanel(props: {
   actions: StrategyAction[];
   tokenLabels: TokenLabelMap;
   onExecute: (action: StrategyAction) => void;
+  onCreateManualOrder: (side: 'bid' | 'ask') => void;
+  manualReferencePrice: number;
+  canCreateManualOrder: boolean;
   dryRun: boolean;
 }) {
   return (
@@ -423,6 +437,15 @@ export function StrategyPanel(props: {
       <div className="panelHeader">
         <h2>Strategy Proposals</h2>
         <span className="badge">{props.actions.length} actions</span>
+      </div>
+      <div className="manualQuoteControls">
+        <span className="muted">Manual quote reference: {props.manualReferencePrice.toFixed(8)}</span>
+        <button className="secondary" disabled={!props.canCreateManualOrder} onClick={() => props.onCreateManualOrder('bid')}>
+          Create bid −5%
+        </button>
+        <button className="secondary" disabled={!props.canCreateManualOrder} onClick={() => props.onCreateManualOrder('ask')}>
+          Create ask +5%
+        </button>
       </div>
       <div className="list">
         {props.actions.map((action) => (
@@ -438,6 +461,60 @@ export function StrategyPanel(props: {
         ))}
         {props.actions.length === 0 && <p className="muted">No strategy actions. Initialize and refresh market data.</p>}
       </div>
+    </section>
+  );
+}
+
+export function FillSimulationPanel(props: {
+  config: MarketMakerConfig;
+  setConfig: Dispatch<SetStateAction<MarketMakerConfig>>;
+  running: boolean;
+  dryRun: boolean;
+  broadcastEnabled: boolean;
+  records: ExecutionRecord[];
+}) {
+  const simulatedRecords = props.records.filter((record) => record.idempotencyKey.startsWith('simulation-'));
+  const lastRecord = simulatedRecords[0];
+  const live = props.running && props.config.simulateOwnFills && !props.dryRun && props.broadcastEnabled;
+
+  return (
+    <section className="panel fillSimulationPanel">
+      <div className="panelHeader">
+        <h2>Liquidity Simulation</h2>
+        <span className="badge">{live ? 'live' : 'standby'}</span>
+      </div>
+      <p className="muted">
+        On each bot cycle, the simulator places a quote, takes one of this wallet&apos;s orders, then concludes the
+        remaining order before quoting again. These fills are broadcast transactions, not strategy proposals.
+      </p>
+      <label className="switchLabel">
+        <input
+          type="checkbox"
+          checked={props.config.simulateOwnFills}
+          onChange={(event) => props.setConfig({ ...props.config, simulateOwnFills: event.target.checked })}
+        />
+        Simulate and self-fill own orders
+      </label>
+      <label>
+        Settlement timeout (seconds)
+        <input
+          type="number"
+          min="5"
+          step="1"
+          value={Math.floor(props.config.simulationTradeTimeoutMs / 1_000)}
+          onChange={(event) =>
+            props.setConfig(setNumber(props.config, 'simulationTradeTimeoutMs', String(Number(event.target.value) * 1_000)))
+          }
+        />
+        <small className="fieldHint">Wait before concluding a partially self-filled order.</small>
+      </label>
+      {!props.running && <p className="muted">Start Loop to run the lifecycle.</p>}
+      {(props.dryRun || !props.broadcastEnabled) && props.config.simulateOwnFills && (
+        <p className="warningText">Turn off Dry run and enable broadcasting before starting; otherwise no fills are sent.</p>
+      )}
+      {lastRecord && (
+        <p className="muted">Latest simulator action: {lastRecord.kind} · {lastRecord.status}</p>
+      )}
     </section>
   );
 }
@@ -513,8 +590,12 @@ export function BranchPanel(props: {
     <section className="panel branchPanel">
       <div className="panelHeader">
         <h2>UTXO Branches</h2>
-        <span className="badge">{props.branches.length} branches</span>
+        <span className="badge">{props.branches.length} available UTXOs</span>
       </div>
+      <p className="muted">
+        These are the UTXOs currently safe for transaction building. The depth limit applies only while an output is
+        unconfirmed in the mempool; confirmed UTXOs restart at depth 0 and can be used again.
+      </p>
       <div className="branchGrid">
         {props.branches.map((branch) => (
           <div className="branchCard" key={branch.outpoint}>
@@ -534,6 +615,22 @@ export function BranchPanel(props: {
         <p className="muted">
           Source asset: {formatTokenLabel(props.plan.sourceAsset, props.tokenLabels)} ({props.plan.perBranchAmount} per branch)
         </p>
+        <p className="muted">
+          {props.plan.availableBranches.length} of {props.plan.targetBranchCount} requested branches are already available.
+        </p>
+        {props.plan.availableBranches.length > 0 && (
+          <div className="list">
+            {props.plan.availableBranches.map((branch) => (
+              <div className="listItem" key={branch.outpoint}>
+                <div>
+                  <strong>Use existing UTXO</strong>
+                  <p>{branch.amountAtoms} atoms · {branch.status} · depth {branch.depth}</p>
+                  <code>{branch.outpoint}</code>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {props.plan.warnings.map((warning) => (
           <p className="warningText" key={warning}>{warning}</p>
         ))}

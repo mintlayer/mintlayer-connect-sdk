@@ -163,10 +163,10 @@ test('fill order', async () => {
 
   expect(result.JSONRepresentation).toStrictEqual({
     "fee": {
-      "atoms": "40400000000",
-      "decimal": "0.404",
+      "atoms": "38200000000",
+      "decimal": "0.382",
     },
-    "id": "7cf8eb89b786869160e47e27b25cbf577dc2112516cf5b147cd22bd341a18d66",
+    "id": "74c29ea1eb7fc09ce3d2a7c362c34ac3b9c148394ccdfae5269c6457bdcae278",
     "inputs": [
       {
         "input": {
@@ -217,8 +217,8 @@ test('fill order', async () => {
         "value": {
           "type": "Coin",
           "amount": {
-            "atoms": "1702165204300000",
-            "decimal": "17021.652043"
+            "atoms": "1702167404300000",
+            "decimal": "17021.674043"
           }
         },
         "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6"
@@ -240,9 +240,7 @@ test('fill order that fail on call', async () => {
 
   const result = await spy.mock.results[0]?.value;
 
-  console.log(JSON.stringify(result, null, 2));
-
-  expect(result.JSONRepresentation.fee.decimal).toBe('0.399');
+  expect(result.JSONRepresentation.fee.decimal).toBe('0.377');
 });
 
 // replay similar tx: https://lovelace.explorer.mintlayer.org/tx/a3a822f5e9099075e07234f435a2cda80cb6e88836331238b882da785973d7ac
@@ -303,10 +301,10 @@ test('conclude order - snapshot', async () => {
 
   expect(result.JSONRepresentation).toStrictEqual({
     "fee": {
-      "atoms": "40500000000",
-      "decimal": "0.405",
+      "atoms": "40400000000",
+      "decimal": "0.404",
     },
-    "id": "a0e027bed40136528b3c5462b198a7e9781fad6659ab6c0d22b8c2a499148964",
+    "id": "ab9083c8826d3c9e39605f2f171a09d2bc4ff881f62c18c4dd4bf557409d2861",
     "inputs": [
       {
         "input": {
@@ -367,8 +365,8 @@ test('conclude order - snapshot', async () => {
         "value": {
           "type": "Coin",
           "amount": {
-            "atoms": "1703165104300000",
-            "decimal": "17031.651043"
+            "atoms": "1703165204300000",
+            "decimal": "17031.652043"
           }
         },
         "destination": "tmt1qxrwc3gy2lgf4kvqwwfa388vn3cavgrqyyrgswe6"

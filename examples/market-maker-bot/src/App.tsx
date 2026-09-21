@@ -3,6 +3,7 @@ import { useState } from 'react';
 import {
   BranchPanel,
   ConfigPanel,
+  FillSimulationPanel,
   OrderBookPanel,
   StrategyPanel,
   TradesPanel,
@@ -29,6 +30,7 @@ export default function App() {
     stopLoop,
     resetLocalState,
     executeStrategyAction,
+    createManualOrder,
     concludeOrder,
     executePreparationAction,
   } = useMarketMakerBot();
@@ -102,7 +104,18 @@ export default function App() {
           actions={state.actions}
           tokenLabels={state.tokenLabels}
           dryRun={state.dryRun}
+          manualReferencePrice={state.manualReferencePrice}
+          canCreateManualOrder={initialized && state.manualReferencePrice > 0 && state.config.orderSize > 0}
           onExecute={(action) => void executeStrategyAction(action)}
+          onCreateManualOrder={(side) => void createManualOrder(side)}
+        />
+        <FillSimulationPanel
+          config={state.config}
+          setConfig={setConfig}
+          running={running}
+          dryRun={state.dryRun}
+          broadcastEnabled={state.broadcastEnabled}
+          records={state.records}
         />
         <TransactionPanel records={state.records} />
         <TradesPanel trades={state.trades} tokenLabels={state.tokenLabels} baseToken={state.config.baseToken} />

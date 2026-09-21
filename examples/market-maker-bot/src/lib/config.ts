@@ -6,6 +6,7 @@ const DEFAULT_CONFIG: MarketMakerConfig = {
   baseToken: 'HUG',
   quoteToken: 'Coin',
   orderSize: 0.01,
+  referencePrice: 1,
   spreadBps: 20,
   inventoryTarget: 0.5,
   rebalanceThreshold: 0.1,
@@ -16,6 +17,8 @@ const DEFAULT_CONFIG: MarketMakerConfig = {
   allowMainnetBroadcast: false,
   enableFillTrading: true,
   allowSelfFills: false,
+  simulateOwnFills: false,
+  simulationTradeTimeoutMs: 60_000,
 };
 
 function optionalString(value: unknown): string | undefined {
@@ -47,12 +50,14 @@ export function loadConfigFromEnv(env: ImportMetaEnv = import.meta.env): MarketM
   return {
     network: networkFromEnv(env.VITE_NETWORK),
     apiUrl: optionalString(env.VITE_API_URL),
+    batchApiUrl: optionalString(env.VITE_BATCH_API_URL),
     apiKey: optionalString(env.VITE_API_KEY),
     walletSeed: optionalString(env.VITE_WALLET_SEED),
     pair: optionalString(env.VITE_PAIR) ?? DEFAULT_CONFIG.pair,
     baseToken: optionalString(env.VITE_BASE_TOKEN) ?? DEFAULT_CONFIG.baseToken,
     quoteToken: optionalString(env.VITE_QUOTE_TOKEN) ?? DEFAULT_CONFIG.quoteToken,
     orderSize: numberFromEnv(env.VITE_ORDER_SIZE, DEFAULT_CONFIG.orderSize),
+    referencePrice: numberFromEnv(env.VITE_REFERENCE_PRICE, DEFAULT_CONFIG.referencePrice),
     spreadBps: numberFromEnv(env.VITE_SPREAD_BPS, DEFAULT_CONFIG.spreadBps),
     inventoryTarget: numberFromEnv(env.VITE_INVENTORY_TARGET, DEFAULT_CONFIG.inventoryTarget),
     rebalanceThreshold: numberFromEnv(env.VITE_REBALANCE_THRESHOLD, DEFAULT_CONFIG.rebalanceThreshold),
@@ -66,6 +71,11 @@ export function loadConfigFromEnv(env: ImportMetaEnv = import.meta.env): MarketM
     allowMainnetBroadcast: booleanFromEnv(env.VITE_ALLOW_MAINNET_BROADCAST, DEFAULT_CONFIG.allowMainnetBroadcast),
     enableFillTrading: booleanFromEnv(env.VITE_ENABLE_FILL_TRADING, DEFAULT_CONFIG.enableFillTrading),
     allowSelfFills: booleanFromEnv(env.VITE_ALLOW_SELF_FILLS, DEFAULT_CONFIG.allowSelfFills),
+    simulateOwnFills: booleanFromEnv(env.VITE_SIMULATE_OWN_FILLS, DEFAULT_CONFIG.simulateOwnFills),
+    simulationTradeTimeoutMs: Math.max(
+      5_000,
+      Math.floor(numberFromEnv(env.VITE_SIMULATION_TRADE_TIMEOUT_MS, DEFAULT_CONFIG.simulationTradeTimeoutMs)),
+    ),
   };
 }
 
@@ -74,6 +84,12 @@ export function validateConfig(config: MarketMakerConfig): string[] {
 
   if (!config.walletSeed) {
     warnings.push('VITE_WALLET_SEED is missing. The app can render, but SDK initialization will fail.');
+  }
+
+  if (config.apiUrl && !config.batchApiUrl) {
+    warnings.push(
+      'VITE_API_URL is custom but VITE_BATCH_API_URL is not set. Balance and spendable-UTXO data can come from different indexers.',
+    );
   }
 
   if (config.network === 'mainnet' && !config.allowMainnetBroadcast) {
@@ -88,6 +104,14 @@ export function validateConfig(config: MarketMakerConfig): string[] {
     warnings.push('Order size must be positive.');
   }
 
+  if (config.referencePrice <= 0) {
+    warnings.push('Reference price must be positive.');
+  }
+
+  if (config.simulationTradeTimeoutMs < 5_000) {
+    warnings.push('Liquidity simulation timeout must be at least 5 seconds.');
+  }
+
   if (config.inventoryTarget < 0 || config.inventoryTarget > 1) {
     warnings.push('Inventory target should be between 0 and 1.');
   }
@@ -100,6 +124,7 @@ export function updateConfigNumber(
   key: keyof Pick<
     MarketMakerConfig,
     | 'orderSize'
+    | 'referencePrice'
     | 'spreadBps'
     | 'inventoryTarget'
     | 'rebalanceThreshold'
@@ -107,6 +132,7 @@ export function updateConfigNumber(
     | 'maxOrders'
     | 'pollIntervalMs'
     | 'maxUnconfirmedBranchDepth'
+    | 'simulationTradeTimeoutMs'
   >,
   value: string,
 ): MarketMakerConfig {

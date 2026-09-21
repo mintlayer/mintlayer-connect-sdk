@@ -31,6 +31,15 @@ function getTxJson(tx: BuiltTransaction) {
   return tx.JSONRepresentation;
 }
 
+function getUtxoInputOutpoints(tx: BuiltTransaction): string[] {
+  return tx.JSONRepresentation.inputs.flatMap((entry) => {
+    const input = (entry as { input?: { input_type?: string; source_id?: string; index?: number } }).input;
+    return input?.input_type === 'UTXO' && input.source_id !== undefined && input.index !== undefined
+      ? [`${input.source_id}:${input.index}`]
+      : [];
+  });
+}
+
 export function strategyActionToRequest(action: StrategyAction, destination: string): ExecutionRequest {
   if (action.kind === 'conclude-order') {
     return {
@@ -47,7 +56,7 @@ export function strategyActionToRequest(action: StrategyAction, destination: str
       id: `exec:${action.id}`,
       kind: 'fill-order',
       orderId: action.orderId,
-      amount: action.amount,
+      amount: action.exactAmount ?? action.amount,
       destination,
       description: action.reason,
       idempotencyKey: action.id,
@@ -136,7 +145,6 @@ export async function executeRequest(args: {
     const tx = await buildTransaction(client, request, availableUtxos);
     const signedHex = await (client as unknown as { signTransaction(tx: BuiltTransaction): Promise<string> }).signTransaction(tx);
     const txJson = getTxJson(tx);
-    await walletState.applyLocalTx(tx);
 
     const signedRecord: ExecutionRecord = {
       ...record,
@@ -144,14 +152,21 @@ export async function executeRequest(args: {
       updatedAt: now(),
       txId: txJson.id,
       signedHex,
+      inputOutpoints: getUtxoInputOutpoints(tx),
       tradeMeta,
     };
 
     if (!broadcast) {
+      // A signing preview is not a submitted transaction. Recording it in
+      // WalletState would mark its inputs spent_pending and can strand the
+      // wallet's large funding UTXO behind a preview.
       return signedRecord;
     }
 
     try {
+      // Reserve immediately before submitting so concurrent bot cycles cannot
+      // reuse an input while the request is in flight.
+      await walletState.applyLocalTx(tx);
       const broadcastResponse = await client.broadcastTx(signedHex);
       await walletState.applyMempoolTx(tx);
       return {
