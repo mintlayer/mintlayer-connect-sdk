@@ -5,7 +5,7 @@ import { createBotClient } from '../lib/client';
 import { loadConfigFromEnv, validateConfig } from '../lib/config';
 import { executeRequest, mergeRecords, strategyActionToRequest } from '../lib/execution';
 import { buildSyntheticBook, isOwnOrder } from '../lib/orderBook';
-import { fetchPairOrders, getPairOrdersPath } from '../lib/orders';
+import { fetchPairOrders } from '../lib/orders';
 import { planAllStrategyActions } from '../lib/strategy';
 import { listTrades } from '../lib/trades';
 import { analyzeBranches, createBranchPreparationPlan } from '../lib/utxoBranches';
@@ -149,9 +149,20 @@ export function useMarketMakerBot() {
       const addresses = client.getAddresses();
       const nextWalletState = await createWalletStateForAddresses(addresses);
       const walletSnapshot = await loadWalletSnapshot(client, nextWalletState, config.maxUnconfirmedBranchDepth);
+      const [pairOrders, accountOrders] = await Promise.all([fetchPairOrders(config), client.getAccountOrders()]);
+
+      const typedOrders = pairOrders as MarketOrder[];
+      const typedOwnOrders =
+        accountOrders.length > 0
+          ? (accountOrders as MarketOrder[]).filter((order) =>
+              typedOrders.some((pairOrder) => pairOrder.order_id === order.order_id),
+            )
+          : typedOrders.filter((order) => isOwnOrder(order, walletSnapshot.addresses));
 
       setWalletState(nextWalletState);
       setWallet(walletSnapshot);
+      setOrders(typedOrders);
+      setOwnOrders(typedOwnOrders);
 
       const branchSnapshot = analyzeBranches(walletSnapshot, config.maxUnconfirmedBranchDepth);
       const labels = await loadTokenLabels(
