@@ -50,8 +50,9 @@ export function planStrategyActions(args: {
   book: SyntheticBook;
   ownOrders: MarketOrder[];
   wallet: WalletSnapshot | null;
+  quoteLevelOffset?: number;
 }): StrategyAction[] {
-  const { config, book, ownOrders, wallet } = args;
+  const { config, book, ownOrders, wallet, quoteLevelOffset = 0 } = args;
   const actions: StrategyAction[] = [];
   const addresses = wallet?.addresses;
   const concludeDestination = addresses?.receiving[0];
@@ -66,6 +67,10 @@ export function planStrategyActions(args: {
   const bidPrice = book.midPrice * (1 - halfSpread - inventorySkew * config.rebalanceThreshold);
   const askPrice = book.midPrice * (1 + halfSpread - inventorySkew * config.rebalanceThreshold);
   const activeBudget = Math.max(0, config.maxOrders - ownOrders.length);
+  // Keep several price levels queued for each side. Apart from providing a
+  // more useful market-making ladder, this means applying one proposal still
+  // leaves other independent proposals ready to review and execute.
+  const quoteLevels = 3;
 
   if (ownOrders.length > config.maxOrders) {
     for (const order of ownOrders.slice(config.maxOrders)) {
@@ -82,38 +87,48 @@ export function planStrategyActions(args: {
     return actions;
   }
 
-  if (inventory.baseBalance < config.maxPosition && inventory.quoteBalance > config.orderSize * bidPrice) {
-    actions.push({
-      id: stableId(['bid', config.pair, bidPrice.toFixed(8), config.orderSize]),
-      kind: 'create-order',
-      side: 'bid',
-      price: bidPrice,
-      reason: 'Quote below mid price to acquire base asset while respecting inventory limits.',
-      args: {
-        conclude_destination: concludeDestination,
-        ask_token: config.baseToken,
-        ask_amount: config.orderSize,
-        give_token: config.quoteToken,
-        give_amount: config.orderSize * bidPrice,
-      },
-    });
-  }
+  for (let level = 0; level < quoteLevels; level += 1) {
+    // Each extra level is one half-spread farther from the top quote.
+    const quoteLevel = quoteLevelOffset + level;
+    const levelOffset = quoteLevel * halfSpread;
 
-  if (inventory.baseBalance >= config.orderSize) {
-    actions.push({
-      id: stableId(['ask', config.pair, askPrice.toFixed(8), config.orderSize]),
-      kind: 'create-order',
-      side: 'ask',
-      price: askPrice,
-      reason: 'Quote above mid price to sell base asset while keeping exposure bounded.',
-      args: {
-        conclude_destination: concludeDestination,
-        ask_token: config.quoteToken,
-        ask_amount: config.orderSize * askPrice,
-        give_token: config.baseToken,
-        give_amount: config.orderSize,
-      },
-    });
+    if (inventory.baseBalance < config.maxPosition) {
+      const levelBidPrice = bidPrice * (1 - levelOffset);
+      if (inventory.quoteBalance > config.orderSize * levelBidPrice) {
+        actions.push({
+          id: stableId(['bid', config.pair, quoteLevel + 1, levelBidPrice.toFixed(8), config.orderSize]),
+          kind: 'create-order',
+          side: 'bid',
+          price: levelBidPrice,
+          reason: `Bid level ${quoteLevel + 1}: acquire base below mid price while respecting inventory limits.`,
+          args: {
+            conclude_destination: concludeDestination,
+            ask_token: config.baseToken,
+            ask_amount: config.orderSize,
+            give_token: config.quoteToken,
+            give_amount: config.orderSize * levelBidPrice,
+          },
+        });
+      }
+    }
+
+    if (inventory.baseBalance >= config.orderSize) {
+      const levelAskPrice = askPrice * (1 + levelOffset);
+      actions.push({
+        id: stableId(['ask', config.pair, quoteLevel + 1, levelAskPrice.toFixed(8), config.orderSize]),
+        kind: 'create-order',
+        side: 'ask',
+        price: levelAskPrice,
+        reason: `Ask level ${quoteLevel + 1}: sell base above mid price while keeping exposure bounded.`,
+        args: {
+          conclude_destination: concludeDestination,
+          ask_token: config.quoteToken,
+          ask_amount: config.orderSize * levelAskPrice,
+          give_token: config.baseToken,
+          give_amount: config.orderSize,
+        },
+      });
+    }
   }
 
   return actions.slice(0, activeBudget);
@@ -197,6 +212,7 @@ export function planAllStrategyActions(args: {
   book: SyntheticBook;
   ownOrders: MarketOrder[];
   wallet: WalletSnapshot | null;
+  quoteLevelOffset?: number;
 }): StrategyAction[] {
   return [...planFillActions(args), ...planStrategyActions(args)];
 }

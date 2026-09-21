@@ -82,6 +82,7 @@ export function useMarketMakerBot() {
   const [records, setRecords] = useState<ExecutionRecord[]>([]);
   const [broadcastEnabled, setBroadcastEnabled] = useState(false);
   const [dryRun, setDryRun] = useState(true);
+  const [quoteLevelOffset, setQuoteLevelOffset] = useState(0);
   const [lastCycleAt, setLastCycleAt] = useState<number | null>(null);
   const [tokenLabels, setTokenLabels] = useState<TokenLabelMap>({
     Coin: { tokenId: 'Coin', ticker: 'ML', decimals: 11 },
@@ -90,10 +91,17 @@ export function useMarketMakerBot() {
 
   const configWarnings = useMemo(() => validateConfig(config), [config]);
   const book = useMemo(() => buildSyntheticBook(orders, config.baseToken, config.quoteToken), [orders, config]);
-  const actions = useMemo(
-    () => planAllStrategyActions({ config, book, ownOrders, wallet }),
-    [book, config, ownOrders, wallet],
-  );
+  const actions = useMemo(() => {
+    const appliedActionIds = new Set(
+      records
+        .filter((record) => record.status !== 'rejected')
+        .map((record) => record.idempotencyKey),
+    );
+
+    return planAllStrategyActions({ config, book, ownOrders, wallet, quoteLevelOffset }).filter(
+      (action) => !appliedActionIds.has(action.id),
+    );
+  }, [book, config, ownOrders, quoteLevelOffset, records, wallet]);
   const trades = useMemo(() => listTrades(records), [records]);
   const branches = useMemo(
     () => analyzeBranches(wallet, config.maxUnconfirmedBranchDepth),
@@ -204,13 +212,15 @@ export function useMarketMakerBot() {
         request,
         config,
         broadcast: forceBroadcast && !dryRun,
+        availableUtxos: wallet?.availableUtxos ?? [],
         tradeMeta: request.kind === 'fill-order' ? request.tradeMeta : undefined,
       });
 
       setRecords((current) => mergeRecords(current, record));
       await refresh();
+      return record;
     },
-    [broadcastEnabled, config, dryRun, records, refresh, runtime.client, walletState],
+    [broadcastEnabled, config, dryRun, records, refresh, runtime.client, wallet?.availableUtxos, walletState],
   );
 
   const executeStrategyAction = useCallback(
@@ -220,7 +230,13 @@ export function useMarketMakerBot() {
         return;
       }
 
-      await execute(strategyActionToRequest(action, destination));
+      const record = await execute(strategyActionToRequest(action, destination));
+      // Advance after both previews and successful broadcasts. The market API
+      // can take a cycle to reflect a broadcast, so relying only on refreshed
+      // own orders leaves the proposal box empty in the meantime.
+      if (record?.status !== 'rejected') {
+        setQuoteLevelOffset((current) => current + 3);
+      }
     },
     [execute, wallet?.addresses.receiving],
   );

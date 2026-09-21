@@ -41,6 +41,10 @@ export type WalletSnapshot = {
     token: Record<string, number>;
   } | null;
   localBalance: WalletBalance | null;
+  /** Confirmed outputs currently reported by the network API. */
+  networkUtxos: WalletUtxo[];
+  /** Confirmed network outputs plus safe wallet-created unconfirmed outputs. */
+  availableUtxos: WalletUtxo[];
   utxos: WalletUtxo[];
   spendableUtxos: WalletUtxo[];
   transactions: WalletTx[];

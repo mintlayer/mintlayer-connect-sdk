@@ -196,8 +196,16 @@ export function WalletPanel(props: {
           <strong>{(inventory.baseShare * 100).toFixed(2)}%</strong>
         </div>
         <div>
-          <span>Local UTXOs</span>
-          <strong>{wallet?.utxos.length ?? 0}</strong>
+          <span>Available UTXOs</span>
+          <strong>{wallet?.availableUtxos.length ?? 0}</strong>
+        </div>
+        <div>
+          <span>Network UTXOs</span>
+          <strong>{wallet?.networkUtxos.length ?? 0}</strong>
+        </div>
+        <div>
+          <span>Internal UTXOs</span>
+          <strong>{wallet?.spendableUtxos.filter((utxo) => utxo.status === 'unconfirmed').length ?? 0}</strong>
         </div>
       </div>
       <div className="addressBlock">

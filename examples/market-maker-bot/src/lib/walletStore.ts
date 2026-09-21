@@ -4,6 +4,7 @@ import {
   type SyncCursor,
   type WalletTx,
   type WalletTxStore,
+  type WalletUtxo,
 } from '@mintlayer/sdk';
 
 import type { Client } from '@mintlayer/sdk';
@@ -146,10 +147,56 @@ export async function loadWalletSnapshot(
     sdkBalances = null;
   }
 
+  let networkUtxos: WalletUtxo[] = [];
+  try {
+    const networkEntries = await client.getAccountUtxos();
+    networkUtxos = networkEntries.map((entry) => ({
+      ...entry,
+      txId: entry.outpoint.source_id,
+      outputIndex: entry.outpoint.index,
+      status: 'confirmed' as const,
+      txState: 'confirmed' as const,
+      unconfirmedChainDepth: 0,
+    }));
+  } catch {
+    // Keep locally persisted outputs usable if the network API is temporarily unavailable.
+  }
+
+  const transactions = await createLocalStorageWalletTxStore(getAccountId(addresses)).getTransactions(getAccountId(addresses));
+  const reservedNetworkOutpoints = new Set(
+    transactions
+      .filter((tx) => !['rejected', 'conflicted', 'orphaned'].includes(tx.state))
+      .flatMap((tx) => {
+        const txJson = 'JSONRepresentation' in tx.tx ? tx.tx.JSONRepresentation : tx.tx;
+        return txJson.inputs
+          .map((input: any) => input?.input)
+          .filter((input: any) => input?.input_type === 'UTXO')
+          .map((input: any) => `${input.source_id}:${input.index}`);
+      }),
+  );
+  const spendableUtxos = walletState.getSpendableUtxos({
+    allowUnconfirmed: true,
+    allowOwnChangeOnly: true,
+    maxUnconfirmedChainDepth: maxUnconfirmedBranchDepth,
+  });
+  // A transaction may appear in both sources once the API observes it. Prefer
+  // the network entry then so its confirmed status wins, and never hand the
+  // assembler the same outpoint twice.
+  const availableUtxos = Array.from(
+    new Map(
+      [
+        ...spendableUtxos,
+        ...networkUtxos.filter((utxo) => !reservedNetworkOutpoints.has(`${utxo.txId}:${utxo.outputIndex}`)),
+      ].map((utxo) => [`${utxo.txId}:${utxo.outputIndex}`, utxo]),
+    ).values(),
+  );
+
   return {
     addresses,
     sdkBalances,
     localBalance: walletState.getBalance({ includeUnconfirmed: true }),
+    networkUtxos,
+    availableUtxos,
     utxos: walletState.getUtxos({
       includeSpent: true,
       includeRejected: true,
@@ -157,11 +204,7 @@ export async function loadWalletSnapshot(
       includeOrphaned: true,
       includeUnconfirmed: true,
     }),
-    spendableUtxos: walletState.getSpendableUtxos({
-      allowUnconfirmed: true,
-      allowOwnChangeOnly: true,
-      maxUnconfirmedChainDepth: maxUnconfirmedBranchDepth,
-    }),
-    transactions: await createLocalStorageWalletTxStore(getAccountId(addresses)).getTransactions(getAccountId(addresses)),
+    spendableUtxos,
+    transactions,
   };
 }

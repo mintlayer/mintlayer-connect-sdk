@@ -765,7 +765,8 @@ type TransferParams =
       token_details?: undefined;
     };
 
-type TransactionOpts = {
+/** Options controlling UTXO selection while assembling a transaction. */
+export type TransactionOpts = {
   withUTXO?: UtxoEntry[];
   forceSpendUtxo?: UtxoEntry[];
 };
@@ -1519,6 +1520,17 @@ class Client {
     } catch (error) {
       throw new Error(`API error: ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * Returns UTXOs currently reported as spendable by the network for all
+   * connected receiving and change addresses. These are network-confirmed
+   * inputs; callers may combine them with locally tracked mempool outputs.
+   */
+  async getAccountUtxos(): Promise<UtxoEntry[]> {
+    this.ensureInitialized();
+    const addresses = [...this.connectedAddresses.receiving, ...this.connectedAddresses.change];
+    return this.apiProvider.getAccountUtxos(addresses, this.network === 'mainnet' ? 0 : 1);
   }
 
   /**
@@ -3368,15 +3380,15 @@ class Client {
    * @param token_id - Optional token ID (if transferring tokens instead of base coin)
    * @returns A transaction ready to be signed
    */
-  async buildTransfer({ to, amount, token_id }: TransferArgs): Promise<AssembledTransaction> {
+  async buildTransfer({ to, amount, token_id }: TransferArgs, opts?: TransactionOpts): Promise<AssembledTransaction> {
     this.ensureInitialized();
     if (token_id) {
       this.validateRawId(token_id, 'transfer', 'token_id');
       const token = await this.apiProvider.getToken(token_id);
       const token_details: TokenDetails = token;
-      return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
+      return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details }, opts });
     } else {
-      return this.buildTransaction({ type: 'Transfer', params: { to, amount } });
+      return this.buildTransaction({ type: 'Transfer', params: { to, amount }, opts });
     }
   }
 
@@ -3718,7 +3730,7 @@ class Client {
     ask_amount,
     give_token,
     give_amount,
-  }: CreateOrderArgs): Promise<AssembledTransaction> {
+  }: CreateOrderArgs, opts?: TransactionOpts): Promise<AssembledTransaction> {
     this.ensureInitialized();
 
     let ask_token_details = null;
@@ -3745,6 +3757,7 @@ class Client {
         ask_token_details,
         give_token_details,
       },
+      opts,
     });
   }
 
@@ -3777,7 +3790,10 @@ class Client {
   /**
    * Builds an order fill transaction without signing it.
    */
-  async buildFillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<AssembledTransaction> {
+  async buildFillOrder(
+    { order_id, amount, destination }: FillOrderArgs,
+    opts?: TransactionOpts,
+  ): Promise<AssembledTransaction> {
     this.ensureInitialized();
     this.validateRawId(order_id, 'fill order', 'order_id');
     const data = await this.apiProvider.getOrder(order_id);
@@ -3799,6 +3815,7 @@ class Client {
     const tx = await this.buildTransaction({
       type: 'FillOrder',
       params: { order_id, amount, destination, order_details, ask_token_details, give_token_details },
+      opts,
     });
     tx.orderInfo = {
       [order_details.order_id]: Signer.orderAdditionalInfoFromOrder(order_details),
@@ -3837,12 +3854,12 @@ class Client {
   /**
    * Builds an order conclusion transaction without signing it.
    */
-  async buildConcludeOrder({ order_id }: ConcludeOrderArgs): Promise<AssembledTransaction> {
+  async buildConcludeOrder({ order_id }: ConcludeOrderArgs, opts?: TransactionOpts): Promise<AssembledTransaction> {
     this.ensureInitialized();
     this.validateRawId(order_id, 'conclude order', 'order_id');
     const order: OrderData = await this.apiProvider.getOrder(order_id);
 
-    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
+    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order }, opts });
     tx.orderInfo = {
       [order.order_id]: Signer.orderAdditionalInfoFromOrder(order),
     };

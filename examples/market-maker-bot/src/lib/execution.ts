@@ -1,4 +1,4 @@
-import type { Client, WalletState } from '@mintlayer/sdk';
+import type { Client, TransactionOpts, WalletState, WalletUtxo } from '@mintlayer/sdk';
 
 import type { ExecutionRecord, ExecutionRequest, MarketMakerConfig, StrategyAction } from './types';
 
@@ -81,35 +81,34 @@ export function mergeRecords(records: ExecutionRecord[], next: ExecutionRecord):
   return [next, ...records];
 }
 
-async function buildTransaction(client: Client, request: ExecutionRequest): Promise<BuiltTransaction> {
-  const sdkClient = client as unknown as {
-    buildCreateOrder: Client['buildCreateOrder'];
-    buildConcludeOrder: Client['buildConcludeOrder'];
-    buildFillOrder: Client['buildFillOrder'];
-    buildTransfer: Client['buildTransfer'];
-  };
+async function buildTransaction(
+  client: Client,
+  request: ExecutionRequest,
+  availableUtxos: WalletUtxo[],
+): Promise<BuiltTransaction> {
+  const opts: TransactionOpts = { withUTXO: availableUtxos };
 
   if (request.kind === 'create-order') {
-    return (await sdkClient.buildCreateOrder(request.args)) as unknown as BuiltTransaction;
+    return (await client.buildCreateOrder(request.args, opts)) as unknown as BuiltTransaction;
   }
 
   if (request.kind === 'conclude-order') {
-    return (await sdkClient.buildConcludeOrder({ order_id: request.orderId })) as unknown as BuiltTransaction;
+    return (await client.buildConcludeOrder({ order_id: request.orderId }, opts)) as unknown as BuiltTransaction;
   }
 
   if (request.kind === 'fill-order') {
-    return (await sdkClient.buildFillOrder({
+    return (await client.buildFillOrder({
       order_id: request.orderId,
       amount: request.amount,
       destination: request.destination,
-    })) as unknown as BuiltTransaction;
+    }, opts)) as unknown as BuiltTransaction;
   }
 
   if (request.tokenId) {
-    return (await sdkClient.buildTransfer({ to: request.to, amount: request.amount, token_id: request.tokenId })) as unknown as BuiltTransaction;
+    return (await client.buildTransfer({ to: request.to, amount: request.amount, token_id: request.tokenId }, opts)) as unknown as BuiltTransaction;
   }
 
-  return (await sdkClient.buildTransfer({ to: request.to, amount: request.amount })) as unknown as BuiltTransaction;
+  return (await client.buildTransfer({ to: request.to, amount: request.amount }, opts)) as unknown as BuiltTransaction;
 }
 
 export async function executeRequest(args: {
@@ -118,9 +117,10 @@ export async function executeRequest(args: {
   request: ExecutionRequest;
   config: MarketMakerConfig;
   broadcast: boolean;
+  availableUtxos: WalletUtxo[];
   tradeMeta?: ExecutionRecord['tradeMeta'];
 }): Promise<ExecutionRecord> {
-  const { client, walletState, request, config, broadcast, tradeMeta } = args;
+  const { client, walletState, request, config, broadcast, tradeMeta, availableUtxos } = args;
   const record = createRecord(request);
 
   if (config.network === 'mainnet' && !config.allowMainnetBroadcast && broadcast) {
@@ -133,7 +133,7 @@ export async function executeRequest(args: {
   }
 
   try {
-    const tx = await buildTransaction(client, request);
+    const tx = await buildTransaction(client, request, availableUtxos);
     const signedHex = await (client as unknown as { signTransaction(tx: BuiltTransaction): Promise<string> }).signTransaction(tx);
     const txJson = getTxJson(tx);
     await walletState.applyLocalTx(tx);
