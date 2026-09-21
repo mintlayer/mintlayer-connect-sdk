@@ -4569,6 +4569,8 @@ class Signer {
 
     const optUtxos = new Uint8Array(optUtxosArray);
 
+    console.log('tx.JSONRepresentation', tx.JSONRepresentation);
+
     const encodedWitnesses = tx.JSONRepresentation.inputs.map((input: any, index: number) => {
       let address: string | undefined = undefined;
 
@@ -4582,7 +4584,7 @@ class Signer {
         address = input.input.authority;
       }
 
-      if (input.input.input_type === 'AccountCommand' && input.input.command === 'FillOrder') {
+      if (input.input.input_type === 'AccountCommand' && ["ConcludeOrder", "FillOrder"].includes(input.input.command)) {
         address = input.input.destination;
       }
 
