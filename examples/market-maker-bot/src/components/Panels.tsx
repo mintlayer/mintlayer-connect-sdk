@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { isActiveOrder } from '../lib/orderBook';
@@ -49,7 +50,7 @@ export function ConfigPanel(props: ConfigPanelProps) {
   const { config, tokenLabels, warnings, broadcastEnabled, dryRun, setConfig, setBroadcastEnabled, setDryRun } = props;
 
   return (
-    <section className="panel">
+    <section className="panel configPanel">
       <div className="panelHeader">
         <h2>Strategy Config</h2>
         <span className="badge">{formatPairLabel(config, tokenLabels)}</span>
@@ -176,7 +177,7 @@ export function WalletPanel(props: {
     wallet && config.baseToken !== 'Coin' && configuredTokenBalance === 0 && tokenBalances.length > 0;
 
   return (
-    <section className="panel">
+    <section className="panel walletPanel">
       <div className="panelHeader">
         <h2>Wallet State</h2>
         <span className="badge">{wallet ? 'loaded' : 'not loaded'}</span>
@@ -235,6 +236,7 @@ export function OrderBookPanel(props: {
   config: MarketMakerConfig;
   tokenLabels: TokenLabelMap;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { book, orders, ownOrders, config, tokenLabels } = props;
   const activeOrders = orders.filter(isActiveOrder);
   const pairPath = getPairOrdersPath(config);
@@ -242,47 +244,72 @@ export function OrderBookPanel(props: {
   const quoteLabel = formatTokenLabel(config.quoteToken, tokenLabels);
 
   return (
-    <section className="panel">
-      <div className="panelHeader">
+    <section className="panel orderBookPanel">
+      <button
+        className="panelHeader orderBookHeader"
+        aria-expanded={detailsOpen}
+        aria-controls="order-book-dialog"
+        onClick={() => setDetailsOpen(true)}
+      >
         <h2>Order Book</h2>
-        <span className="badge">{activeOrders.length} active</span>
+        <span className="badge">{activeOrders.length} active · details</span>
+      </button>
+      <div className="bookGrid compactBook">
+        <OrderSide title="Bids" rows={book.bids.slice(0, 5)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
+        <OrderSide title="Asks" rows={book.asks.slice(0, 5)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
       </div>
-      <div className="addressBlock">
-        <span>Pair</span>
-        <strong>{formatPairLabel(config, tokenLabels)}</strong>
-        <code>{pairPath ?? 'Only token/Coin pairs are supported right now'}</code>
-      </div>
-      <div className="stats">
-        <div>
-          <span>Best Bid</span>
-          <strong>{book.bestBid?.toFixed(8) ?? '-'}</strong>
+
+      {detailsOpen && (
+        <div className="modalBackdrop" onMouseDown={() => setDetailsOpen(false)}>
+          <div
+            className="orderBookDialog"
+            id="order-book-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-book-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="dialogHeader">
+              <h2 id="order-book-title">Order Book</h2>
+              <button className="secondary" onClick={() => setDetailsOpen(false)}>Close</button>
+            </div>
+            <div className="addressBlock">
+              <span>Pair</span>
+              <strong>{formatPairLabel(config, tokenLabels)}</strong>
+              <code>{pairPath ?? 'Only token/Coin pairs are supported right now'}</code>
+            </div>
+            <div className="stats">
+              <div>
+                <span>Best Bid</span>
+                <strong>{book.bestBid?.toFixed(8) ?? '-'}</strong>
+              </div>
+              <div>
+                <span>Best Ask</span>
+                <strong>{book.bestAsk?.toFixed(8) ?? '-'}</strong>
+              </div>
+              <div>
+                <span>Mid</span>
+                <strong>{book.midPrice?.toFixed(8) ?? '-'}</strong>
+              </div>
+              <div>
+                <span>Own Orders</span>
+                <strong>{ownOrders.length}</strong>
+              </div>
+            </div>
+            <div className="bookGrid">
+              <OrderSide title="Bids" rows={book.bids.slice(0, 8)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
+              <OrderSide title="Asks" rows={book.asks.slice(0, 8)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
+            </div>
+            {activeOrders.length === 0 && (
+              <p className="muted">No active orders returned for this pair. Filled or zero-balance orders are ignored.</p>
+            )}
+            {book.midPrice === null && activeOrders.length > 0 && (
+              <p className="warningText">
+                Orders were fetched, but none matched the configured base/quote token ids for book construction.
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          <span>Best Ask</span>
-          <strong>{book.bestAsk?.toFixed(8) ?? '-'}</strong>
-        </div>
-        <div>
-          <span>Mid</span>
-          <strong>{book.midPrice?.toFixed(8) ?? '-'}</strong>
-        </div>
-        <div>
-          <span>Own Orders</span>
-          <strong>{ownOrders.length}</strong>
-        </div>
-      </div>
-      <div className="bookGrid">
-        <OrderSide title="Bids" rows={book.bids.slice(0, 8)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
-        <OrderSide title="Asks" rows={book.asks.slice(0, 8)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
-      </div>
-      {activeOrders.length === 0 && (
-        <p className="muted">
-          No active orders returned for this pair. Filled or zero-balance orders are ignored.
-        </p>
-      )}
-      {book.midPrice === null && activeOrders.length > 0 && (
-        <p className="warningText">
-          Orders were fetched, but none matched the configured base/quote token ids for book construction.
-        </p>
       )}
     </section>
   );
@@ -321,7 +348,7 @@ export function StrategyPanel(props: {
   dryRun: boolean;
 }) {
   return (
-    <section className="panel">
+    <section className="panel strategyPanel">
       <div className="panelHeader">
         <h2>Strategy Proposals</h2>
         <span className="badge">{props.actions.length} actions</span>
@@ -346,7 +373,7 @@ export function StrategyPanel(props: {
 
 export function TransactionPanel(props: { records: ExecutionRecord[] }) {
   return (
-    <section className="panel">
+    <section className="panel transactionPanel">
       <div className="panelHeader">
         <h2>Transactions</h2>
         <span className="badge">{props.records.length} tracked</span>
@@ -372,7 +399,7 @@ export function TradesPanel(props: { trades: TradeRecord[]; tokenLabels: TokenLa
   const baseLabel = formatTokenLabel(props.baseToken, props.tokenLabels);
 
   return (
-    <section className="panel wide">
+    <section className="panel tradesPanel">
       <div className="panelHeader">
         <h2>Trades (Fills)</h2>
         <span className="badge">{props.trades.length} recorded</span>
@@ -412,7 +439,7 @@ export function BranchPanel(props: {
   onExecute: (request: ExecutionRequest) => void;
 }) {
   return (
-    <section className="panel wide">
+    <section className="panel branchPanel">
       <div className="panelHeader">
         <h2>UTXO Branches</h2>
         <span className="badge">{props.branches.length} branches</span>

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import {
   BranchPanel,
   ConfigPanel,
@@ -15,6 +17,7 @@ function formatTime(value: number | null): string {
 }
 
 export default function App() {
+  const [configOpen, setConfigOpen] = useState(false);
   const {
     state,
     setConfig,
@@ -33,24 +36,21 @@ export default function App() {
   const running = state.runtime.mode === 'running';
 
   return (
-    <main>
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Mintlayer SDK Example</p>
-          <h1>Market Maker Bot</h1>
-          <p>
-            Browser-based testnet SPA for synthetic orderbook tracking, inventory-aware quoting,
-            transaction lifecycle visualization, and UTXO branch preparation.
-          </p>
-        </div>
+    <main className="appShell">
+      <section className="toolbar controlBar">
         <div className="heroCard">
-          <span>Status</span>
+          <span>Runtime</span>
           <strong>{state.runtime.mode}</strong>
           <small>Last cycle: {formatTime(state.lastCycleAt)}</small>
         </div>
-      </header>
-
-      <section className="toolbar">
+        <button
+          className="secondary"
+          aria-expanded={configOpen}
+          aria-controls="strategy-config-dialog"
+          onClick={() => setConfigOpen(true)}
+        >
+          Strategy config
+        </button>
         <button disabled={state.runtime.mode === 'initializing'} onClick={() => void initialize()}>
           {initialized ? 'Reinitialize' : 'Initialize SDK'}
         </button>
@@ -82,16 +82,6 @@ export default function App() {
       {state.runtime.error && <div className="banner errorText">{state.runtime.error}</div>}
 
       <div className="layout">
-        <ConfigPanel
-          config={state.config}
-          tokenLabels={state.tokenLabels}
-          warnings={state.configWarnings}
-          broadcastEnabled={state.broadcastEnabled}
-          dryRun={state.dryRun}
-          setConfig={setConfig}
-          setBroadcastEnabled={setBroadcastEnabled}
-          setDryRun={setDryRun}
-        />
         <WalletPanel
           wallet={state.wallet}
           config={state.config}
@@ -120,6 +110,34 @@ export default function App() {
           onExecute={(request) => void executePreparationAction(request)}
         />
       </div>
+
+      {configOpen && (
+        <div className="modalBackdrop" onMouseDown={() => setConfigOpen(false)}>
+          <div
+            className="configDialog"
+            id="strategy-config-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="strategy-config-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="dialogHeader">
+              <h2 id="strategy-config-title">Strategy config</h2>
+              <button className="secondary" onClick={() => setConfigOpen(false)}>Close</button>
+            </div>
+            <ConfigPanel
+              config={state.config}
+              tokenLabels={state.tokenLabels}
+              warnings={state.configWarnings}
+              broadcastEnabled={state.broadcastEnabled}
+              dryRun={state.dryRun}
+              setConfig={setConfig}
+              setBroadcastEnabled={setBroadcastEnabled}
+              setDryRun={setDryRun}
+            />
+          </div>
+        </div>
+      )}
     </main>
   );
 }
