@@ -373,6 +373,18 @@ code {
   grid-template-columns: 1fr 1fr;
 }
 
+.foreignOrdersToggle {
+  align-items: center;
+  display: flex;
+  font-size: 0.8rem;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.foreignOrdersToggle input {
+  width: auto;
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
@@ -389,6 +401,11 @@ td {
 th:first-child,
 td:first-child {
   text-align: left;
+}
+
+.ownOrder td {
+  background: #e8f7ee;
+  border-bottom-color: #b9e2c8;
 }
 
 .orderAction {

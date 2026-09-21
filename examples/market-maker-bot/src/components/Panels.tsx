@@ -239,8 +239,13 @@ export function OrderBookPanel(props: {
   onConclude: (orderId: string) => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [showForeignOrders, setShowForeignOrders] = useState(true);
   const { book, orders, ownOrders, config, tokenLabels, canConclude, onConclude } = props;
   const activeOrders = orders.filter(isActiveOrder);
+  const ownOrderIds = new Set(ownOrders.map((order) => order.order_id));
+  const isOwnOrder = (orderId: string) => ownOrderIds.has(orderId);
+  const visibleRows = (rows: SyntheticBook['bids']) =>
+    showForeignOrders ? rows : rows.filter((row) => isOwnOrder(row.orderId));
   const pairPath = getPairOrdersPath(config);
   const baseLabel = formatTokenLabel(config.baseToken, tokenLabels);
   const quoteLabel = formatTokenLabel(config.quoteToken, tokenLabels);
@@ -298,22 +303,34 @@ export function OrderBookPanel(props: {
                 <strong>{ownOrders.length}</strong>
               </div>
             </div>
+            <label className="foreignOrdersToggle">
+              <input
+                type="checkbox"
+                checked={showForeignOrders}
+                onChange={(event) => setShowForeignOrders(event.target.checked)}
+              />
+              Show foreign orders
+            </label>
             <div className="bookGrid">
               <OrderSide
                 title="Bids"
-                rows={book.bids.slice(0, 8)}
+                rows={visibleRows(book.bids).slice(0, 8)}
                 baseLabel={baseLabel}
                 quoteLabel={quoteLabel}
                 canConclude={canConclude}
                 onConclude={onConclude}
+                isOwnOrder={isOwnOrder}
+                highlightOwnOrders={showForeignOrders}
               />
               <OrderSide
                 title="Asks"
-                rows={book.asks.slice(0, 8)}
+                rows={visibleRows(book.asks).slice(0, 8)}
                 baseLabel={baseLabel}
                 quoteLabel={quoteLabel}
                 canConclude={canConclude}
                 onConclude={onConclude}
+                isOwnOrder={isOwnOrder}
+                highlightOwnOrders={showForeignOrders}
               />
             </div>
             {!canConclude && (
@@ -341,6 +358,8 @@ function OrderSide(props: {
   quoteLabel: string;
   canConclude?: boolean;
   onConclude?: (orderId: string) => void;
+  isOwnOrder?: (orderId: string) => boolean;
+  highlightOwnOrders?: boolean;
 }) {
   return (
     <div>
@@ -355,24 +374,30 @@ function OrderSide(props: {
           </tr>
         </thead>
         <tbody>
-          {props.rows.map((row) => (
-            <tr key={row.orderId}>
-              <td>{row.price.toFixed(8)}</td>
-              <td>{row.baseAmount.toFixed(8)}</td>
-              <td>{row.quoteAmount.toFixed(8)}</td>
-              {props.onConclude && (
+          {props.rows.map((row) => {
+            const isOwnOrder = props.isOwnOrder?.(row.orderId) ?? false;
+
+            return (
+              <tr key={row.orderId} className={props.highlightOwnOrders && isOwnOrder ? 'ownOrder' : undefined}>
+                <td>{row.price.toFixed(8)}</td>
+                <td>{row.baseAmount.toFixed(8)}</td>
+                <td>{row.quoteAmount.toFixed(8)}</td>
+                {props.onConclude && (
                 <td className="orderAction">
-                  <button
-                    className="secondary"
-                    disabled={!props.canConclude}
-                    onClick={() => props.onConclude?.(row.orderId)}
-                  >
-                    Conclude
-                  </button>
+                    {isOwnOrder && (
+                      <button
+                        className="secondary"
+                        disabled={!props.canConclude}
+                        onClick={() => props.onConclude?.(row.orderId)}
+                      >
+                        Conclude
+                      </button>
+                    )}
                 </td>
-              )}
-            </tr>
-          ))}
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

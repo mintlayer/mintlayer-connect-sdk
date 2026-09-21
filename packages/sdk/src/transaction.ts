@@ -64,7 +64,7 @@ export const FEE_AMOUNT_PER_KB = BigInt('100000000000');
  * raw assembler has always used it, and it is the default for the fluent
  * builder when no block height was passed to the constructor.
  */
-export const FEE_BLOCK_HEIGHT = 200000n;
+export const FEE_BLOCK_HEIGHT = 800000n;
 
 /**
  * Everything the assembler needs that does not belong to the transaction

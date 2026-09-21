@@ -17,6 +17,7 @@ import initWasm, {
   data_deposit_fee,
   encode_signed_transaction,
   encode_witness,
+  encode_witness_no_signature,
   SignatureHashType,
   extract_htlc_secret,
   verify_challenge,
@@ -27,6 +28,7 @@ import initWasm, {
   pubkey_to_pubkeyhash_address,
   sign_challenge,
 } from '@mintlayer/wasm-lib';
+import type { OrderAdditionalInfo as WasmOrderAdditionalInfo } from '@mintlayer/wasm-lib';
 import { Transaction, FEE_BLOCK_HEIGHT } from './transaction';
 import {
   mergeUint8Arrays,
@@ -722,6 +724,8 @@ export type { TransactionJSONRepresentation } from './types/transaction';
 type AssembledTransaction = AssembledTransactionData & {
   intent?: string;
   htlc?: { spend_pubkey: string };
+  /** Order state required by wasm-lib when signing FillOrder/ConcludeOrder inputs. */
+  orderInfo?: Record<string, OrderAdditionalInfo>;
 };
 
 /**
@@ -952,7 +956,7 @@ type BuildTransactionParams =
       opts?: TransactionOpts;
     };
 
-interface OrderData {
+export interface OrderData {
   order_id: string;
   ask_balance: AmountFields;
   nonce: number;
@@ -963,6 +967,12 @@ interface OrderData {
   give_balance: AmountFields;
   give_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
 }
+
+/**
+ * Order state supplied to wasm-lib when signing an order transaction.
+ * Keys in the surrounding record must be Mintlayer order IDs.
+ */
+export type OrderAdditionalInfo = WasmOrderAdditionalInfo;
 
 interface ClientOptions {
   network?: 'testnet' | 'mainnet';
@@ -3786,10 +3796,14 @@ class Client {
       give_token_details = await this.apiProvider.getToken(give_currency.token_id);
     }
 
-    return this.buildTransaction({
+    const tx = await this.buildTransaction({
       type: 'FillOrder',
       params: { order_id, amount, destination, order_details, ask_token_details, give_token_details },
     });
+    tx.orderInfo = {
+      [order_details.order_id]: Signer.orderAdditionalInfoFromOrder(order_details),
+    };
+    return tx;
   }
 
   /**
@@ -3828,7 +3842,11 @@ class Client {
     this.validateRawId(order_id, 'conclude order', 'order_id');
     const order: OrderData = await this.apiProvider.getOrder(order_id);
 
-    return this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
+    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
+    tx.orderInfo = {
+      [order.order_id]: Signer.orderAdditionalInfoFromOrder(order),
+    };
+    return tx;
   }
 
   /**
@@ -4490,10 +4508,52 @@ class Client {
 class Signer {
   private keys: Record<string, Uint8Array>;
   private network: Network;
+  private orderInfo: Record<string, OrderAdditionalInfo>;
 
-  constructor(privateKeys: Record<string, Uint8Array>, network: Network = Network.Testnet) {
+  constructor(
+    privateKeys: Record<string, Uint8Array>,
+    network: Network = Network.Testnet,
+    orderInfo: Record<string, OrderAdditionalInfo> = {},
+  ) {
     this.keys = privateKeys;
     this.network = network;
+    this.orderInfo = { ...orderInfo };
+  }
+
+  /**
+   * Converts an explorer/API order into the shape required by wasm-lib.
+   */
+  static orderAdditionalInfoFromOrder(order: OrderData): OrderAdditionalInfo {
+    const currencyAmount = (
+      currency: OrderData['ask_currency'],
+      amount: AmountFields,
+    ): OrderAdditionalInfo['initially_asked'] =>
+      currency.type === 'Coin'
+        ? { coins: { atoms: String(amount.atoms) } }
+        : { tokens: { token_id: currency.token_id, amount: { atoms: String(amount.atoms) } } };
+
+    return {
+      initially_asked: currencyAmount(order.ask_currency, order.initially_asked),
+      initially_given: currencyAmount(order.give_currency, order.initially_given),
+      ask_balance: { atoms: String(order.ask_balance.atoms) },
+      give_balance: { atoms: String(order.give_balance.atoms) },
+    };
+  }
+
+  /**
+   * Adds or replaces the metadata for an order returned by the API.
+   * Call this before {@link sign} when signing a manually assembled order transaction.
+   */
+  setOrderInfo(order: OrderData): this {
+    return this.setOrderAdditionalInfo(order.order_id, Signer.orderAdditionalInfoFromOrder(order));
+  }
+
+  /**
+   * Adds or replaces pre-converted order metadata. The key must equal the order ID.
+   */
+  setOrderAdditionalInfo(orderId: string, info: OrderAdditionalInfo): this {
+    this.orderInfo[orderId] = info;
+    return this;
   }
 
   private getPrivateKey(address: string): Uint8Array | undefined {
@@ -4502,6 +4562,19 @@ class Signer {
 
   private createSignature(tx: AssembledTransaction) {
     const network = this.network;
+    // Metadata is transaction-wide: wasm-lib requires every order referenced by
+    // any input to be present while each individual witness is encoded.
+    const orderInfo = { ...this.orderInfo, ...tx.orderInfo };
+    for (const { input } of tx.JSONRepresentation.inputs as Input[]) {
+      if (
+        input.input_type === 'AccountCommand' &&
+        (input.command === 'FillOrder' || input.command === 'ConcludeOrder') &&
+        !orderInfo[input.order_id]
+      ) {
+        throw new Error(`Order metadata not found for order: ${input.order_id}`);
+      }
+    }
+
     const optUtxos_ = tx.JSONRepresentation.inputs.map((input: any) => {
       if (input.input.input_type !== 'UTXO') {
         return 0;
@@ -4569,8 +4642,6 @@ class Signer {
 
     const optUtxos = new Uint8Array(optUtxosArray);
 
-    console.log('tx.JSONRepresentation', tx.JSONRepresentation);
-
     const encodedWitnesses = tx.JSONRepresentation.inputs.map((input: any, index: number) => {
       let address: string | undefined = undefined;
 
@@ -4584,7 +4655,12 @@ class Signer {
         address = input.input.authority;
       }
 
-      if (input.input.input_type === 'AccountCommand' && ["ConcludeOrder", "FillOrder"].includes(input.input.command)) {
+      if (input.input.input_type === 'AccountCommand' && input.input.command === 'FillOrder') {
+        // FillOrder has no signature witness in orders V1.
+        return encode_witness_no_signature();
+      }
+
+      if (input.input.input_type === 'AccountCommand' && input.input.command === 'ConcludeOrder') {
         address = input.input.destination;
       }
 
@@ -4603,7 +4679,7 @@ class Signer {
       const block_height = FEE_BLOCK_HEIGHT;
       const additional_info = {
         pool_info: {},
-        order_info: {},
+        order_info: orderInfo,
       };
 
       const witness = encode_witness(
