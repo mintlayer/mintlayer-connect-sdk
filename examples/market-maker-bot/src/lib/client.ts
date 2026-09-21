@@ -126,19 +126,12 @@ export async function createBotClient(config: MarketMakerConfig): Promise<Client
     throw new Error('VITE_WALLET_SEED is required for browser mnemonic mode.');
   }
 
-  console.log('sss');
-
   const accountProvider = new MnemonicAccountProvider(config.walletSeed, config.network, {
     receivingAddressCount: 8,
     changeAddressCount: 8,
   });
 
-  console.log('accountProvider', accountProvider);
-
   const apiProvider = createApiProvider(config);
-
-
-  console.log('apiProvider', apiProvider);
   const client = await Client.create({
     network: config.network,
     autoRestore: false,

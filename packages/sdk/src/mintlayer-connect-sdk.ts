@@ -365,9 +365,13 @@ interface MnemonicAccountProviderOptions {
  * ```
  */
 class MnemonicAccountProvider implements AccountProvider {
-  private readonly addresses: Address;
-  private readonly privateKeys: Record<string, Uint8Array>;
+  private addresses?: Address;
+  private privateKeys?: Record<string, Uint8Array>;
   private readonly network: Network;
+  private readonly mnemonic: string;
+  private readonly receivingAddressCount: number;
+  private readonly changeAddressCount: number;
+  private initialization?: Promise<void>;
 
   constructor(
     mnemonic: string,
@@ -376,27 +380,46 @@ class MnemonicAccountProvider implements AccountProvider {
   ) {
     const { receivingAddressCount = 1, changeAddressCount = 1 } = options;
     this.network = network === 'mainnet' ? Network.Mainnet : Network.Testnet;
+    this.mnemonic = mnemonic;
+    this.receivingAddressCount = receivingAddressCount;
+    this.changeAddressCount = changeAddressCount;
+  }
 
-    const accountPrivKey = make_default_account_privkey(mnemonic, this.network);
+  /**
+   * Delays key derivation until an async provider operation. This lets callers
+   * supply the provider to `Client.create()` before the client initializes the
+   * WASM module.
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialization) {
+      this.initialization = this.initialize();
+    }
+    await this.initialization;
+  }
+
+  private async initialize(): Promise<void> {
+    await initWasm();
+
+    const accountPrivKey = make_default_account_privkey(this.mnemonic, this.network);
 
     const receiving: string[] = [];
     const change: string[] = [];
-    this.privateKeys = {};
+    const privateKeys: Record<string, Uint8Array> = {};
 
-    for (let i = 0; i < receivingAddressCount; i++) {
+    for (let i = 0; i < this.receivingAddressCount; i++) {
       const privKey = make_receiving_address(accountPrivKey, i);
       const pubKey = public_key_from_private_key(privKey);
       const address = pubkey_to_pubkeyhash_address(pubKey, this.network);
       receiving.push(address);
-      this.privateKeys[address] = privKey;
+      privateKeys[address] = privKey;
     }
 
-    for (let i = 0; i < changeAddressCount; i++) {
+    for (let i = 0; i < this.changeAddressCount; i++) {
       const privKey = make_change_address(accountPrivKey, i);
       const pubKey = public_key_from_private_key(privKey);
       const address = pubkey_to_pubkeyhash_address(pubKey, this.network);
       change.push(address);
-      this.privateKeys[address] = privKey;
+      privateKeys[address] = privKey;
     }
 
     this.addresses = {
@@ -404,27 +427,32 @@ class MnemonicAccountProvider implements AccountProvider {
         mintlayer: { receiving, change },
       },
     };
+    this.privateKeys = privateKeys;
   }
 
   async connect(): Promise<Address> {
-    return this.addresses;
+    await this.ensureInitialized();
+    return this.addresses!;
   }
 
   async restore(): Promise<Address> {
-    return this.addresses;
+    await this.ensureInitialized();
+    return this.addresses!;
   }
 
   async disconnect(): Promise<void> {}
 
   async request(method: string, params: any): Promise<any> {
+    await this.ensureInitialized();
+
     if (method === 'signTransaction') {
-      const signer = new Signer(this.privateKeys, this.network);
+      const signer = new Signer(this.privateKeys!, this.network);
       return signer.sign(params.txData);
     }
 
     if (method === 'signChallenge') {
       const { message, address } = params;
-      const privateKey = this.privateKeys[address];
+      const privateKey = this.privateKeys![address];
       if (!privateKey) {
         throw new Error(`Private key not found for address: ${address}`);
       }
