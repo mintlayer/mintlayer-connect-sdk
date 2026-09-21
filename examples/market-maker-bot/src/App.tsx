@@ -29,6 +29,7 @@ export default function App() {
     stopLoop,
     resetLocalState,
     executeStrategyAction,
+    concludeOrder,
     executePreparationAction,
   } = useMarketMakerBot();
 
@@ -94,6 +95,8 @@ export default function App() {
           ownOrders={state.ownOrders}
           config={state.config}
           tokenLabels={state.tokenLabels}
+          canConclude={initialized && !state.dryRun}
+          onConclude={(orderId) => void concludeOrder(orderId)}
         />
         <StrategyPanel
           actions={state.actions}

@@ -235,9 +235,11 @@ export function OrderBookPanel(props: {
   ownOrders: MarketOrder[];
   config: MarketMakerConfig;
   tokenLabels: TokenLabelMap;
+  canConclude: boolean;
+  onConclude: (orderId: string) => void;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const { book, orders, ownOrders, config, tokenLabels } = props;
+  const { book, orders, ownOrders, config, tokenLabels, canConclude, onConclude } = props;
   const activeOrders = orders.filter(isActiveOrder);
   const pairPath = getPairOrdersPath(config);
   const baseLabel = formatTokenLabel(config.baseToken, tokenLabels);
@@ -297,9 +299,26 @@ export function OrderBookPanel(props: {
               </div>
             </div>
             <div className="bookGrid">
-              <OrderSide title="Bids" rows={book.bids.slice(0, 8)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
-              <OrderSide title="Asks" rows={book.asks.slice(0, 8)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
+              <OrderSide
+                title="Bids"
+                rows={book.bids.slice(0, 8)}
+                baseLabel={baseLabel}
+                quoteLabel={quoteLabel}
+                canConclude={canConclude}
+                onConclude={onConclude}
+              />
+              <OrderSide
+                title="Asks"
+                rows={book.asks.slice(0, 8)}
+                baseLabel={baseLabel}
+                quoteLabel={quoteLabel}
+                canConclude={canConclude}
+                onConclude={onConclude}
+              />
             </div>
+            {!canConclude && (
+              <p className="muted">Initialize the SDK and turn off Dry Run in Strategy config to conclude and broadcast an order.</p>
+            )}
             {activeOrders.length === 0 && (
               <p className="muted">No active orders returned for this pair. Filled or zero-balance orders are ignored.</p>
             )}
@@ -315,7 +334,14 @@ export function OrderBookPanel(props: {
   );
 }
 
-function OrderSide(props: { title: string; rows: SyntheticBook['bids']; baseLabel: string; quoteLabel: string }) {
+function OrderSide(props: {
+  title: string;
+  rows: SyntheticBook['bids'];
+  baseLabel: string;
+  quoteLabel: string;
+  canConclude?: boolean;
+  onConclude?: (orderId: string) => void;
+}) {
   return (
     <div>
       <h3>{props.title}</h3>
@@ -325,6 +351,7 @@ function OrderSide(props: { title: string; rows: SyntheticBook['bids']; baseLabe
             <th>Price ({props.quoteLabel}/{props.baseLabel})</th>
             <th>{props.baseLabel}</th>
             <th>{props.quoteLabel}</th>
+            {props.onConclude && <th aria-label="Order action" />}
           </tr>
         </thead>
         <tbody>
@@ -333,6 +360,17 @@ function OrderSide(props: { title: string; rows: SyntheticBook['bids']; baseLabe
               <td>{row.price.toFixed(8)}</td>
               <td>{row.baseAmount.toFixed(8)}</td>
               <td>{row.quoteAmount.toFixed(8)}</td>
+              {props.onConclude && (
+                <td className="orderAction">
+                  <button
+                    className="secondary"
+                    disabled={!props.canConclude}
+                    onClick={() => props.onConclude?.(row.orderId)}
+                  >
+                    Conclude
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

@@ -391,6 +391,15 @@ td:first-child {
   text-align: left;
 }
 
+.orderAction {
+  width: 1%;
+}
+
+.orderAction button {
+  font-size: 0.7rem;
+  padding: 0.3rem 0.45rem;
+}
+
 .list {
   display: grid;
   gap: 0.45rem;

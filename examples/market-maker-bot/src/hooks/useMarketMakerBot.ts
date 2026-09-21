@@ -225,6 +225,29 @@ export function useMarketMakerBot() {
     [execute, wallet?.addresses.receiving],
   );
 
+  const concludeOrder = useCallback(
+    async (orderId: string) => {
+      const destination = wallet?.addresses.receiving[0];
+      if (!destination) {
+        return;
+      }
+
+      await execute(
+        strategyActionToRequest(
+          {
+            id: `manual-conclude:${orderId}`,
+            kind: 'conclude-order',
+            orderId,
+            reason: 'Manually concluded from the order book.',
+          },
+          destination,
+        ),
+        true,
+      );
+    },
+    [execute, wallet?.addresses.receiving],
+  );
+
   const executePreparationAction = useCallback(
     async (request: ExecutionRequest) => {
       await execute(request);
@@ -352,6 +375,7 @@ export function useMarketMakerBot() {
     stopLoop,
     resetLocalState,
     executeStrategyAction,
+    concludeOrder,
     executePreparationAction,
   };
 }
