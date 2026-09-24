@@ -526,14 +526,16 @@ export class WalletState {
    * unconfirmed wallet-relevant transaction.
    */
   async applyMempoolTx(tx: WalletTxInput | WalletTx): Promise<WalletTx> {
+    const existing = this.transactions.find((item) => item.txId === ('state' in tx ? tx.txId : getTxId(tx)));
     const walletTx: WalletTx =
       'state' in tx
-        ? { ...tx, state: 'mempool' }
+        ? { ...existing, ...tx, state: 'mempool' }
         : {
+            ...existing,
             txId: getTxId(tx),
             tx,
             state: 'mempool',
-            timestamp: Date.now(),
+            timestamp: existing?.timestamp ?? Date.now(),
           };
 
     await this.store.putTransaction(this.accountId, walletTx);

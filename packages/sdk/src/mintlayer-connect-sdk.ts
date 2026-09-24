@@ -17,6 +17,7 @@ import initWasm, {
   data_deposit_fee,
   encode_signed_transaction,
   encode_witness,
+  encode_witness_no_signature,
   SignatureHashType,
   extract_htlc_secret,
   verify_challenge,
@@ -27,6 +28,7 @@ import initWasm, {
   pubkey_to_pubkeyhash_address,
   sign_challenge,
 } from '@mintlayer/wasm-lib';
+import type { OrderAdditionalInfo as WasmOrderAdditionalInfo } from '@mintlayer/wasm-lib';
 import { Transaction, FEE_BLOCK_HEIGHT } from './transaction';
 import {
   mergeUint8Arrays,
@@ -365,9 +367,13 @@ interface MnemonicAccountProviderOptions {
  * ```
  */
 class MnemonicAccountProvider implements AccountProvider {
-  private readonly addresses: Address;
-  private readonly privateKeys: Record<string, Uint8Array>;
+  private addresses?: Address;
+  private privateKeys?: Record<string, Uint8Array>;
   private readonly network: Network;
+  private readonly mnemonic: string;
+  private readonly receivingAddressCount: number;
+  private readonly changeAddressCount: number;
+  private initialization?: Promise<void>;
 
   constructor(
     mnemonic: string,
@@ -376,27 +382,46 @@ class MnemonicAccountProvider implements AccountProvider {
   ) {
     const { receivingAddressCount = 1, changeAddressCount = 1 } = options;
     this.network = network === 'mainnet' ? Network.Mainnet : Network.Testnet;
+    this.mnemonic = mnemonic;
+    this.receivingAddressCount = receivingAddressCount;
+    this.changeAddressCount = changeAddressCount;
+  }
 
-    const accountPrivKey = make_default_account_privkey(mnemonic, this.network);
+  /**
+   * Delays key derivation until an async provider operation. This lets callers
+   * supply the provider to `Client.create()` before the client initializes the
+   * WASM module.
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (!this.initialization) {
+      this.initialization = this.initialize();
+    }
+    await this.initialization;
+  }
+
+  private async initialize(): Promise<void> {
+    await initWasm();
+
+    const accountPrivKey = make_default_account_privkey(this.mnemonic, this.network);
 
     const receiving: string[] = [];
     const change: string[] = [];
-    this.privateKeys = {};
+    const privateKeys: Record<string, Uint8Array> = {};
 
-    for (let i = 0; i < receivingAddressCount; i++) {
+    for (let i = 0; i < this.receivingAddressCount; i++) {
       const privKey = make_receiving_address(accountPrivKey, i);
       const pubKey = public_key_from_private_key(privKey);
       const address = pubkey_to_pubkeyhash_address(pubKey, this.network);
       receiving.push(address);
-      this.privateKeys[address] = privKey;
+      privateKeys[address] = privKey;
     }
 
-    for (let i = 0; i < changeAddressCount; i++) {
+    for (let i = 0; i < this.changeAddressCount; i++) {
       const privKey = make_change_address(accountPrivKey, i);
       const pubKey = public_key_from_private_key(privKey);
       const address = pubkey_to_pubkeyhash_address(pubKey, this.network);
       change.push(address);
-      this.privateKeys[address] = privKey;
+      privateKeys[address] = privKey;
     }
 
     this.addresses = {
@@ -404,27 +429,32 @@ class MnemonicAccountProvider implements AccountProvider {
         mintlayer: { receiving, change },
       },
     };
+    this.privateKeys = privateKeys;
   }
 
   async connect(): Promise<Address> {
-    return this.addresses;
+    await this.ensureInitialized();
+    return this.addresses!;
   }
 
   async restore(): Promise<Address> {
-    return this.addresses;
+    await this.ensureInitialized();
+    return this.addresses!;
   }
 
   async disconnect(): Promise<void> {}
 
   async request(method: string, params: any): Promise<any> {
+    await this.ensureInitialized();
+
     if (method === 'signTransaction') {
-      const signer = new Signer(this.privateKeys, this.network);
+      const signer = new Signer(this.privateKeys!, this.network);
       return signer.sign(params.txData);
     }
 
     if (method === 'signChallenge') {
       const { message, address } = params;
-      const privateKey = this.privateKeys[address];
+      const privateKey = this.privateKeys![address];
       if (!privateKey) {
         throw new Error(`Private key not found for address: ${address}`);
       }
@@ -694,6 +724,8 @@ export type { TransactionJSONRepresentation } from './types/transaction';
 type AssembledTransaction = AssembledTransactionData & {
   intent?: string;
   htlc?: { spend_pubkey: string };
+  /** Order state required by wasm-lib when signing FillOrder/ConcludeOrder inputs. */
+  orderInfo?: Record<string, OrderAdditionalInfo>;
 };
 
 /**
@@ -733,7 +765,8 @@ type TransferParams =
       token_details?: undefined;
     };
 
-type TransactionOpts = {
+/** Options controlling UTXO selection while assembling a transaction. */
+export type TransactionOpts = {
   withUTXO?: UtxoEntry[];
   forceSpendUtxo?: UtxoEntry[];
 };
@@ -900,7 +933,7 @@ type BuildTransactionParams =
       type: 'FillOrder';
       params: {
         order_id: string;
-        amount: number;
+        amount: string | number;
         destination: string;
         order_details: OrderData;
         ask_token_details: TokenDetails;
@@ -924,7 +957,7 @@ type BuildTransactionParams =
       opts?: TransactionOpts;
     };
 
-interface OrderData {
+export interface OrderData {
   order_id: string;
   ask_balance: AmountFields;
   nonce: number;
@@ -935,6 +968,12 @@ interface OrderData {
   give_balance: AmountFields;
   give_currency: { type: 'Coin' } | { type: 'Token'; token_id: string };
 }
+
+/**
+ * Order state supplied to wasm-lib when signing an order transaction.
+ * Keys in the surrounding record must be Mintlayer order IDs.
+ */
+export type OrderAdditionalInfo = WasmOrderAdditionalInfo;
 
 interface ClientOptions {
   network?: 'testnet' | 'mainnet';
@@ -1044,7 +1083,7 @@ export type CreateOrderArgs = {
 
 export type FillOrderArgs = {
   order_id: string;
-  amount: number;
+  amount: string | number;
   destination: string;
 };
 
@@ -1481,6 +1520,17 @@ class Client {
     } catch (error) {
       throw new Error(`API error: ${(error as Error).message}`);
     }
+  }
+
+  /**
+   * Returns UTXOs currently reported as spendable by the network for all
+   * connected receiving and change addresses. These are network-confirmed
+   * inputs; callers may combine them with locally tracked mempool outputs.
+   */
+  async getAccountUtxos(): Promise<UtxoEntry[]> {
+    this.ensureInitialized();
+    const addresses = [...this.connectedAddresses.receiving, ...this.connectedAddresses.change];
+    return this.apiProvider.getAccountUtxos(addresses, this.network === 'mainnet' ? 0 : 1);
   }
 
   /**
@@ -3330,15 +3380,15 @@ class Client {
    * @param token_id - Optional token ID (if transferring tokens instead of base coin)
    * @returns A transaction ready to be signed
    */
-  async buildTransfer({ to, amount, token_id }: TransferArgs): Promise<AssembledTransaction> {
+  async buildTransfer({ to, amount, token_id }: TransferArgs, opts?: TransactionOpts): Promise<AssembledTransaction> {
     this.ensureInitialized();
     if (token_id) {
       this.validateRawId(token_id, 'transfer', 'token_id');
       const token = await this.apiProvider.getToken(token_id);
       const token_details: TokenDetails = token;
-      return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details } });
+      return this.buildTransaction({ type: 'Transfer', params: { to, amount, token_id, token_details }, opts });
     } else {
-      return this.buildTransaction({ type: 'Transfer', params: { to, amount } });
+      return this.buildTransaction({ type: 'Transfer', params: { to, amount }, opts });
     }
   }
 
@@ -3680,7 +3730,7 @@ class Client {
     ask_amount,
     give_token,
     give_amount,
-  }: CreateOrderArgs): Promise<AssembledTransaction> {
+  }: CreateOrderArgs, opts?: TransactionOpts): Promise<AssembledTransaction> {
     this.ensureInitialized();
 
     let ask_token_details = null;
@@ -3707,6 +3757,7 @@ class Client {
         ask_token_details,
         give_token_details,
       },
+      opts,
     });
   }
 
@@ -3739,7 +3790,10 @@ class Client {
   /**
    * Builds an order fill transaction without signing it.
    */
-  async buildFillOrder({ order_id, amount, destination }: FillOrderArgs): Promise<AssembledTransaction> {
+  async buildFillOrder(
+    { order_id, amount, destination }: FillOrderArgs,
+    opts?: TransactionOpts,
+  ): Promise<AssembledTransaction> {
     this.ensureInitialized();
     this.validateRawId(order_id, 'fill order', 'order_id');
     const data = await this.apiProvider.getOrder(order_id);
@@ -3758,10 +3812,15 @@ class Client {
       give_token_details = await this.apiProvider.getToken(give_currency.token_id);
     }
 
-    return this.buildTransaction({
+    const tx = await this.buildTransaction({
       type: 'FillOrder',
       params: { order_id, amount, destination, order_details, ask_token_details, give_token_details },
+      opts,
     });
+    tx.orderInfo = {
+      [order_details.order_id]: Signer.orderAdditionalInfoFromOrder(order_details),
+    };
+    return tx;
   }
 
   /**
@@ -3795,12 +3854,16 @@ class Client {
   /**
    * Builds an order conclusion transaction without signing it.
    */
-  async buildConcludeOrder({ order_id }: ConcludeOrderArgs): Promise<AssembledTransaction> {
+  async buildConcludeOrder({ order_id }: ConcludeOrderArgs, opts?: TransactionOpts): Promise<AssembledTransaction> {
     this.ensureInitialized();
     this.validateRawId(order_id, 'conclude order', 'order_id');
     const order: OrderData = await this.apiProvider.getOrder(order_id);
 
-    return this.buildTransaction({ type: 'ConcludeOrder', params: { order } });
+    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order }, opts });
+    tx.orderInfo = {
+      [order.order_id]: Signer.orderAdditionalInfoFromOrder(order),
+    };
+    return tx;
   }
 
   /**
@@ -4462,10 +4525,52 @@ class Client {
 class Signer {
   private keys: Record<string, Uint8Array>;
   private network: Network;
+  private orderInfo: Record<string, OrderAdditionalInfo>;
 
-  constructor(privateKeys: Record<string, Uint8Array>, network: Network = Network.Testnet) {
+  constructor(
+    privateKeys: Record<string, Uint8Array>,
+    network: Network = Network.Testnet,
+    orderInfo: Record<string, OrderAdditionalInfo> = {},
+  ) {
     this.keys = privateKeys;
     this.network = network;
+    this.orderInfo = { ...orderInfo };
+  }
+
+  /**
+   * Converts an explorer/API order into the shape required by wasm-lib.
+   */
+  static orderAdditionalInfoFromOrder(order: OrderData): OrderAdditionalInfo {
+    const currencyAmount = (
+      currency: OrderData['ask_currency'],
+      amount: AmountFields,
+    ): OrderAdditionalInfo['initially_asked'] =>
+      currency.type === 'Coin'
+        ? { coins: { atoms: String(amount.atoms) } }
+        : { tokens: { token_id: currency.token_id, amount: { atoms: String(amount.atoms) } } };
+
+    return {
+      initially_asked: currencyAmount(order.ask_currency, order.initially_asked),
+      initially_given: currencyAmount(order.give_currency, order.initially_given),
+      ask_balance: { atoms: String(order.ask_balance.atoms) },
+      give_balance: { atoms: String(order.give_balance.atoms) },
+    };
+  }
+
+  /**
+   * Adds or replaces the metadata for an order returned by the API.
+   * Call this before {@link sign} when signing a manually assembled order transaction.
+   */
+  setOrderInfo(order: OrderData): this {
+    return this.setOrderAdditionalInfo(order.order_id, Signer.orderAdditionalInfoFromOrder(order));
+  }
+
+  /**
+   * Adds or replaces pre-converted order metadata. The key must equal the order ID.
+   */
+  setOrderAdditionalInfo(orderId: string, info: OrderAdditionalInfo): this {
+    this.orderInfo[orderId] = info;
+    return this;
   }
 
   private getPrivateKey(address: string): Uint8Array | undefined {
@@ -4474,6 +4579,19 @@ class Signer {
 
   private createSignature(tx: AssembledTransaction) {
     const network = this.network;
+    // Metadata is transaction-wide: wasm-lib requires every order referenced by
+    // any input to be present while each individual witness is encoded.
+    const orderInfo = { ...this.orderInfo, ...tx.orderInfo };
+    for (const { input } of tx.JSONRepresentation.inputs as Input[]) {
+      if (
+        input.input_type === 'AccountCommand' &&
+        (input.command === 'FillOrder' || input.command === 'ConcludeOrder') &&
+        !orderInfo[input.order_id]
+      ) {
+        throw new Error(`Order metadata not found for order: ${input.order_id}`);
+      }
+    }
+
     const optUtxos_ = tx.JSONRepresentation.inputs.map((input: any) => {
       if (input.input.input_type !== 'UTXO') {
         return 0;
@@ -4555,6 +4673,11 @@ class Signer {
       }
 
       if (input.input.input_type === 'AccountCommand' && input.input.command === 'FillOrder') {
+        // FillOrder has no signature witness in orders V1.
+        return encode_witness_no_signature();
+      }
+
+      if (input.input.input_type === 'AccountCommand' && input.input.command === 'ConcludeOrder') {
         address = input.input.destination;
       }
 
@@ -4573,7 +4696,7 @@ class Signer {
       const block_height = FEE_BLOCK_HEIGHT;
       const additional_info = {
         pool_info: {},
-        order_info: {},
+        order_info: orderInfo,
       };
 
       const witness = encode_witness(

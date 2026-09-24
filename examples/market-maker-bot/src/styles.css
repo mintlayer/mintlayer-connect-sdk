@@ -1,0 +1,530 @@
+:root {
+  color: #172033;
+  background: #f4f7fb;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 7px;
+  background: #1f5eff;
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.45rem 0.7rem;
+}
+
+button:disabled {
+  background: #9aa8c0;
+  cursor: not-allowed;
+}
+
+button.danger {
+  background: #b42318;
+}
+
+button.secondary {
+  background: #eef4ff;
+  color: #1f5eff;
+}
+
+button.secondary:hover:not(:disabled) {
+  background: #dce9ff;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #912018;
+}
+
+input {
+  border: 1px solid #d9e1ee;
+  border-radius: 7px;
+  color: #172033;
+  padding: 0.42rem 0.55rem;
+  width: 100%;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 1800px;
+  padding: 0.75rem;
+}
+
+.appShell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.heroCard,
+.panel,
+.toolbar,
+.banner {
+  background: white;
+  border: 1px solid #dfe7f3;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgb(31 94 255 / 6%);
+}
+
+.heroCard {
+  align-items: baseline;
+  display: flex;
+  gap: 0.45rem;
+  padding: 0.4rem 0.65rem;
+}
+
+.heroCard span,
+.heroCard small,
+.muted,
+.stats span,
+.addressBlock span {
+  color: #68768d;
+}
+
+.heroCard strong {
+  font-size: 0.85rem;
+}
+
+.toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.45rem;
+}
+
+.controlBar .heroCard {
+  margin-right: 0.1rem;
+}
+
+.layout {
+  display: grid;
+  flex: 1;
+  gap: 0.6rem;
+  grid-template-areas:
+    "wallet wallet strategy strategy simulator trades"
+    "book book branches branches transactions transactions";
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel {
+  min-height: 0;
+  overflow: auto;
+  padding: 0.7rem;
+}
+
+.walletPanel {
+  grid-area: wallet;
+}
+
+.orderBookPanel {
+  grid-area: book;
+}
+
+.strategyPanel {
+  grid-area: strategy;
+}
+
+.manualQuoteControls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: -0.1rem 0 0.65rem;
+}
+
+.manualQuoteControls .muted {
+  flex-basis: 100%;
+  font-size: 0.78rem;
+}
+
+.fillSimulationPanel {
+  grid-area: simulator;
+}
+
+.transactionPanel {
+  grid-area: transactions;
+}
+
+.tradesPanel {
+  grid-area: trades;
+}
+
+.branchPanel {
+  grid-area: branches;
+}
+
+.modalBackdrop {
+  align-items: center;
+  background: rgb(23 32 51 / 42%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 10;
+}
+
+.configDialog {
+  background: #f4f7fb;
+  border: 1px solid #dfe7f3;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgb(23 32 51 / 25%);
+  max-height: min(720px, calc(100dvh - 2rem));
+  overflow: auto;
+  padding: 0.7rem;
+  width: min(760px, 100%);
+}
+
+.orderBookDialog {
+  background: #f4f7fb;
+  border: 1px solid #dfe7f3;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgb(23 32 51 / 25%);
+  max-height: min(720px, calc(100dvh - 2rem));
+  overflow: auto;
+  padding: 0.7rem;
+  width: min(980px, 100%);
+}
+
+.dialogHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.dialogHeader h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.configDialog .configPanel {
+  grid-area: auto;
+  overflow: visible;
+}
+
+.panelHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.55rem;
+}
+
+.panelHeader h2,
+.panel h3 {
+  margin: 0;
+}
+
+.panelHeader h2 {
+  font-size: 0.95rem;
+}
+
+.orderBookHeader {
+  align-items: center;
+  background: transparent;
+  color: #172033;
+  display: flex;
+  justify-content: space-between;
+  padding: 0;
+  text-align: left;
+  width: 100%;
+}
+
+.orderBookHeader:hover:not(:disabled) h2 {
+  color: #1f5eff;
+}
+
+.badge {
+  background: #eef4ff;
+  border-radius: 999px;
+  color: #1f5eff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.2rem 0.45rem;
+}
+
+.grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+label {
+  color: #46546b;
+  display: grid;
+  font-size: 0.76rem;
+  font-weight: 700;
+  gap: 0.35rem;
+}
+
+.switchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+}
+
+.switchLabel {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.switchLabel input {
+  width: auto;
+}
+
+.warningList,
+.warningText {
+  color: #9a5b00;
+}
+
+.warningList {
+  margin-bottom: 0;
+}
+
+.errorText {
+  color: #b42318;
+}
+
+.banner {
+  flex: 0 0 auto;
+  max-height: 4rem;
+  overflow: auto;
+  padding: 0.55rem 0.7rem;
+}
+
+.stats {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stats div,
+.branchCard,
+.listItem,
+.prepBox,
+.addressBlock {
+  background: #f7f9fd;
+  border: 1px solid #e2e9f4;
+  border-radius: 8px;
+  padding: 0.55rem;
+}
+
+.stats div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.stats strong {
+  font-size: 1rem;
+}
+
+.addressBlock {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.55rem;
+}
+
+.tokenList {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.tokenList div {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.fieldHint,
+.tokenIdHint {
+  color: #5c667a;
+  display: block;
+  font-size: 0.82rem;
+  margin-top: 0.25rem;
+}
+
+.tokenIdHint {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+code {
+  color: #1b3f8b;
+  overflow-wrap: anywhere;
+}
+
+.bookGrid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.foreignOrdersToggle {
+  align-items: center;
+  display: flex;
+  font-size: 0.8rem;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.foreignOrdersToggle input {
+  width: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid #e4ebf5;
+  font-size: 0.72rem;
+  padding: 0.35rem 0.2rem;
+  text-align: right;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+.ownOrder td {
+  background: #e8f7ee;
+  border-bottom-color: #b9e2c8;
+}
+
+.orderAction {
+  width: 1%;
+}
+
+.orderAction button {
+  font-size: 0.7rem;
+  padding: 0.3rem 0.45rem;
+}
+
+.list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.listItem {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: space-between;
+}
+
+.listItem p {
+  color: #526074;
+  margin: 0.25rem 0 0;
+}
+
+.actionKind {
+  background: #eef4ff;
+  border-radius: 999px;
+  color: #1f5eff;
+  display: inline-block;
+  font-size: 0.72rem;
+  margin-right: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  vertical-align: middle;
+}
+
+.branchGrid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.branchCard {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.branchCard p {
+  margin: 0;
+}
+
+.depthBar {
+  background: #dbe5f4;
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.depthBar span {
+  background: #1f5eff;
+  display: block;
+  height: 100%;
+}
+
+.prepBox {
+  margin-top: 0.55rem;
+}
+
+@media (max-width: 1180px) {
+  .layout {
+    grid-template-areas:
+      "wallet strategy transactions"
+      "book trades branches";
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  main {
+    padding: 0.5rem;
+  }
+
+  .heroCard {
+    width: 100%;
+  }
+
+  .layout {
+    grid-template-areas:
+      "wallet book"
+      "strategy transactions"
+      "trades branches";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+  }
+
+  .two,
+  .bookGrid,
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}
