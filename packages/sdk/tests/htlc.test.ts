@@ -254,6 +254,23 @@ test('buildTransaction for transfer htlc - snapshot', async () => {
   console.log(JSON.stringify(result.JSONRepresentation, null, 2));
 });
 
+test('buildCreateHtlc converts a fractional coin amount to exact atoms', async () => {
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+
+  const transaction = await client.buildCreateHtlc({
+    amount: 1.1,
+    spend_address: 'tmt1q9874wgx6enm2mzfu0yxhzleu84pp00l95l7er5z',
+    spend_pubkey: '0002aac655156131ce3a06eab9f0a38f43df1b1c1f25f4944bae262ed614fd52d4c6',
+    refund_address: 'tmt1q9r4gz3aevjm38yq8ycd6gl3kqd25xh4jqzjthdc',
+    refund_timelock: { type: 'ForBlockCount', content: 6 },
+    secret_hash: { hex: '0000000000000000000000000000000000000000', string: null },
+  });
+
+  const htlc = transaction.JSONRepresentation.outputs.find((output: any) => output.type === 'Htlc');
+  expect(htlc.value.amount).toEqual({ atoms: '110000000000', decimal: '1.1' });
+});
+
 // example of TX: 513932890fb1fee9b21d3004d4292e7eace8753f43d601013d635b8b1195f207
 // test('buildTransaction for htlc transfer - snapshot 2', async () => {
 //   const client = await Client.create({ network: 'testnet', autoRestore: false });

@@ -2245,15 +2245,17 @@ class Client {
     if (type === 'Htlc') {
       // @ts-ignore
       const { token_id, token_details } = params;
+      const amountDecimals = token_details?.number_of_decimals ?? 11;
+      const amountAtoms = decimalsToAtoms(params.amount!, amountDecimals);
 
       if (token_details) {
-        input_amount_token_req += BigInt(params.amount! * Math.pow(10, token_details.number_of_decimals));
+        input_amount_token_req += amountAtoms;
         send_token = {
           token_id,
           number_of_decimals: token_details.number_of_decimals,
         };
       } else {
-        input_amount_coin_req += BigInt(params.amount! * Math.pow(10, 11));
+        input_amount_coin_req += amountAtoms;
       }
 
       outputs.push({
@@ -2272,13 +2274,13 @@ class Client {
             ? {
                 amount: {
                   decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, token_details.number_of_decimals)).toString(),
+                  atoms: amountAtoms.toString(),
                 },
               }
             : {
                 amount: {
                   decimal: params.amount!.toString(),
-                  atoms: (params.amount! * Math.pow(10, 11)).toString(),
+                  atoms: amountAtoms.toString(),
                 },
               }),
           ...(token_details
