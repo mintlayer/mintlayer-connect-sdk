@@ -20,12 +20,18 @@ jobs:
       - name: Derive package from tag
         run: |
           TAG="${{ inputs.tag }}"
+          TAG="${TAG//[[:space:]]/}"
           case "$TAG" in
             sdk-v*)      PKG="@mintlayer/sdk" ;;
             react-v*)    PKG="@mintlayer/react" ;;
             wasm-lib-v*) PKG="@mintlayer/wasm-lib" ;;
             *) echo "Unknown tag format: $TAG (expected sdk-vX.Y.Z | react-vX.Y.Z | wasm-lib-vX.Y.Z)" >&2; exit 1 ;;
           esac
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}.git"
+          if ! git ls-remote --exit-code "$REPO_URL" "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag not found on origin: $TAG. Push the release tag before dispatching Publish." >&2
+            exit 1
+          fi
           echo "PKG=$PKG" >> "$GITHUB_ENV"
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "PKG_DIR=packages/${PKG#*/}" >> "$GITHUB_ENV"
@@ -47,8 +53,8 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          version: 10
+        # version is derived from packageManager in package.json (pnpm@10.15.0);
+        # passing an explicit version here triggers a "Multiple versions of pnpm specified" error
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
