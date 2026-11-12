@@ -731,3 +731,15 @@ describe('Review-round regression pins', () => {
     expect(sizeHtlc).toBeGreaterThan(sizePlain);
   });
 });
+
+test('block reward funding retains its source type through assembly and decode', async () => {
+  const rewardUtxo = { ...ROUNDTRIP_UTXOS[0], outpoint: { ...ROUNDTRIP_UTXOS[0].outpoint, source_type: 'BlockReward' } };
+  const { tx, rt, json } = await buildAndDecode([
+    { type: 'Transfer', destination: USER_ADDRESS, value: { type: 'Coin', amount: { atoms: '100000000000', decimal: '1' } } },
+  ], { utxos: [rewardUtxo] });
+  expect(json.inputs[0].input.source_type).toBe('BlockReward');
+  expect(json.inputs[0].input.source_id).toBe(rewardUtxo.outpoint.source_id);
+  const encoded = rt.getTransactionBINrepresentation(rt.json() as any, 1);
+  const roundTrip = encode_transaction(mergeUint8Arrays(encoded.inputs), mergeUint8Arrays(encoded.outputs), 0n);
+  expect(Buffer.from(roundTrip).toString('hex')).toBe(tx.HEXRepresentation_unsigned);
+});

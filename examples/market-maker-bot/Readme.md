@@ -1,217 +1,209 @@
-# Market Maker Bot (UTXO Network)
+# Market Maker Bot
 
-## Overview
+A server-run Mintlayer market maker with a React control panel, SQLite persistence,
+and real Node.js WASM signing through `@mintlayer/sdk`.
 
-This project is an automated market-making bot designed for a UTXO-based blockchain network.  
-Unlike account-based systems (e.g. Ethereum), this bot operates on a UTXO model, meaning liquidity management, order tracking, and state reconstruction are derived from unspent transaction outputs.
+The server owns the wallet, strategy, transaction lifecycle and polling loop. The
+browser displays server state and sends commands; closing a tab does not stop the bot.
 
-The bot relies on an existing blockchain SDK to interact with the network, construct transactions, and query on-chain state.
+## Run locally
 
-Its primary goal is to provide continuous liquidity on selected trading pairs by maintaining bid/ask orders and dynamically rebalancing inventory.
+Use Node.js 24 and the workspace's pinned pnpm 10.15.0. From the repository root:
 
----
-
-## Key Features
-
-- Automated market making on UTXO-based DEX / orderbook
-- Inventory-aware quoting (risk-adjusted spread)
-- Real-time order book tracking via SDK
-- UTXO-aware balance management (no account abstraction)
-- Auto rebalancing between assets in a pair
-- Configurable spread, depth, and order size
-- Fail-safe order cancellation / replacement logic
-- Stateless recovery from blockchain data (rebuild from UTXO set)
-
----
-
-## Architecture
-
-### 1. Chain Layer (SDK)
-Responsible for all blockchain interactions:
-- Fetching UTXOs
-- Broadcasting transactions
-- Querying order book / DEX state
-- Address management
-
-> All interactions go strictly through the provided SDK.
-
-### 2. Strategy Layer
-Implements market-making logic:
-- Spread calculation
-- Mid-price estimation
-- Inventory exposure control
-- Order placement / cancellation decisions
-
-### 3. Execution Layer
-Handles:
-- Transaction construction via SDK
-- Signing & broadcasting
-- Retry logic
-- Conflict resolution (UTXO double-spend handling)
-
----
-
-## Requirements
-
-- Node.js >= 20
-- pnpm 10.x when using Node 20. pnpm 11 requires Node 22.13+ because it uses `node:sqlite`.
-- Access to the UTXO network SDK
-- Running API server
-- Valid wallet keys for signing transactions
-
----
-
-## Installation
-
-From the repository root:
-
-```bash
-corepack prepare pnpm@10.15.0 --activate
+```sh
 pnpm install
 pnpm build:sdk
-pnpm --filter market-maker-bot dev
-```
-
-The app is a Vite React SPA and runs entirely in the browser. It consumes `@mintlayer/sdk` from the current pnpm workspace.
-
-If your shell still resolves to pnpm 11 on Node 20, run the command through the pinned version:
-
-```bash
-npx pnpm@10.15.0 --filter market-maker-bot build
-```
-
----
-
-## Configuration
-
-Create a `.env` file:
-
-```env
-VITE_NETWORK=testnet
-
-VITE_API_URL=
-VITE_BATCH_API_URL=
-VITE_API_KEY=
-
-VITE_WALLET_SEED=your-testnet-mnemonic
-
-VITE_PAIR=HUG/ML
-VITE_BASE_TOKEN=token_id_for_HUG
-VITE_QUOTE_TOKEN=Coin
-VITE_ORDER_SIZE=0.01
-VITE_REFERENCE_PRICE=1
-VITE_SPREAD_BPS=20
-VITE_INVENTORY_TARGET=0.5
-VITE_REBALANCE_THRESHOLD=0.1
-
-VITE_MAX_POSITION=1.0
-VITE_MAX_ORDERS=10
-VITE_MAX_UNCONFIRMED_BRANCH_DEPTH=24
-VITE_ALLOW_MAINNET_BROADCAST=false
-VITE_SIMULATE_OWN_FILLS=false
-VITE_SIMULATION_TRADE_TIMEOUT_MS=60000
-```
-
-Important: a `VITE_WALLET_SEED` value is bundled into browser code. Use this only for testnet/demo wallets. Production unattended bots should keep signing keys outside the browser.
-
-Token configuration uses SDK currency ids. Set `VITE_BASE_TOKEN` / `VITE_QUOTE_TOKEN` to `Coin` for ML or to the actual Mintlayer token id for tokens. Tickers such as `HUG` are display labels only and will not match balances returned by `client.getBalances()`.
-
-`VITE_API_URL` supplies balances and market data. `VITE_BATCH_API_URL` must point to the Mojito-compatible `/batch` service for the *same chain/indexer*, because it supplies the UTXOs used to fund transactions. When using a custom API server, set both; otherwise the bot can display a large balance from one source while assembling transactions from another source's small UTXO set.
-
----
-
-## Usage
-
-### Start bot
-
-```bash
+cp examples/market-maker-bot/.env.example examples/market-maker-bot/.env
+# Set BOT_WALLET_SEED and the actual BOT_BASE_TOKEN ID in that file.
+pnpm --filter market-maker-bot build
 pnpm --filter market-maker-bot start
 ```
 
-### Development mode
+Open http://127.0.0.1:3001. A fresh database starts **stopped, in Dry run**.
+Sign in if `BOT_ADMIN_PASSWORD` is configured. Wait for synchronization, review
+proposals, select an execution mode and press Start.
 
-```bash
-pnpm --filter market-maker-bot dev
+For development, `pnpm --filter market-maker-bot dev` builds the backend once,
+starts it on port 3001, and starts Vite on port 5173 with an API/SSE proxy. Frontend
+HMR works normally; restart this command after backend changes.
+
+The server loads `.env` relative to its working directory. Workspace filter commands
+run in `examples/market-maker-bot`. If launching the executable directly, use that
+working directory or provide all settings through the process environment.
+
+## Node WASM
+
+The build uses the existing real CommonJS WASM build in
+`packages/sdk/tests/__mocks__/pkg-node`, with the same no-op default initializer as
+`packages/sdk/tests/__mocks__/@mintlayer/wasm-lib.ts`. There is no fake encoding.
+
+`BOT_NODE_WASM_DIR=/path/to/pkg-node pnpm --filter market-maker-bot build` selects
+an alternative compatible Node build. It must contain `package.json`,
+`wasm_wrappers.js` and `wasm_wrappers_bg.wasm` and export the functions required by
+the SDK. The build copies these files into `dist-server/wasm-node`; the deployed
+executable does not read from the tests directory. Generated WASM bindings are not
+modified. Keep this artifact beside the backend executable.
+
+## Modes and controls
+
+- **Observe:** synchronize and display state; do not build or send new transactions.
+- **Dry run:** build/sign previews on the server without submitting or reserving funds.
+- **Live:** execute proposals and recover submissions while running.
+- **Start/Stop:** control automatic execution. Stop immediately fences in-flight
+  builds before submission. Transactions already submitted remain tracked.
+- **Sync now:** refresh chain/wallet state without starting automatic execution.
+- Manual operations use the same serialized executor and risk limits as the loop.
+
+Strategy settings are edited as a draft and applied with a version check. Changing
+assets requires stopping and settling open orders. The server's network, mnemonic,
+credentials and mainnet broadcast policy cannot be changed through the UI.
+
+The ordinary strategy maintains bid/ask levels, skews quotes toward the configured
+inventory target, fills external orders when rebalancing is enabled, and concludes
+filled/excess or displaced orders before replacing them. Limits include worst-case
+base acquisition by open bids, pending transactions, branch depth and fee budgets.
+Quote and fill amounts are computed in atoms with per-token decimals. Self-fill
+simulation is an explicit testnet-only option with a settlement delay. Different
+orders can trade consecutively using accepted unconfirmed WalletState change;
+settling one order does not block fills of other orders.
+For a creation observed in mempool, exact initial order data from its durable
+transaction also permits a fill before the indexer publishes the order endpoint.
+
+## Persistence and recovery
+
+One local SQLite file stores SDK `WalletTx` records, sync cursors, trading settings,
+commands, signed transaction attempts, reservations, owned orders and events.
+`WalletState` remains the SDK implementation that derives UTXOs from transactions;
+there is no separate UTXO database model.
+
+SQLite uses WAL, FULL synchronous commits and short transactions. A separate
+SQLite owner-lock file prevents two executors from running against the same DB.
+The OS releases that lock after exit or SIGKILL. Store DB files on a local
+persistent filesystem. Do not remove DB/WAL files to recover an uncertain tx.
+
+Signed bytes and reservations are committed before sending. A timeout or a failed
+result write leaves an `unknown`/`submitting` attempt with its inputs reserved.
+Recovery checks the transaction ID and resends **the same signed bytes**, with
+bounded backoff, rather than building a second order. Recovery sends only while
+Start is active and execution mode is Live; other modes continue observing.
+
+On restart `BOT_AUTO_RESUME=false` keeps automatic execution stopped. With
+`BOT_AUTO_RESUME=true`, a previously running mode resumes after successful sync.
+A changed mainnet policy still blocks live broadcasting.
+
+Without `BOT_RPC_URL`, the bot can submit through an indexer with POST routes enabled.
+Own change is usable when that indexer also exposes the transaction in its mempool;
+otherwise only confirmed funding is available. With RPC, the bot also verifies the
+node/indexer chain and lag and checks the normal/orphan mempool directly.
+Missing indexer data alone never releases a reservation. A confirmed conflicting
+input spend invalidates dependent attempts when the indexer exposes spend metadata.
+Unsupported spend-status endpoints leave the attempt unresolved, visible in UI;
+the bot will not guess that funds are free. Transiently dropped transactions are
+rebroadcast from their original bytes.
+
+The first sync scans address history in batches to recover prior own orders,
+including filled orders no longer visible in the market listing. Pair requests
+walk all pages. Historical concluded orders are not counted as open liquidity.
+Reorgs trigger wallet rollback and reconciliation before more trading. Stale,
+partial or failed synchronization pauses new decisions.
+
+Diagnostic events/finished commands have configurable retention; transaction
+history and unresolved attempts do not expire. UI history uses bounded pages.
+SQLite WAL checkpoints run periodically; log files should be rotated by the process
+supervisor. A synthetic 20,000-transaction replay test measures the existing SDK
+model before considering any performance changes.
+
+## Configuration
+
+See `.env.example` for all defaults. Important server settings:
+
+| Setting | Purpose |
+| --- | --- |
+| `BOT_WALLET_SEED` | Mnemonic available only to the server |
+| `BOT_API_URL`, `BOT_API_KEY` | Indexer; address UTXOs are queried from this same source |
+| `BOT_RPC_URL`, `BOT_RPC_USER`, `BOT_RPC_PASSWORD` | Optional node RPC for mempool and submission |
+| `BOT_DB_PATH` | Persistent local SQLite file; use separate files for different wallets/networks |
+| `BOT_ADMIN_PASSWORD` | UI password; required when binding beyond loopback |
+| `BOT_COOKIE_SECURE` | Set true when serving UI over HTTPS |
+| `BOT_AUTO_RESUME` | Resume the saved running state after restart; default false |
+| `BOT_DAILY_FEE_LIMIT`, `BOT_MAX_TX_FEE` | Rolling 24-hour and per-tx fee caps in coin units |
+| `BOT_MAX_PENDING` | Cap on unresolved/unconfirmed submissions |
+| `BOT_EVENT_RETENTION_DAYS` | Diagnostic history retention; default 14 days |
+
+Trading parameters initialize a new DB. Later UI edits are persisted in SQLite.
+Operational settings and secrets are read on every server start. Legacy `VITE_*`
+trading/seed/API variables are accepted **only by the backend** for migration;
+rename them to `BOT_*`. Vite exposes only `PUBLIC_*`, and the frontend never
+imports the signing client or network provider. `VITE_BATCH_API_URL` is no longer
+needed: direct address UTXO requests use the configured indexer.
+
+Before moving an existing wallet, stop the old browser loop and wait for in-flight
+operations to finish. Avoid running both implementations with the same wallet.
+The server rebuilds confirmed history from the network; it does not blindly import
+old browser reservations or broadcast unsigned/localStorage records.
+
+## Logs and health
+
+Fastify/Pino writes structured runtime/request logs to stdout. The SQLite event
+journal records state changes and command errors. Signed bytes, seeds and
+credentials are not included in public API state; signing previews stay server-side.
+SDK initialization also emits its existing startup diagnostics.
+
+- `GET /health/live`: process liveness.
+- `GET /health/ready`: successful initialization and fresh sync; 503 otherwise.
+- UI: last sync/cycle, data freshness, execution mode, config version, own orders,
+  pending/unknown/confirmed attempts, events and paginated history.
+
+For a local long-running process, `pnpm --filter market-maker-bot start:service`
+restarts the server after a crash with bounded backoff and keeps runtime logs in
+`data/runtime.log` (10 MiB per file, three rotated files). It resumes the persisted
+running flag; a UI Stop remains stopped after restart. Run it independently of
+your terminal session when leaving it unattended. Stop leaves on-chain orders open;
+use their Conclude action to settle them. The host still needs to remain awake.
+
+## Backup and restore
+
+While the server is running:
+
+```sh
+pnpm --filter market-maker-bot backup /absolute/path/to/backup.sqlite
 ```
 
----
+This uses SQLite Online Backup and works with active WAL. Keep the backup private:
+it contains signed transaction bytes and trading history. The seed is not stored
+in the database. To restore, stop the server, choose a new `BOT_DB_PATH` pointing
+to the backup, then restart and inspect reconciliation before enabling Live.
 
-## Market Making Logic
+## Docker
 
-The bot continuously:
+Build from the repository root with the example's Dockerfile:
 
-1. Fetches latest order book via SDK
-2. Computes mid price
-3. Calculates bid/ask spread
-4. Evaluates current inventory (UTXO-based balances)
-5. Places or updates orders accordingly
-6. Cancels stale or unfilled orders
-7. Rebalances assets if exposure exceeds threshold
-
-### UTXO-specific behavior
-
-- Balance is derived from UTXO aggregation, not account balance
-- Orders consume UTXOs when executed
-- Partial fills may result in fragmented UTXO sets
-- The bot maintains a local UTXO index
-- State reconciliation happens on every cycle
-
----
-
-## Safety Mechanisms
-
-- Duplicate UTXO detection before transaction broadcast
-- Idempotent order placement
-- Automatic recovery after crash
-- Circuit breaker for abnormal spreads
-- Max exposure limits per asset
-- Browser transaction state is persisted locally and interpreted through SDK `WalletState`
-- UTXO branch depth is visualized and capped below the 30-transaction mempool chain limit
-- Mainnet auto-broadcast is disabled unless explicitly overridden
-
----
-
-## Current Implementation Status
-
-- React SPA scaffold, SDK initialization, and testnet mnemonic mode are implemented.
-- Wallet, balance, local UTXO, orderbook, own order, strategy proposal, transaction queue, and UTXO branch panels are implemented.
-- Strategy proposals run as dry-run by default. Signing a preview does not reserve UTXOs; only a broadcast attempt reserves its selected inputs while it is pending.
-- The Liquidity Simulation panel can drive a testnet lifecycle of quote, self-fill, and conclude/requote. It is disabled by default and runs only while the loop is active, Dry run is off, and broadcasting is enabled.
-- UTXO branch preparation is guarded and warns when multiple branch preparation transactions should be prepared one at a time.
-- Production unattended signing should move out of the browser before mainnet use.
-
----
-
-## Project Structure
-
-```text
-examples/market-maker-bot/
-├── PLAN.md
-├── PROGRESS.md
-├── ARCHITECTURE.md
-├── package.json
-├── vite.config.ts
-├── index.html
-├── src/
-│   ├── App.tsx
-│   ├── main.tsx
-│   ├── components/
-│   ├── hooks/
-│   └── lib/
+```sh
+docker build -f examples/market-maker-bot/Dockerfile -t mintlayer-market-maker .
+docker run --env-file examples/market-maker-bot/.env \
+  -e BOT_HOST=0.0.0.0 -e BOT_ADMIN_PASSWORD=replace-with-a-long-password \
+  -e BOT_DB_PATH=/data/bot.sqlite \
+  -v mintlayer-market-maker:/data -p 127.0.0.1:3001:3001 \
+  --restart unless-stopped --log-opt max-size=10m --log-opt max-file=3 \
+  mintlayer-market-maker
 ```
 
-The bot logic is split into SDK client setup, strategy calculation, execution queue, wallet transaction state, and UTXO branch management so it can later be moved to a headless runner if needed.
+For remote access put the UI behind HTTPS and set `BOT_COOKIE_SECURE=true`.
+The repository `.dockerignore` excludes environment files, wallet data and builds.
 
-Pair orders are fetched from `/order/pair/{tokenId}_TML` for token/ML markets instead of filtering the global `/order` list client-side.
+## Verification
 
----
+```sh
+pnpm --filter market-maker-bot test
+pnpm --filter market-maker-bot test:smoke # after build; uses an isolated fake chain
+pnpm --filter @mintlayer/sdk exec jest --runInBand
+pnpm build:sdk
+pnpm --filter market-maker-bot build
+```
 
-## Disclaimer
-
-Use at your own risk. Test on testnet first.
-
----
-
-## License
-
-MIT
+Server tests use real SQLite and Node WASM. They cover crash/timeout recovery,
+atomic reservations, preview isolation, control races, API authentication, full
+pagination, owned-order discovery/settlement, reorg, backup, branch selection,
+precise amounts and a 20,000-transaction journal. These tests make no live broadcasts.
+A 24–72 hour funded testnet run remains a separate operational acceptance step;
+local recovery tests do not establish that it has been completed.

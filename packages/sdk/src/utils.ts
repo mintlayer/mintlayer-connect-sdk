@@ -59,18 +59,36 @@ function atomsToDecimal(atoms: string | number, decimals: number): string {
   return fractionalPart === '' ? integerPart : `${integerPart}.${fractionalPart}`;
 }
 
+/** Convert a decimal amount without passing string amounts through a JS number.
+ * Extra fractional digits round to the nearest atom, away from zero on ties.
+ * Number inputs retain the previous toFixed rounding behavior.
+ */
 export function decimalsToAtoms(value: string | number, decimals: number): bigint {
-  const v = Number(value);
-  const [intPart, fracPart = ''] = v.toFixed(decimals).split('.');
-  const paddedFrac = (fracPart + '0'.repeat(decimals)).slice(0, decimals);
-  const full = intPart + paddedFrac;
-  return BigInt(full);
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 100) {
+    throw new Error('Decimals must be an integer between 0 and 100');
+  }
+  if (typeof value === 'number' && !Number.isFinite(value)) throw new Error('Invalid decimal amount');
+  const text = typeof value === 'number' && Math.abs(value) < 1e21 ? value.toFixed(decimals) : String(value).trim();
+  const normalized = text.replace(/^([+-]?)\./, (_match, sign: string) => `${sign}0.`);
+  const match = /^([+-]?)(\d+)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(normalized);
+  if (!match) throw new Error('Invalid decimal amount');
+  const exponent = Number(match[4] ?? 0);
+  if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 1000) throw new Error('Decimal exponent out of range');
+  const digits = match[2] + (match[3] ?? '');
+  const shift = decimals + exponent - (match[3]?.length ?? 0);
+  let magnitude: bigint;
+  if (shift >= 0) magnitude = BigInt(digits) * 10n ** BigInt(shift);
+  else {
+    const divisor = 10n ** BigInt(-shift);
+    const integer = BigInt(digits);
+    magnitude = integer / divisor + (integer % divisor * 2n >= divisor ? 1n : 0n);
+  }
+  return match[1] === '-' ? -magnitude : magnitude;
 }
 
-export function decimals(value: string | number, decimals: number): string {
-  const v = Number(value);
-  if (isNaN(v)) return '0';
-  return v.toFixed(decimals).replace(/\.?0+$/, '');
+export function decimals(value: string | number, precision: number): string {
+  const atoms = decimalsToAtoms(value, precision);
+  return `${atoms < 0n ? '-' : ''}${atomsToDecimal((atoms < 0n ? -atoms : atoms).toString(), precision)}`;
 }
 
 export { mergeUint8Arrays, stringToUint8Array, hexToUint8Array, uint8ArrayToHex, BASE58_ALPHABET, atomsToDecimal };

@@ -193,7 +193,11 @@ function getTransactionInputsBytesFor(
     .filter(({ input }) => input.input_type === 'UTXO')
     .map(({ input }) => {
       const bytes = Uint8Array.from(input.source_id.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
-      return encode_input_for_utxo(encode_outpoint_source_id(bytes, SourceId.Transaction), input.index);
+      const source =
+        input.source_type === SourceId.BlockReward || String(input.source_type) === 'BlockReward'
+          ? SourceId.BlockReward
+          : SourceId.Transaction;
+      return encode_input_for_utxo(encode_outpoint_source_id(bytes, source), input.index);
     });
 
   const inputCommands = (inputs as any[])
@@ -1162,8 +1166,8 @@ const decodedInput = (input: any, index: number): any => {
         // the OUTPOINT index from the decode — NOT the input's array position
         index: input.Utxo.index,
         input_type: 'UTXO',
-        source_id: input.Utxo.id.Transaction,
-        source_type: 'Transaction',
+        source_id: input.Utxo.id.Transaction ?? input.Utxo.id.BlockReward,
+        source_type: input.Utxo.id.BlockReward !== undefined ? 'BlockReward' : 'Transaction',
       },
     };
   }

@@ -1,40 +1,145 @@
-# Market Maker SPA Progress
+# Server migration progress
 
-## Current Status
+Updated: 2026-11-12.
 
-- The Vite React TypeScript SPA implementation is complete for the approved first version.
-- The app builds successfully with `pnpm --filter market-maker-bot build`.
-- The repository now pins `pnpm@10.15.0` for Node 20 compatibility.
-- Token balances are shown by SDK `token_id`; configured token values must use token ids rather than tickers.
+## Implemented
 
-## Completed
+- One TypeScript/Node backend with Fastify, a serialized BotRunner and SQLite WAL.
+- Existing SDK WalletState retained. SQLite WalletTxStore replaces localStorage;
+  transactions still derive the wallet's UTXO state.
+- Existing real CommonJS Node WASM build, adapted like the SDK Jest shim and
+  copied beside the backend executable. No generated WASM bindings changed.
+- Server-only mnemonic/signing/API credentials; the browser bundle contains no
+  account provider, WASM or injected VITE seed. Legacy VITE settings are read only
+  on the server; new configuration uses BOT_*.
+- Durable, versioned config, idempotent commands, immediate Stop/mode downgrade
+  fencing, normal automatic market making and separate testnet self-fill simulation.
+- SQLite owner lock, atomic input/order reservations, signed bytes before submit,
+  explicit first-submit rejection vs unknown outcome, exact-byte retries and
+  confirmation/conflict/reorg reconciliation.
+- Full pair pagination, address-history bootstrap with persisted batch progress,
+  registry of own orders including fully filled/unsettled orders, and durable
+  settlement flags that historical API pages cannot reopen.
+- Mempool-aware unconfirmed change with same-chain/node-lag checks. Without RPC,
+  spending is restricted to confirmed outputs. Shallow branches are preferred.
+- Atom-based quoting/fills, token metadata decimals, worst-case open-bid exposure,
+  pending/depth limits and server-configured rolling/per-transaction fee caps.
+- React panels now consume HTTP snapshots, commands and SSE invalidation. Added
+  own-order settlement, server event history, paginated transaction/event browsing,
+  login and config drafts with explicit Apply.
+- JSON runtime/request logs plus durable business events, freshness/health checks,
+  SQLite Online Backup CLI, persistent data directory and Docker run instructions.
+- Targeted SDK corrections: exact decimal-string amounts and create-order inputs,
+  BigInt conclude proceeds, TokenV1 decimals in fill, order-independent chain depth,
+  reorg state taking precedence over old confirmation metadata, and block-reward source preservation during input encoding/decoding.
 
-- Created persistent planning memory in `PLAN.md`.
-- Created this progress log.
-- Added `ARCHITECTURE.md` with the app state model and UTXO branch policy.
-- Updated `Readme.md` with installation, env vars, usage, structure, and safety notes.
-- Scaffolded a workspace Vite React app with `@mintlayer/sdk`.
-- Implemented browser mnemonic SDK initialization with default testnet guardrails.
-- Implemented localStorage-backed `WalletState` persistence and wallet snapshots.
-- Implemented synthetic orderbook construction from SDK order lists.
-- Implemented inventory-aware dry-run strategy proposals.
-- Implemented a transaction execution queue for build, sign, local reserve, broadcast, and rejection tracking.
-- Implemented UTXO branch visualization and guarded branch preparation requests.
+## Verification completed
 
-## In Progress
+- SDK: 20 Jest suites, 116 tests, 17 snapshots passed; SDK TypeScript build passed.
+- Bot: 37 server integration tests passed with real SQLite and Node WASM, without
+  DOM/jsdom and without live broadcasts.
+- Bot frontend/server TypeScript checks and production build passed.
+- Frozen workspace lockfile install validated with pinned pnpm 10.15.0.
+- Production smoke: launched real backend/static UI against a temporary local fake
+  indexer; checked auth, readiness, assets, dry-run Start/Stop and frontend artifact
+  isolation. All temporary servers were shut down.
+- Browser check of production UI: login, Start, config Apply/version increment and
+  Stop behaved as expected; the server remained authoritative.
+- Real Node WASM create → self-fill → conclude lifecycle tested against controlled
+  chain observations; a running mode downgrade prevented further submissions.
+- Recovery tests include lost response, write failure after network acceptance,
+  interrupted unsigned intent, dependency invalidation, preview isolation, reorg,
+  same-ID create retry, old queued Start/Live fencing, owner-lock release on SIGKILL,
+  backup restore and bootstrap progress.
+- A synthetic 20,000-transaction SQLite in-memory journal restored/replayed in
+  roughly 80–100 ms per pass locally. This measures the existing SDK derivation;
+  it is not a long-duration memory or on-disk durability benchmark.
 
-- No implementation task is currently in progress.
+## Operational acceptance remaining
 
-## Next
+- A funded 24–72 hour testnet run against the actual target indexer/node has not
+  been performed. Validate its API/RPC capabilities, fees, rate limits, long-run
+  memory/WAL growth and recovery under real outages before unattended live use.
+- The Dockerfile/run recipe is supplied but no Docker image build was run here.
+- The existing browser wallet state is not imported as trusted reservations.
+  Stop the old bot before using its wallet on the server; bootstrap uses chain data.
+- Some indexers do not expose reliable input spend metadata. Such uncertain
+  transactions retain reservations and remain visible; missing data is never
+  treated as permission to reuse their inputs.
+- Durable financial history intentionally grows on disk. Event/command retention,
+  log rotation and backups are configured separately; deleting the database is
+  not a transaction recovery mechanism.
 
-- Manual test with a funded testnet mnemonic and broadcast disabled first.
-- Fix the existing SDK TypeScript error in `packages/sdk/src/mintlayer-connect-sdk.ts` before relying on `pnpm build:sdk` as a green verification step.
+## Live testnet check — 2026-11-12
 
-## Verification Log
+- Started the production server with the operator's updated `.env`. Live wallet
+  synchronization, token metadata and full pair pagination succeeded.
+- Verified the create-order guard against the existing 65 active orders and a
+  configured MAX_ORDERS=10. A signed preview succeeded without submission.
+- After explicit operator approval, temporarily raised the cap to 66 and submitted
+  exactly one ask: give 0.01 VESPA, ask 0.00522001311 TML, fee 0.443 TML.
+- The transaction was accepted, observed in the mempool, then mined. The order
+  endpoint returned its exact balances and the derived order ID matched the chain.
+- The backend reconciled the transaction to confirmed and released both input
+  reservations. The wallet now has 66 active orders; no additional order was made.
+- Restored MAX_ORDERS=10 immediately after submission (config version 3). Automatic
+  execution stayed stopped throughout. The server remains available on localhost.
+- The detailed run record is in ignored `data/one-test-order.json`; it contains
+  transaction/order identifiers and verification results, never keys or signed bytes.
+- This verifies a live create/confirm cycle; it does not replace the remaining
+  24–72 hour operational acceptance run or live node-RPC testing.
 
-- `pnpm --filter market-maker-bot build` passed.
-- `pnpm install` passed and repaired workspace dependency links.
-- `pnpm build:sdk` failed in existing SDK code at `packages/sdk/src/mintlayer-connect-sdk.ts` where `params.token_id` is `string | undefined` but the HTLC build params require `string`.
-- User-reported pnpm 11 failure on Node 20 is an environment/toolchain mismatch; pnpm 11 requires Node 22.13+ and imports `node:sqlite`.
-- Token balance display was clarified: the SDK returns `sdkBalances.token` as `Record<token_id, number>`, so `VITE_BASE_TOKEN=HUG` will display zero unless `HUG` is the actual token id.
-- Order book fetching now uses `/order/pair/{tokenId}_TML` for token/ML pairs and ignores zero-balance orders when building bids/asks.
+## Continuous testnet run — 2026-11-12
+
+- Operator authorized continued live trading including own fills. Enabled both
+  testnet self-fill simulation and own-fill eligibility; retained MAX_ORDERS=10,
+  the existing fee budgets and UTXO safety limits.
+- A live conclude exposed an SDK bug: a fully filled token order generated an
+  invalid zero-token remainder output. Omitted empty token payouts, including
+  zero ask proceeds when an order has never traded.
+- The public indexer wraps this intrinsic node validation error in HTTP 500.
+  Recognize that specific invalid-bytes rejection even after an earlier timeout,
+  release its reservations and retain ambiguous HTTP failures for reconciliation.
+  Recovered the previously reserved fee input without deleting wallet history.
+- Observed an actual own fill and its follow-up conclude both confirmed, followed
+  by submission of the next own fill. The loop remains running in Live mode.
+- Added `start:service`: bounded crash-restart backoff, persisted running-state
+  resume and 10 MiB logs with three rotated files. Started it independently of the
+  terminal. A separate isolated smoke run verified crash restart, resume, rotation
+  and graceful shutdown. Host shutdown/sleep still interrupts the run.
+- Validation: 20 SDK suites / 118 tests / 17 snapshots, 37 backend tests, SDK and
+  bot builds, production HTTP smoke and diff checks passed. A full-day soak has
+  not yet completed.
+
+## Self-fill throughput — 2026-11-12
+
+- Removed the simulation-wide wait for all pending transactions. Different orders
+  now consume accepted, unconfirmed WalletState change; order reservations still
+  prevent overlapping commands on the same order. Waiting on one settlement timer
+  no longer blocks other orders. Uncertain submissions, pending and depth limits
+  remain enforced by the runner and spendable-UTXO policy.
+- Applied a five-second interval to the active testnet run and reloaded through
+  the supervisor. Observed four simultaneously broadcasted self-fills whose fee
+  inputs form a parent/child chain of depth four, before block confirmation.
+- Added a real-WASM regression proving two fills of different orders spend
+  unconfirmed change without a block, respect the pending cap and survive restart.
+  All 38 backend tests, server build and diff checks passed.
+
+## Recovery from indexer order lag — 2026-11-12
+
+- The live run reached 159 confirmed transactions (67 fills, 90 concludes and two
+  creations), then stopped producing transactions: five pre-confirmation order
+  endpoint 404s exhausted a permanent build retry cap. The order later existed,
+  but its saved rejected intent could never rebuild. No submitted tx was pending.
+- Removed the lifetime retry ceiling; failures retain bounded backoff. Simulation
+  skips cooling-down candidates so a transient error on one order does not stop
+  work on other orders. This also allows rolling fee-budget failures to recover.
+- For independently observed mempool creations, the chain adapter can supply exact
+  initial order data from the durable create transaction when `/order` returns 404.
+  This fallback is refreshed each sync and removed if acceptance is no longer
+  observable; arbitrary missing orders never receive fabricated state.
+- Reloaded the supervised live process. The blocked fill rebuilt and confirmed;
+  the next create also confirmed, followed by further fill/create submissions.
+- All 40 backend tests passed, including more-than-five-failure recovery and real
+  WASM create-to-fill without an indexed order, restart and loss of visibility.
+  Server build and diff checks passed.

@@ -34,11 +34,7 @@ type ConfigPanelProps = {
   config: MarketMakerConfig;
   tokenLabels: TokenLabelMap;
   warnings: string[];
-  broadcastEnabled: boolean;
-  dryRun: boolean;
   setConfig: Dispatch<SetStateAction<MarketMakerConfig>>;
-  setBroadcastEnabled: (enabled: boolean) => void;
-  setDryRun: (enabled: boolean) => void;
 };
 
 function setNumber(config: MarketMakerConfig, key: keyof MarketMakerConfig, value: string): MarketMakerConfig {
@@ -47,7 +43,7 @@ function setNumber(config: MarketMakerConfig, key: keyof MarketMakerConfig, valu
 }
 
 export function ConfigPanel(props: ConfigPanelProps) {
-  const { config, tokenLabels, warnings, broadcastEnabled, dryRun, setConfig, setBroadcastEnabled, setDryRun } = props;
+  const { config, tokenLabels, warnings, setConfig } = props;
 
   return (
     <section className="panel configPanel">
@@ -62,12 +58,18 @@ export function ConfigPanel(props: ConfigPanelProps) {
         </label>
         <label>
           Base Token ID
-          <input value={config.baseToken} onChange={(event) => setConfig({ ...config, baseToken: event.target.value })} />
+          <input
+            value={config.baseToken}
+            onChange={(event) => setConfig({ ...config, baseToken: event.target.value })}
+          />
           <small className="fieldHint">Ticker: {formatTokenLabel(config.baseToken, tokenLabels)}</small>
         </label>
         <label>
           Quote Token ID
-          <input value={config.quoteToken} onChange={(event) => setConfig({ ...config, quoteToken: event.target.value })} />
+          <input
+            value={config.quoteToken}
+            onChange={(event) => setConfig({ ...config, quoteToken: event.target.value })}
+          />
           <small className="fieldHint">Ticker: {formatTokenLabel(config.quoteToken, tokenLabels)}</small>
         </label>
         <label>
@@ -130,21 +132,41 @@ export function ConfigPanel(props: ConfigPanelProps) {
             onChange={(event) => setConfig(setNumber(config, 'maxUnconfirmedBranchDepth', event.target.value))}
           />
         </label>
+        <label>
+          Max Base Position
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={config.maxPosition}
+            onChange={(event) => setConfig(setNumber(config, 'maxPosition', event.target.value))}
+          />
+        </label>
+        <label>
+          Rebalance Threshold
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.01"
+            value={config.rebalanceThreshold}
+            onChange={(event) => setConfig(setNumber(config, 'rebalanceThreshold', event.target.value))}
+          />
+        </label>
+        <label>
+          Cycle Interval (seconds)
+          <input
+            type="number"
+            min="5"
+            max="3600"
+            value={config.pollIntervalMs / 1000}
+            onChange={(event) =>
+              setConfig(setNumber(config, 'pollIntervalMs', String(Number(event.target.value) * 1000)))
+            }
+          />
+        </label>
       </div>
       <div className="switchRow">
-        <label className="switchLabel">
-          <input type="checkbox" checked={dryRun} onChange={(event) => setDryRun(event.target.checked)} />
-          Dry run
-        </label>
-        <label className="switchLabel">
-          <input
-            type="checkbox"
-            checked={broadcastEnabled}
-            disabled={dryRun}
-            onChange={(event) => setBroadcastEnabled(event.target.checked)}
-          />
-          Broadcast signed transactions
-        </label>
         <label className="switchLabel">
           <input
             type="checkbox"
@@ -195,15 +217,15 @@ export function WalletPanel(props: {
       </div>
       <div className="stats">
         <div>
-          <span>ML Balance</span>
+          <span>Available {formatTokenLabel('Coin', tokenLabels)}</span>
           <strong>{wallet?.sdkBalances?.coin.toFixed(8) ?? '0.00000000'}</strong>
         </div>
         <div>
-          <span>{formatTokenLabel(config.baseToken, tokenLabels)} Balance</span>
+          <span>Available {formatTokenLabel(config.baseToken, tokenLabels)}</span>
           <strong>{inventory.baseBalance.toFixed(8)}</strong>
         </div>
         <div>
-          <span>Base Share</span>
+          <span>Available Base Share</span>
           <strong>{(inventory.baseShare * 100).toFixed(2)}%</strong>
         </div>
         <div>
@@ -240,7 +262,8 @@ export function WalletPanel(props: {
         )}
         {configuredTokenMissing && (
           <p className="warningText">
-            Configured base token `{formatTokenLabel(config.baseToken, tokenLabels)}` did not match any SDK balance. Check the token id value.
+            Configured base token `{formatTokenLabel(config.baseToken, tokenLabels)}` did not match any SDK balance.
+            Check the token id value.
           </p>
         )}
       </div>
@@ -297,12 +320,14 @@ export function OrderBookPanel(props: {
           >
             <div className="dialogHeader">
               <h2 id="order-book-title">Order Book</h2>
-              <button className="secondary" onClick={() => setDetailsOpen(false)}>Close</button>
+              <button className="secondary" onClick={() => setDetailsOpen(false)}>
+                Close
+              </button>
             </div>
             <div className="addressBlock">
               <span>Pair</span>
               <strong>{formatPairLabel(config, tokenLabels)}</strong>
-              <code>{pairPath ?? 'Only token/Coin pairs are supported right now'}</code>
+              <code>{pairPath ?? 'Pair not configured'}</code>
             </div>
             <div className="stats">
               <div>
@@ -352,11 +377,11 @@ export function OrderBookPanel(props: {
                 highlightOwnOrders={showForeignOrders}
               />
             </div>
-            {!canConclude && (
-              <p className="muted">Initialize the SDK and turn off Dry Run in Strategy config to conclude and broadcast an order.</p>
-            )}
+            {!canConclude && <p className="muted">Select Live execution mode to broadcast an order conclusion.</p>}
             {activeOrders.length === 0 && (
-              <p className="muted">No active orders returned for this pair. Filled or zero-balance orders are ignored.</p>
+              <p className="muted">
+                No active orders returned for this pair. Filled or zero-balance orders are ignored.
+              </p>
             )}
             {book.midPrice === null && activeOrders.length > 0 && (
               <p className="warningText">
@@ -386,7 +411,9 @@ function OrderSide(props: {
       <table>
         <thead>
           <tr>
-            <th>Price ({props.quoteLabel}/{props.baseLabel})</th>
+            <th>
+              Price ({props.quoteLabel}/{props.baseLabel})
+            </th>
             <th>{props.baseLabel}</th>
             <th>{props.quoteLabel}</th>
             {props.onConclude && <th aria-label="Order action" />}
@@ -402,7 +429,7 @@ function OrderSide(props: {
                 <td>{row.baseAmount.toFixed(8)}</td>
                 <td>{row.quoteAmount.toFixed(8)}</td>
                 {props.onConclude && (
-                <td className="orderAction">
+                  <td className="orderAction">
                     {isOwnOrder && (
                       <button
                         className="secondary"
@@ -412,7 +439,7 @@ function OrderSide(props: {
                         Conclude
                       </button>
                     )}
-                </td>
+                  </td>
                 )}
               </tr>
             );
@@ -440,10 +467,18 @@ export function StrategyPanel(props: {
       </div>
       <div className="manualQuoteControls">
         <span className="muted">Manual quote reference: {props.manualReferencePrice.toFixed(8)}</span>
-        <button className="secondary" disabled={!props.canCreateManualOrder} onClick={() => props.onCreateManualOrder('bid')}>
+        <button
+          className="secondary"
+          disabled={!props.canCreateManualOrder}
+          onClick={() => props.onCreateManualOrder('bid')}
+        >
           Create bid −5%
         </button>
-        <button className="secondary" disabled={!props.canCreateManualOrder} onClick={() => props.onCreateManualOrder('ask')}>
+        <button
+          className="secondary"
+          disabled={!props.canCreateManualOrder}
+          onClick={() => props.onCreateManualOrder('ask')}
+        >
           Create ask +5%
         </button>
       </div>
@@ -456,10 +491,12 @@ export function StrategyPanel(props: {
               </strong>
               <p>{action.reason}</p>
             </div>
-            <button onClick={() => props.onExecute(action)}>{props.dryRun ? 'Sign Preview' : 'Execute'}</button>
+            <button onClick={() => props.onExecute(action)}>{props.dryRun ? 'Preview' : 'Execute'}</button>
           </div>
         ))}
-        {props.actions.length === 0 && <p className="muted">No strategy actions. Initialize and refresh market data.</p>}
+        {props.actions.length === 0 && (
+          <p className="muted">No strategy actions. Initialize and refresh market data.</p>
+        )}
       </div>
     </section>
   );
@@ -467,54 +504,22 @@ export function StrategyPanel(props: {
 
 export function FillSimulationPanel(props: {
   config: MarketMakerConfig;
-  setConfig: Dispatch<SetStateAction<MarketMakerConfig>>;
   running: boolean;
   dryRun: boolean;
   broadcastEnabled: boolean;
   records: ExecutionRecord[];
 }) {
-  const simulatedRecords = props.records.filter((record) => record.idempotencyKey.startsWith('simulation-'));
-  const lastRecord = simulatedRecords[0];
   const live = props.running && props.config.simulateOwnFills && !props.dryRun && props.broadcastEnabled;
-
   return (
     <section className="panel fillSimulationPanel">
       <div className="panelHeader">
-        <h2>Liquidity Simulation</h2>
-        <span className="badge">{live ? 'live' : 'standby'}</span>
+        <h2>Testnet Simulation</h2>
+        <span className="badge">{live ? 'live' : props.config.simulateOwnFills ? 'enabled' : 'off'}</span>
       </div>
       <p className="muted">
-        On each bot cycle, the simulator places a quote, takes one of this wallet&apos;s orders, then concludes the
-        remaining order before quoting again. These fills are broadcast transactions, not strategy proposals.
+        Server-controlled create → self-fill → conclude lifecycle. Configure it in Strategy config.
       </p>
-      <label className="switchLabel">
-        <input
-          type="checkbox"
-          checked={props.config.simulateOwnFills}
-          onChange={(event) => props.setConfig({ ...props.config, simulateOwnFills: event.target.checked })}
-        />
-        Simulate and self-fill own orders
-      </label>
-      <label>
-        Settlement timeout (seconds)
-        <input
-          type="number"
-          min="5"
-          step="1"
-          value={Math.floor(props.config.simulationTradeTimeoutMs / 1_000)}
-          onChange={(event) =>
-            props.setConfig(setNumber(props.config, 'simulationTradeTimeoutMs', String(Number(event.target.value) * 1_000)))
-          }
-        />
-        <small className="fieldHint">Wait before concluding a partially self-filled order.</small>
-      </label>
-      {!props.running && <p className="muted">Start Loop to run the lifecycle.</p>}
-      {(props.dryRun || !props.broadcastEnabled) && props.config.simulateOwnFills && (
-        <p className="warningText">Turn off Dry run and enable broadcasting before starting; otherwise no fills are sent.</p>
-      )}
-      {lastRecord && (
-        <p className="muted">Latest simulator action: {lastRecord.kind} · {lastRecord.status}</p>
-      )}
+      <p>Settlement delay: {props.config.simulationTradeTimeoutMs / 1000}s</p>
     </section>
   );
 }
@@ -530,7 +535,9 @@ export function TransactionPanel(props: { records: ExecutionRecord[] }) {
         {props.records.map((record) => (
           <div className="listItem" key={record.id}>
             <div>
-              <strong>{record.kind} - {record.status}</strong>
+              <strong>
+                {record.kind} - {record.status}
+              </strong>
               <p>{record.description}</p>
               {record.txId && <code>{record.txId}</code>}
               {record.error && <p className="errorText">{record.error}</p>}
@@ -585,6 +592,7 @@ export function BranchPanel(props: {
   plan: BranchPreparationPlan;
   tokenLabels: TokenLabelMap;
   onExecute: (request: ExecutionRequest) => void;
+  disabled?: boolean;
 }) {
   return (
     <section className="panel branchPanel">
@@ -605,7 +613,9 @@ export function BranchPanel(props: {
             <div className="depthBar">
               <span style={{ width: `${Math.min(100, branch.depth * 3.33)}%` }} />
             </div>
-            <p>Depth {branch.depth}, remaining {branch.remainingDepth}</p>
+            <p>
+              Depth {branch.depth}, remaining {branch.remainingDepth}
+            </p>
             {branch.warning && <p className="warningText">{branch.warning}</p>}
           </div>
         ))}
@@ -613,10 +623,12 @@ export function BranchPanel(props: {
       <div className="prepBox">
         <h3>Preparation Plan</h3>
         <p className="muted">
-          Source asset: {formatTokenLabel(props.plan.sourceAsset, props.tokenLabels)} ({props.plan.perBranchAmount} per branch)
+          Source asset: {formatTokenLabel(props.plan.sourceAsset, props.tokenLabels)} ({props.plan.perBranchAmount} per
+          branch)
         </p>
         <p className="muted">
-          {props.plan.availableBranches.length} of {props.plan.targetBranchCount} requested branches are already available.
+          {props.plan.availableBranches.length} of {props.plan.targetBranchCount} requested branches are already
+          available.
         </p>
         {props.plan.availableBranches.length > 0 && (
           <div className="list">
@@ -624,7 +636,9 @@ export function BranchPanel(props: {
               <div className="listItem" key={branch.outpoint}>
                 <div>
                   <strong>Use existing UTXO</strong>
-                  <p>{branch.amountAtoms} atoms · {branch.status} · depth {branch.depth}</p>
+                  <p>
+                    {branch.amountAtoms} atoms · {branch.status} · depth {branch.depth}
+                  </p>
                   <code>{branch.outpoint}</code>
                 </div>
               </div>
@@ -632,7 +646,9 @@ export function BranchPanel(props: {
           </div>
         )}
         {props.plan.warnings.map((warning) => (
-          <p className="warningText" key={warning}>{warning}</p>
+          <p className="warningText" key={warning}>
+            {warning}
+          </p>
         ))}
         <div className="list">
           {props.plan.actions.map((request) => (
@@ -644,10 +660,14 @@ export function BranchPanel(props: {
                 </strong>
                 <p>Destination: {props.plan.destination || 'wallet not initialized'}</p>
               </div>
-              <button onClick={() => props.onExecute(request)}>Prepare</button>
+              <button disabled={props.disabled} onClick={() => props.onExecute(request)}>
+                Prepare
+              </button>
             </div>
           ))}
-          {props.plan.actions.length === 0 && <p className="muted">No branch preparation needed from the current local state.</p>}
+          {props.plan.actions.length === 0 && (
+            <p className="muted">No branch preparation needed from the current local state.</p>
+          )}
         </div>
       </div>
     </section>

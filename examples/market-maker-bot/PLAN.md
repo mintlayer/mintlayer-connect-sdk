@@ -1,3 +1,5 @@
+> This browser-only plan is historical. The active implementation and agreed decisions are recorded in [SERVER_MIGRATION_PLAN.md](SERVER_MIGRATION_PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md) and [PROGRESS.md](PROGRESS.md). The server keeps SDK WalletState with a SQLite WalletTxStore and the existing real Node WASM build.
+
 # Market Maker SPA Implementation Plan
 
 This file is the workspace handoff copy of the approved plan. Keep it current when the implementation changes so another agent can continue without reading the chat.
