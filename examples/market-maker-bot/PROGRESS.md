@@ -143,3 +143,22 @@ Updated: 2026-11-12.
 - All 40 backend tests passed, including more-than-five-failure recovery and real
   WASM create-to-fill without an indexed order, restart and loss of visibility.
   Server build and diff checks passed.
+
+## Canonical conflict recovery — 2026-11-12
+
+- A live status check exposed a falsely conflicted create that was actually mined.
+  Its spent-input metadata had been treated as proof of a competing spend during
+  transaction-endpoint lag. WalletState then propagated the stale rejection through
+  confirmed descendants, hiding their subsequent unconfirmed change.
+- Conflict detection now identifies a different transaction spending the exact
+  outpoint in a verified canonical block. A spent-height flag alone is insufficient.
+- Address-history sync rechecks locally rejected/conflicted transactions, restores
+  canonical confirmations and attempt/order state, and renews reservations atomically
+  if a previously invalidated transaction is observed back in mempool.
+- WalletState no longer propagates an ancestor's local rejection through a confirmed
+  descendant. Such a confirmation establishes a valid funding boundary.
+- Reloaded through the supervisor. The false conflict recovered to confirmed,
+  available TML recovered from 0.66 to approximately 99.75 and live fills/settlements
+  resumed. At the check: 176 confirmed attempts and two broadcasted attempts.
+- Validation: 42 backend tests, all 20 SDK suites / 119 tests / 17 snapshots,
+  SDK/server builds and diff checks passed.

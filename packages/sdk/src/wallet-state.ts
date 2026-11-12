@@ -783,6 +783,11 @@ export class WalletState {
           continue;
         }
 
+        // Canonical confirmation proves this transaction and its ancestry are
+        // valid. A stale local rejection of an ancestor cannot poison it or
+        // the unconfirmed change chains built on top of it.
+        if (getWalletTxState(tx) === 'confirmed') continue;
+
         const txJson = getTxJson(tx.tx);
         const dependsOnRejectedTx = txJson.inputs
           .map(getInputOutPoint)

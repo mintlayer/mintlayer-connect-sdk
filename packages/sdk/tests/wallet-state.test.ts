@@ -196,6 +196,21 @@ test('releases inputs and rejects dependent local chain when broadcast requires 
   expect(rejectedUtxos.find((utxo) => utxo.txId === 'child-local-spend')?.status).toBe('rejected');
 });
 
+test('a confirmed descendant shields its change from a stale rejected ancestor', async () => {
+  const ancestor = coinTransfer(ADDRESS, '100');
+  const confirmed = coinTransfer(ADDRESS, '99');
+  const change = coinTransfer(ADDRESS, '98');
+  const store = createMemoryWalletTxStore({ transactions: { bot: [
+    walletTx('ancestor', [ancestor], 'conflicted'),
+    walletTx('mined', [confirmed], 'confirmed', [utxoInput('ancestor', 0, ancestor)]),
+    { ...walletTx('pending', [change], 'mempool', [utxoInput('mined', 0, confirmed)]), createdByWallet: true },
+  ] } });
+  const state = await WalletState.create({ accountId: 'bot', store, isMineOutput });
+  const available = state.getSpendableUtxos({ allowUnconfirmed: true, allowOwnChangeOnly: true });
+  expect(available.map(u => u.txId)).toEqual(['pending']);
+  expect(available[0].unconfirmedChainDepth).toBe(1);
+});
+
 test('sync diff can confirm local transactions and mark external spends', async () => {
   const fundingOutput = coinTransfer(ADDRESS, '100');
   const store = createMemoryWalletTxStore({

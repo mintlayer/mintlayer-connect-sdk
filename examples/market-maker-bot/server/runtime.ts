@@ -473,7 +473,7 @@ export class BotRunner {
           });
         }
       } else {
-        if (await this.api.hasConfirmedInputConflict(txJson(attempt.tx).inputs)) {
+        if (await this.api.hasConfirmedInputConflict(txJson(attempt.tx).inputs, attempt.record.txId)) {
           this.invalidateChain(attempt.record.txId);
           continue;
         }
@@ -616,7 +616,7 @@ export class BotRunner {
       throw new Error('Address history response is incomplete');
     const known = new Map(this.db.transactions(this.account).map((tx) => [tx.txId, tx]));
     const missing = [...new Set<string>(summaries.flatMap((summary) => summary.transaction_history))].filter(
-      (id) => !known.has(id) || known.get(id)?.state === 'orphaned',
+      (id) => !known.has(id) || ['orphaned', 'rejected', 'conflicted'].includes(known.get(id)!.state ?? ''),
     );
     let processed = 0;
     for (const id of missing.reverse().slice(0, 100)) {
@@ -652,6 +652,25 @@ export class BotRunner {
           this.db.saveOrder(order, true);
         }
         this.db.putWalletTx(this.account, observed);
+        if (observed.state === 'confirmed') {
+          const attempt = this.db.attemptByTxId(id);
+          if (attempt && attempt.record.status !== 'confirmed') {
+            attempt.record = { ...attempt.record, status: 'confirmed', error: undefined, updatedAt: Date.now() };
+            this.db.transition(this.account, attempt, observed, true);
+            if (attempt.createdOrder) this.db.restoreConfirmedCreation(attempt.createdOrder.order_id);
+            if (attempt.request.kind === 'conclude-order') this.db.concludeOrder(attempt.request.orderId);
+          }
+        } else {
+          const attempt = this.db.attemptByTxId(id);
+          if (attempt?.tx && attempt.signedHex && ['rejected', 'conflicted', 'cancelled'].includes(attempt.record.status)) {
+            attempt.record = { ...attempt.record, status: 'broadcasted', error: undefined, updatedAt: Date.now() };
+            // Renew reservations atomically before treating a previously
+            // invalidated transaction as accepted. Conflicting ownership must
+            // fail synchronization rather than expose the inputs twice.
+            this.db.reserve(this.account, attempt);
+            this.db.transition(this.account, attempt, observed);
+          }
+        }
       });
       processed++;
     }

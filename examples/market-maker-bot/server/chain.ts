@@ -178,13 +178,30 @@ export class ChainApi implements ApiProvider {
     if (await this.rpc('mempool_contains_orphan_tx', [id])) return 'orphan';
     return 'absent';
   }
-  async hasConfirmedInputConflict(inputs: unknown[]): Promise<boolean> {
+  async hasConfirmedInputConflict(inputs: unknown[], txId: string): Promise<boolean> {
     for (const entry of inputs as any[]) {
       const input = entry?.input;
       if (input?.input_type !== 'UTXO' || input.source_type !== 'Transaction') continue;
       try {
         const output = await this.get(`/transaction/${input.source_id}/output/${input.index}`);
-        if (output.spent_at_block_height !== null && output.spent_at_block_height !== undefined) return true;
+        const height = output.spent_at_block_height;
+        if (height === null || height === undefined) continue;
+        if (!Number.isSafeInteger(Number(height)) || Number(height) < 0) continue;
+        const hash = await this.blockId(Number(height));
+        const block = await this.get(`/block/${hash}`);
+        const transactions = block.body?.transactions;
+        // A spent input alone is not a conflict: our own transaction may have
+        // mined while its transaction endpoint still lags. Identify the actual
+        // different spender in a canonical block before invalidating anything.
+        if (!Array.isArray(transactions) || transactions.some(tx => tx.id === txId)) continue;
+        const conflict = transactions.some(tx =>
+          typeof tx.id === 'string' && /^[0-9a-f]{64}$/i.test(tx.id) &&
+          Array.isArray(tx.inputs) && tx.inputs.some((entry: any) =>
+            entry.input?.input_type === 'UTXO' && entry.input.source_type === input.source_type &&
+            entry.input.source_id === input.source_id && entry.input.index === input.index,
+          ),
+        );
+        if (conflict && await this.blockId(Number(height)) === hash) return true;
       } catch (error) {
         // Older public deployments do not implement this endpoint. Neither
         // absence nor an unsupported endpoint proves a spend or a rejection.

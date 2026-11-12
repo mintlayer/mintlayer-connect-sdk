@@ -153,6 +153,12 @@ export class BotDatabase {
       JsonRow | undefined;
     return row ? JSON.parse(row.json) : null;
   }
+  attemptByTxId(id: string): Attempt | null {
+    const row = this.db.prepare(
+      "SELECT json FROM attempts WHERE tx_id=? AND COALESCE(json_extract(json,'$.preview'),0)=0 ORDER BY sequence DESC LIMIT 1",
+    ).get(id) as JsonRow | undefined;
+    return row ? JSON.parse(row.json) : null;
+  }
   saveAttempt(attempt: Attempt): void {
     const { record } = attempt;
     this.db
@@ -264,6 +270,9 @@ export class BotDatabase {
   }
   concludeOrder(id: string): void {
     this.db.prepare('UPDATE orders SET concluded=1 WHERE id=?').run(id);
+  }
+  restoreConfirmedCreation(id: string): void {
+    this.db.prepare('UPDATE orders SET concluded=0 WHERE id=?').run(id);
   }
   resetConcludedOrders(): void {
     this.db.prepare('UPDATE orders SET concluded=0 WHERE owned=1').run();

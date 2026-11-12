@@ -1182,6 +1182,49 @@ test('a confirmed input conflict releases both parent and dependent reservations
   db.close();
 });
 
+test('spent metadata requires a different canonical spender, never merely our own mined transaction', async () => {
+  const target = 'c'.repeat(64), other = 'd'.repeat(64);
+  let transactions: any[] | undefined;
+  const api = new ChainApi(options(), async (url) => {
+    const path = new URL(String(url)).pathname;
+    const body = path.endsWith('/output/0') ? { spent_at_block_height: 100 }
+      : path.endsWith('/chain/100') ? block
+      : { body: { transactions } };
+    return new Response(JSON.stringify(body));
+  });
+  assert.equal(await api.hasConfirmedInputConflict([input()], target), false);
+  transactions = [{ id: target, inputs: [input()] }];
+  assert.equal(await api.hasConfirmedInputConflict([input()], target), false);
+  transactions = [{ id: other, inputs: [input('e'.repeat(64))] }];
+  assert.equal(await api.hasConfirmedInputConflict([input()], target), false);
+  transactions = [{ id: other, inputs: [input()] }];
+  assert.equal(await api.hasConfirmedInputConflict([input()], target), true);
+});
+
+test('address history repairs a stale local conflict when the canonical transaction is found', async () => {
+  const f = fixture();
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  await runner.tick();
+  const account = db.getSetting<string>('account')!;
+  const state = await WalletState.create({ accountId: account, store: db.walletStore(), isMineOutput: (o: any) => o.destination === address });
+  const mock = mockClient();
+  const attempt = (await new Executor(db, mock.client, state, account).execute(request, f.opts.config, state.getSpendableUtxos(), () => true, false))!;
+  attempt.record = { ...attempt.record, status: 'conflicted', error: 'Stale local conflict' };
+  db.transition(account, attempt, { txId: mock.tx.id, tx: mock.tx, state: 'conflicted', createdByWallet: true }, true);
+  f.history.push(mock.tx.id);
+  f.observed.set(mock.tx.id, { ...mock.tx, block_id: block });
+  f.api.getAccountUtxos = async () => [{ outpoint: { source_type: 'Transaction', source_id: mock.tx.id, index: 0 }, utxo: mock.tx.outputs[0] }] as any;
+  await runner.tick();
+  assert.equal(db.getAttempt(request.idempotencyKey)?.record.status, 'confirmed');
+  assert.equal(db.transactions(account).find(tx => tx.txId === mock.tx.id)?.state, 'confirmed');
+  assert.equal(runner.snapshot().wallet?.availableUtxos[0].txId, mock.tx.id);
+  assert.equal(runner.snapshot().stale, false);
+  assert.equal(db.reservedResources().size, 0);
+  await runner.close();
+  db.close();
+});
+
 test('outer quote levels are retained when the market has not moved', () => {
   const config = {
     ...options().config,
