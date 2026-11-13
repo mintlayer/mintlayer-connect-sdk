@@ -95,17 +95,35 @@ Without `BOT_RPC_URL`, the bot can submit through an indexer with POST routes en
 Own change is usable when that indexer also exposes the transaction in its mempool;
 otherwise only confirmed funding is available. With RPC, the bot also verifies the
 node/indexer chain and lag and checks the normal/orphan mempool directly.
-Missing indexer data alone never releases a reservation. A confirmed conflicting
-input spend invalidates dependent attempts when the indexer exposes spend metadata.
+Missing indexer data alone never releases a reservation. A different canonical
+transaction spending the same input invalidates dependent attempts. For order
+commands, bounded and checkpointed block scans distinguish an actual competing
+conclusion/insufficient remaining balance from our own mined transaction while
+the transaction endpoint lags. Node validation reasons are retained with secrets
+and reflected signed bytes removed.
 Unsupported spend-status endpoints leave the attempt unresolved, visible in UI;
 the bot will not guess that funds are free. Transiently dropped transactions are
 rebroadcast from their original bytes.
 
 The first sync scans address history in batches to recover prior own orders,
-including filled orders no longer visible in the market listing. Pair requests
-walk all pages. Historical concluded orders are not counted as open liquidity.
-Reorgs trigger wallet rollback and reconciliation before more trading. Stale,
-partial or failed synchronization pauses new decisions.
+including filled orders no longer visible in the market listing. Prices and the
+displayed book use the active aggregated book, with exact ratios and our own
+liquidity excluded from the reference price. External fill candidates use at most
+three 100-order pages; they are an opportunistic subset, not the entire market.
+An incomplete/truncated active book pauses quoting. See the indexer's
+[book contract](https://docs.mintlayer.org/docs/api/endpoints/order/).
+
+Reorg recovery finds a verified common ancestor, persists its progress and
+rechecks only affected confirmations. Bootstrap continues across ticks/restarts;
+cancelled/rejected creations are not resurrected. Recovered fill/conclude chains
+keep their order locked until all pending commands settle.
+
+The Transactions panel's reconcile/abandon action can cancel never-submitted
+bytes or finish an attempt resolved by canonical evidence. It refuses to release
+an uncertain submission merely because it is old or missing from an endpoint.
+Ordinary and simulation modes skip proposals in retry backoff. Exhausting the
+rolling fee budget pauses submissions while synchronization stays fresh, and
+retries resume automatically when the budget becomes available.
 
 Diagnostic events/finished commands have configurable retention; transaction
 history and unresolved attempts do not expire. UI history uses bounded pages.
@@ -207,3 +225,7 @@ pagination, owned-order discovery/settlement, reorg, backup, branch selection,
 precise amounts and a 20,000-transaction journal. These tests make no live broadcasts.
 A 24–72 hour funded testnet run remains a separate operational acceptance step;
 local recovery tests do not establish that it has been completed.
+
+The GitHub Actions bot job runs the build, backend suite and production smoke on
+Node 22. External price anchoring/price bands and long-history incremental scanner
+optimization remain separate work before treating this example as a mainnet bot.

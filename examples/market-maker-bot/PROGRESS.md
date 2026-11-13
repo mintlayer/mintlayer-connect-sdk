@@ -162,3 +162,40 @@ Updated: 2026-11-12.
   resumed. At the check: 176 confirmed attempts and two broadcasted attempts.
 - Validation: 42 backend tests, all 20 SDK suites / 119 tests / 17 snapshots,
   SDK/server builds and diff checks passed.
+
+## Review follow-up and budget pause — 2026-11-12
+
+- The next apparent stall was the configured rolling daily fee budget, not an
+  unresolved submission: 250 transactions were confirmed (98 fills, 120 concludes,
+  32 creations). With operator approval raised the testnet budget from 100 to 150
+  TML; retained the 2 TML transaction cap and all spend/depth/pending limits.
+- Review findings 1–5: replaced full pair-history polling with the active aggregated
+  book plus at most 300 external fill candidates; added durable fork search/replay,
+  targeted rollback and shared recovered order fences; added canonical account-race
+  recovery and guarded operator reconciliation; retained sanitized node reasons;
+  configured a Node 22 bot build/test/smoke job in CI.
+- Also fixed ordinary-mode retry starvation (finding 7) and localhost Host-header
+  validation (finding 9). Budget exhaustion is now an explicit submission pause,
+  while synchronization remains fresh instead of reporting a broken chain sync.
+- Active-book side semantics and rational atom prices checked against the actual
+  public indexer, local core implementation and official API contract. Own liquidity
+  is excluded from reference pricing; UI shows aggregate levels and can still show
+  individual owned orders. Incomplete active-book responses fail closed.
+- Canonical account recovery searches a bounded number of blocks per pass with a
+  persisted cursor. It finds our mined candidate before concluding that another
+  canonical order command invalidated it; neither a 404 nor a timeout frees inputs.
+- Validation: all 54 backend tests, all 20 SDK suites / 119 tests / 17 snapshots,
+  production build and HTTP smoke passed. Added regressions for the three reorg
+  cases, restart during >200-tx replay, shared recovered locks, ordinary-mode progress,
+  budget pause/resume, active-book scaling/precision, node diagnostics, DNS rebinding,
+  account races and guarded abandonment. CI is configured; no hosted run claimed.
+- Backed up live SQLite to ignored `data/pre-review-recovery.sqlite`, then reloaded
+  the supervisor. The live process resumed creating and self-filling orders under
+  the approved budget; snapshots are fresh with no pause.
+- UTXO inventory check: 558 available (384 token, 174 coin), mostly small fill/conclude
+  payouts. The bot had consumed 291 unique inputs across its confirmed transactions.
+  The SDK still prefers large inputs; no unsolicited consolidation was broadcast.
+- Remaining before a mainnet deployment: external price anchoring/bands (finding 6),
+  incremental long-history scanning/storage performance (finding 8), SDK release/PR
+  separation and the remaining operational soak. These are not marked complete by
+  passing local recovery regressions.

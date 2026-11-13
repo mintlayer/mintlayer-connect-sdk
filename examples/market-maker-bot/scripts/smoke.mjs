@@ -24,6 +24,7 @@ const indexer = createServer((request, response) => {
   else if (path === '/chain/100') body = block;
   else if (path.startsWith('/block/')) body = { height: 100 };
   else if (path.startsWith('/token/')) body = { number_of_decimals: 6, token_ticker: { string: 'XYZ' } };
+  else if (path.endsWith('/book')) body = { items: [], next_cursor: null };
   else if (path.startsWith('/order/pair/')) body = [];
   else if (path.endsWith('/spendable-utxos'))
     body = path.includes(address)

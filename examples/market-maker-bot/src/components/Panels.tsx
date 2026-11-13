@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
-import { isActiveOrder } from '../lib/orderBook';
+import { isActiveOrder, buildSyntheticBook } from '../lib/orderBook';
 import { getPairOrdersPath } from '../lib/orders';
 import { actionToText, calculateInventory, getTokenBalance } from '../lib/strategy';
 import { formatPairLabel, formatTokenLabel, shortenTokenId, type TokenLabelMap } from '../lib/tokens';
@@ -285,9 +285,10 @@ export function OrderBookPanel(props: {
   const { book, orders, ownOrders, config, tokenLabels, canConclude, onConclude } = props;
   const activeOrders = orders.filter(isActiveOrder);
   const ownOrderIds = new Set(ownOrders.map((order) => order.order_id));
+  const ownBook = buildSyntheticBook(ownOrders, config.baseToken, config.quoteToken, tokenLabels);
   const isOwnOrder = (orderId: string) => ownOrderIds.has(orderId);
   const visibleRows = (rows: SyntheticBook['bids']) =>
-    showForeignOrders ? rows : rows.filter((row) => isOwnOrder(row.orderId));
+    showForeignOrders ? rows : rows === book.bids ? ownBook.bids : ownBook.asks;
   const pairPath = getPairOrdersPath(config);
   const baseLabel = formatTokenLabel(config.baseToken, tokenLabels);
   const quoteLabel = formatTokenLabel(config.quoteToken, tokenLabels);
@@ -301,7 +302,7 @@ export function OrderBookPanel(props: {
         onClick={() => setDetailsOpen(true)}
       >
         <h2>Order Book</h2>
-        <span className="badge">{activeOrders.length} active · details</span>
+        <span className="badge">{book.bids.length + book.asks.length} levels · details</span>
       </button>
       <div className="bookGrid compactBook">
         <OrderSide title="Bids" rows={book.bids.slice(0, 5)} baseLabel={baseLabel} quoteLabel={quoteLabel} />
@@ -378,9 +379,9 @@ export function OrderBookPanel(props: {
               />
             </div>
             {!canConclude && <p className="muted">Select Live execution mode to broadcast an order conclusion.</p>}
-            {activeOrders.length === 0 && (
+            {book.bids.length + book.asks.length === 0 && (
               <p className="muted">
-                No active orders returned for this pair. Filled or zero-balance orders are ignored.
+                No active liquidity returned for this pair.
               </p>
             )}
             {book.midPrice === null && activeOrders.length > 0 && (
@@ -524,7 +525,7 @@ export function FillSimulationPanel(props: {
   );
 }
 
-export function TransactionPanel(props: { records: ExecutionRecord[] }) {
+export function TransactionPanel(props: { records: ExecutionRecord[]; onAbandon?: (attemptId: string) => void }) {
   return (
     <section className="panel transactionPanel">
       <div className="panelHeader">
@@ -541,6 +542,8 @@ export function TransactionPanel(props: { records: ExecutionRecord[] }) {
               <p>{record.description}</p>
               {record.txId && <code>{record.txId}</code>}
               {record.error && <p className="errorText">{record.error}</p>}
+              {props.onAbandon && ['unknown', 'submitting', 'local'].includes(record.status) &&
+                <button onClick={() => props.onAbandon?.(record.id)}>Reconcile / abandon if rejected</button>}
             </div>
           </div>
         ))}

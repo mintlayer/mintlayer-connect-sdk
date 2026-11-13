@@ -1,7 +1,7 @@
 import { atomsToDecimal, decimalsToAtoms } from '@mintlayer/sdk';
 import { createHash } from 'node:crypto';
 import type { TokenLabelMap } from '../src/lib/tokens';
-import type { MarketMakerConfig, MarketOrder, StrategyAction, WalletSnapshot, BookSide } from '../src/lib/types';
+import type { MarketMakerConfig, MarketOrder, StrategyAction, WalletSnapshot, BookSide, MarketBook, SyntheticBook } from '../src/lib/types';
 
 export const asset = (currency: MarketOrder['ask_currency']): string =>
   currency.type === 'Coin' ? 'Coin' : currency.token_id!;
@@ -21,7 +21,25 @@ export function referencePrice(
   own: MarketOrder[],
   config: MarketMakerConfig,
   labels: TokenLabelMap,
+  book?: MarketBook,
 ): Price {
+  if (book) {
+    const prices = (side: 'ask' | 'bid') => book[side === 'ask' ? 'asks' : 'bids'].filter(level => {
+      const price = { n: BigInt(level.numerator), d: BigInt(level.denominator) };
+      const ours = own.filter(order =>
+        asset(order.give_currency) === (side === 'ask' ? config.baseToken : config.quoteToken) &&
+        asset(order.ask_currency) === (side === 'ask' ? config.quoteToken : config.baseToken) &&
+        atoms(order.ask_balance) > 0n && atoms(order.give_balance) > 0n &&
+        compare(price, side === 'ask' ? { n: atoms(order.ask_balance), d: atoms(order.give_balance) }
+          : { n: atoms(order.give_balance), d: atoms(order.ask_balance) }) === 0,
+      ).reduce((sum, order) => sum + atoms(side === 'ask' ? order.give_balance : order.ask_balance), 0n);
+      return BigInt(level.baseAtoms) > ours;
+    }).map(level => ({ n: BigInt(level.numerator), d: BigInt(level.denominator) }));
+    const bids = prices('bid').sort((a, b) => compare(b, a));
+    const asks = prices('ask').sort(compare);
+    if (bids[0] && asks[0]) return { n: bids[0].n * asks[0].d + asks[0].n * bids[0].d, d: 2n * bids[0].d * asks[0].d };
+    return bids[0] ?? asks[0] ?? { n: decimalsToAtoms(String(config.referencePrice), labels[config.quoteToken].decimals), d: 10n ** BigInt(labels[config.baseToken].decimals) };
+  }
   const ownIds = new Set(own.map((order) => order.order_id));
   const market = orders.filter(
     (order) => !ownIds.has(order.order_id) && atoms(order.ask_balance) > 0n && atoms(order.give_balance) > 0n,
@@ -72,6 +90,21 @@ function holdings(wallet: WalletSnapshot, orders: MarketOrder[], token: string):
 function identity(parts: unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 24);
 }
+export function displayMarketBook(book: MarketBook, config: MarketMakerConfig, labels: TokenLabelMap): SyntheticBook {
+  const side = (name: 'bid' | 'ask') => book[name === 'bid' ? 'bids' : 'asks'].map(level => {
+    const base = Number(atomsToDecimal(level.baseAtoms, labels[config.baseToken].decimals));
+    const price = Number(level.numerator) / Number(level.denominator) *
+      10 ** (labels[config.baseToken].decimals - labels[config.quoteToken].decimals);
+    const quoteAtoms = BigInt(level.baseAtoms) * BigInt(level.numerator) / BigInt(level.denominator);
+    return { side: name, orderId: `${name}:${level.numerator}/${level.denominator}`, price,
+      baseAmount: base, quoteAmount: base * price, ownerAddress: '',
+      askToken: name === 'ask' ? config.quoteToken : config.baseToken,
+      askBalanceAtoms: name === 'ask' ? quoteAtoms.toString() : level.baseAtoms };
+  }).sort((a, b) => name === 'ask' ? a.price - b.price : b.price - a.price);
+  const bids = side('bid'), asks = side('ask');
+  const bestBid = bids[0]?.price ?? null, bestAsk = asks[0]?.price ?? null;
+  return { bids, asks, bestBid, bestAsk, midPrice: bestBid !== null && bestAsk !== null ? (bestBid + bestAsk) / 2 : bestBid ?? bestAsk };
+}
 
 export function planServerActions(args: {
   config: MarketMakerConfig;
@@ -80,6 +113,7 @@ export function planServerActions(args: {
   ownOrders: MarketOrder[];
   labels: TokenLabelMap;
   configVersion: number;
+  marketBook?: MarketBook;
 }): StrategyAction[] {
   const { config, wallet, orders, ownOrders, labels, configVersion } = args;
   const destination = wallet.addresses.receiving[0];
@@ -88,7 +122,7 @@ export function planServerActions(args: {
     quoteDecimals = labels[config.quoteToken].decimals;
   const size = decimalsToAtoms(String(config.orderSize), baseDecimals);
   if (size <= 0n) throw new Error('Order size rounds to zero atoms for this asset');
-  const mid = referencePrice(orders, ownOrders, config, labels);
+  const mid = referencePrice(orders, ownOrders, config, labels, args.marketBook);
   if (mid.n <= 0n || mid.d <= 0n) throw new Error('Reference price rounds to zero');
   const fingerprint = identity([
     configVersion,
@@ -249,9 +283,10 @@ export function manualQuote(
   own: MarketOrder[],
   labels: TokenLabelMap,
   id: string,
+  marketBook?: MarketBook,
 ): StrategyAction {
   const size = decimalsToAtoms(String(config.orderSize), labels[config.baseToken].decimals);
-  const price = mul(referencePrice(orders, own, config, labels), side === 'bid' ? 9500n : 10_500n);
+  const price = mul(referencePrice(orders, own, config, labels, marketBook), side === 'bid' ? 9500n : 10_500n);
   const quote = side === 'ask' ? (size * price.n + price.d - 1n) / price.d : (size * price.n) / price.d;
   if (size <= 0n || quote <= 0n) throw new Error('Order rounds to zero atoms');
   if (

@@ -31,6 +31,7 @@ export type Command =
   | { kind: 'execute'; actionId: string }
   | { kind: 'manual-order'; side: 'bid' | 'ask' }
   | { kind: 'conclude'; orderId: string }
+  | { kind: 'abandon-attempt'; attemptId: string }
   | { kind: 'prepare'; requestId: string };
 export type CommandEnvelope = { id: string; command: Command };
 export type CommandResult = {

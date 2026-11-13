@@ -43,6 +43,9 @@ function parseCommand(raw: unknown, network: string): CommandEnvelope {
     case 'conclude':
       parsed = { kind: 'conclude', orderId: text('orderId') };
       break;
+    case 'abandon-attempt':
+      parsed = { kind: 'abandon-attempt', attemptId: text('attemptId') };
+      break;
     case 'prepare':
       parsed = { kind: 'prepare', requestId: text('requestId') };
       break;
@@ -70,6 +73,14 @@ export function createHttpServer(options: ServerOptions, runner?: BotRunner) {
     (sessions.get(/(?:^|;\s*)bot_session=([a-f0-9]+)/.exec(cookie ?? '')?.[1] ?? '') ?? 0) > Date.now();
   const digest = (text: string) => createHash('sha256').update(text).digest();
   app.addHook('onRequest', async (request, reply) => {
+    let hostname: string;
+    try { hostname = new URL(`http://${request.headers.host}`).hostname; }
+    catch { return reply.code(403).send({ error: 'Invalid host' }); }
+    const allowed = ['0.0.0.0', '::'].includes(options.host)
+      ? null
+      : new Set(['127.0.0.1', 'localhost', '::1'].includes(options.host)
+        ? ['127.0.0.1', 'localhost', '[::1]'] : [options.host]);
+    if (allowed && !allowed.has(hostname)) return reply.code(403).send({ error: 'Unexpected host' });
     if (!request.url.startsWith('/api/')) return;
     if (!['GET', 'HEAD'].includes(request.method)) {
       if (request.headers['x-bot-request'] !== '1') return reply.code(403).send({ error: 'Missing request header' });

@@ -14,19 +14,22 @@ import type {
   MarketMakerConfig,
   MarketOrder,
   StrategyAction,
+  MarketBook,
   WalletSnapshot,
 } from '../src/lib/types';
 import { BotDatabase, txJson } from './database';
 import { ChainApi, HttpError, createClient } from './chain';
-import { Executor } from './execution';
+import { Executor, PolicyPause } from './execution';
 import { validateTradingConfig, type ServerOptions } from './config';
-import { asset, atoms, manualQuote, planServerActions, referencePrice } from './strategy';
+import { asset, atoms, manualQuote, planServerActions, referencePrice, displayMarketBook } from './strategy';
 import { orderIdFromJson } from './orderId';
+import { reconcileOrderAttempt } from './reconciliation';
 
 const outpoint = (entry: { outpoint: { source_type: unknown; source_id: string; index: number } }) =>
   `utxo:${entry.outpoint.source_type}:${entry.outpoint.source_id}:${entry.outpoint.index}`;
 const emptyBook = () => ({ bids: [], asks: [], midPrice: null, bestBid: null, bestAsk: null });
 class BootstrapPending extends Error {}
+type ReorgRecovery = { phase: 'rollback' | 'replay'; fork: import('@mintlayer/sdk').SyncCursor };
 export class BotRunner {
   config: MarketMakerConfig;
   control: Control;
@@ -36,6 +39,7 @@ export class BotRunner {
   private account = '';
   private wallet: WalletSnapshot | null = null;
   private orders: MarketOrder[] = [];
+  private marketBook: MarketBook | undefined;
   private ownOrders: MarketOrder[] = [];
   private labels: TokenLabelMap = {};
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -50,6 +54,7 @@ export class BotRunner {
   private failures = 0;
   private bootstrapping = false;
   private lastMaintenance = 0;
+  private deferredReason: string | null = null;
   private listeners = new Set<() => void>();
 
   constructor(
@@ -179,8 +184,11 @@ export class BotRunner {
         if (unresolved) this.pauseReason = 'Resolving uncertain transaction submissions';
         else if (pending.length >= this.options.maxPending) this.pauseReason = 'Pending transaction limit reached';
         else {
-          const action = this.config.simulateOwnFills ? this.simulationAction() : this.actions()[0];
+          this.deferredReason = null;
+          const action = this.config.simulateOwnFills ? this.simulationAction()
+            : this.actions().find(action => this.simulationRetryReady(action.id));
           if (action) await this.execute(strategyActionToRequest(action, this.wallet!.addresses.receiving[0]), false);
+          else if (this.deferredReason) this.pauseReason = this.deferredReason;
         }
       }
       this.failures = 0;
@@ -197,6 +205,11 @@ export class BotRunner {
         'Bot cycle complete',
       );
     } catch (error) {
+      if (error instanceof PolicyPause) {
+        this.failures = 0;
+        this.pauseReason = error.message;
+        return;
+      }
       if (error instanceof BootstrapPending) {
         this.bootstrapping = true;
         this.lastSyncAt = null;
@@ -285,6 +298,17 @@ export class BotRunner {
     if (!this.client) await this.initialize();
     await this.sync();
     if (command.kind === 'sync') return;
+    if (command.kind === 'abandon-attempt') {
+      const attempt = this.db.getAttempt(command.attemptId);
+      if (!attempt || attempt.preview) throw new Error('Unknown live attempt');
+      if (attempt.record.status === 'signed' && !attempt.submittedAt) {
+        await this.executor!.submit(attempt, () => false);
+        return;
+      }
+      if (this.db.pendingAttempts().some(item => item.record.id === attempt.record.id))
+        throw new Error('Cannot abandon without canonical rejection evidence; inputs remain reserved. Reconciliation continues automatically.');
+      return;
+    }
     if (command.kind === 'start') {
       if (!this.db.isLatestControl(id, ['start', 'stop']))
         throw new Error('Start superseded by a newer control command');
@@ -299,7 +323,7 @@ export class BotRunner {
     if (command.kind === 'manual-order')
       return void (await this.execute(
         strategyActionToRequest(
-          manualQuote(command.side, this.config, this.wallet!, this.orders, this.ownOrders, this.labels, id),
+          manualQuote(command.side, this.config, this.wallet!, this.orders, this.ownOrders, this.labels, id, this.marketBook),
           this.wallet!.addresses.receiving[0],
         ),
         true,
@@ -366,7 +390,10 @@ export class BotRunner {
         this.logger.warn({ ...context, error: this.safeError(attempt.record.error) }, 'Transaction attempt');
       else this.logger.info(context, 'Transaction attempt');
     }
-    if (attempt?.record.status === 'rejected') throw new Error(attempt.record.error ?? 'Transaction build failed');
+    if (attempt?.record.status === 'rejected') {
+      if (attempt.record.error?.startsWith('Rolling daily fee budget exhausted')) throw new PolicyPause(attempt.record.error);
+      throw new Error(attempt.record.error ?? 'Transaction build failed');
+    }
     await this.sync();
   }
   private async sync(): Promise<void> {
@@ -377,26 +404,46 @@ export class BotRunner {
     const previous = this.db.cursor(this.account);
     const reorg =
       previous && (previous.height > tip.height || (await this.api.blockId(previous.height)) !== previous.blockHash);
-    if (reorg) {
-      await this.walletState.rollbackTo(0);
-      this.db.resetConcludedOrders();
-      for (const attempt of this.db.listAttempts(1_000_000).reverse()) {
-        if (attempt.record.status !== 'confirmed' || attempt.preview || !attempt.tx) continue;
-        attempt.record = {
-          ...attempt.record,
-          status: 'unknown',
-          updatedAt: Date.now(),
-          error: 'Rechecking after chain reorganization',
-        };
-        this.db.reserve(this.account, attempt);
-      }
-      this.db.event('warn', 'reorg', 'Chain changed; rechecking wallet transactions');
+    let recovery = this.db.getSetting<ReorgRecovery>('reorgRecovery');
+    if (recovery?.phase === 'replay' && reorg) recovery = null;
+    if (!recovery && reorg) {
+      recovery = { phase: 'rollback', fork: await this.findFork(previous!, tip) };
+      this.db.setSetting('reorgRecovery', recovery);
+    }
+    if (recovery?.phase === 'rollback') {
+      const affected = new Set(this.db.transactions(this.account)
+        .filter(tx => tx.blockHeight !== undefined && tx.blockHeight > recovery!.fork.height).map(tx => tx.txId));
+      // Persist the fork cursor immediately. Bootstrap continuations must never
+      // re-roll back the batches that they have already re-observed.
+      await this.walletState.rollbackTo(recovery.fork);
+      this.db.atomic(() => {
+        for (const attempt of this.db.listAttempts(1_000_000).reverse()) {
+          if (attempt.record.status !== 'confirmed' || attempt.preview || !attempt.tx || !affected.has(attempt.record.txId!)) continue;
+          attempt.record = { ...attempt.record, status: 'unknown', updatedAt: Date.now(), error: 'Rechecking after chain reorganization' };
+          this.db.saveAttempt(attempt);
+          if (attempt.createdOrder) {
+            this.db.saveOrder(attempt.createdOrder, true);
+            this.db.restoreConfirmedCreation(attempt.createdOrder.order_id);
+          }
+          if (attempt.request.kind === 'conclude-order') this.db.restoreConfirmedCreation(attempt.request.orderId);
+        }
+        recovery = { ...recovery!, phase: 'replay' };
+        this.db.setSetting('reorgRecovery', recovery);
+        this.db.setSetting('reorgSearch', null);
+        this.db.event('warn', 'reorg', 'Chain changed; rechecking affected transactions', { forkHeight: recovery.fork.height });
+      });
     }
     const addresses = this.client.getAddresses();
-    await this.discoverHistory(addresses, tip, !!reorg);
-    const [orders, entries] = await Promise.all([
+    await this.discoverHistory(addresses, tip, !!recovery);
+    if (recovery) {
+      for (const attempt of this.db.pendingAttempts())
+        if (attempt.tx && attempt.signedHex) this.db.reserve(this.account, attempt, true);
+      await this.walletState.reload();
+    }
+    const [orders, entries, marketBook] = await Promise.all([
       this.api.pairOrders(this.config),
       this.api.getAccountUtxos([...addresses.receiving, ...addresses.change]),
+      this.api.openBook(this.config),
     ]);
     const known = new Map(this.db.transactions(this.account).map((tx) => [tx.txId, tx]));
     const observations = new Map<string, Awaited<ReturnType<ChainApi['transaction']>>>();
@@ -473,6 +520,19 @@ export class BotRunner {
           });
         }
       } else {
+        const orderRecovery = await reconcileOrderAttempt(this.api, this.db, this.account, attempt, tip);
+        if (orderRecovery.confirmed) {
+          const tx = orderRecovery.confirmed;
+          attempt.record = { ...attempt.record, status: 'confirmed', error: undefined, updatedAt: Date.now() };
+          updated.push(tx);
+          this.db.transition(this.account, attempt, tx, true);
+          if (attempt.request.kind === 'conclude-order') this.db.concludeOrder(attempt.request.orderId);
+          continue;
+        }
+        if (orderRecovery.conflict) {
+          this.invalidateChain(attempt.record.txId, orderRecovery.conflict);
+          continue;
+        }
         if (await this.api.hasConfirmedInputConflict(txJson(attempt.tx).inputs, attempt.record.txId)) {
           this.invalidateChain(attempt.record.txId);
           continue;
@@ -523,8 +583,9 @@ export class BotRunner {
           this.db.saveOrder(order!, true);
         } catch (error) {
           if (!(error instanceof HttpError) || error.status !== 404) throw error;
-          const origin =
-            stored.originTxId && this.db.pendingAttempts().some((attempt) => attempt.record.txId === stored.originTxId);
+          const origin = this.db.pendingAttempts().some((attempt) =>
+            attempt.record.txId === stored.originTxId ||
+            ((attempt.request.kind === 'fill-order' || attempt.request.kind === 'conclude-order') && attempt.request.orderId === stored.order_id));
           if (origin) order = stored;
           else throw new Error(`Owned order ${stored.order_id} is missing; resynchronization required`);
         }
@@ -547,6 +608,7 @@ export class BotRunner {
     if (tip.blockHash !== endTip.blockHash || Date.now() - started > this.options.staleAfterMs)
       throw new Error('Network changed during synchronization; retrying before trading');
     await this.walletState.applySyncDiff({ toCursor: endTip, transactions: updated });
+    if (recovery) this.db.setSetting('reorgRecovery', null);
     const resources = this.db.reservedResources();
     const networkKeys = new Set(networkUtxos.map(outpoint));
     const spendable = this.walletState
@@ -591,9 +653,38 @@ export class BotRunner {
       transactions: this.db.transactions(this.account).slice(-100),
     };
     this.orders = orders;
+    this.marketBook = marketBook;
     this.ownOrders = own;
     this.lastSyncAt = Date.now();
     this.pauseReason = null;
+  }
+  private async findFork(previous: import('@mintlayer/sdk').SyncCursor, tip: import('@mintlayer/sdk').SyncCursor): Promise<import('@mintlayer/sdk').SyncCursor> {
+    const saved = this.db.getSetting<{ from: string; height: number; hash: string }>('reorgSearch');
+    let height = saved?.from === previous.blockHash ? saved.height : previous.height;
+    let hash = saved?.from === previous.blockHash ? saved.hash : previous.blockHash;
+    for (let count = 0; count < 50; count++) {
+      if (height <= tip.height && await this.api.blockId(height) === hash)
+        return { height, blockHash: hash, updatedAt: Date.now() };
+      if (height === 0) throw new Error('Indexer genesis changed');
+      let parent: string | undefined;
+      try { parent = (await this.api.get(`/block/${hash}`)).header?.previous_block_id; }
+      catch (error) { if (!(error instanceof HttpError) || error.status !== 404) throw error; }
+      if (!parent || !/^[0-9a-f]{64}$/i.test(parent)) {
+        // Some indexers remove old-branch headers. A verified older wallet
+        // checkpoint is a safe lower bound; rechecking extra history is fine.
+        const checkpoints = this.db.transactions(this.account)
+          .filter(tx => tx.blockHeight !== undefined && tx.blockHash && tx.blockHeight < height && tx.blockHeight <= tip.height)
+          .sort((a, b) => b.blockHeight! - a.blockHeight!);
+        for (const tx of new Map(checkpoints.map(tx => [tx.blockHeight!, tx])).values())
+          if (await this.api.blockId(tx.blockHeight!) === tx.blockHash)
+            return { height: tx.blockHeight!, blockHash: tx.blockHash!, updatedAt: Date.now() };
+        return { height: 0, blockHash: await this.api.blockId(0), updatedAt: Date.now() };
+      }
+      height--;
+      hash = parent;
+      this.db.setSetting('reorgSearch', { from: previous.blockHash, height, hash });
+    }
+    throw new BootstrapPending(`Finding reorganization fork: checking height ${height}`);
   }
   private async discoverHistory(
     addresses: { receiving: string[]; change: string[] },
@@ -686,7 +777,7 @@ export class BotRunner {
     if (missing.length > 100)
       throw new BootstrapPending(`Bootstrapping wallet history: ${missing.length - 100} transactions remaining`);
   }
-  private invalidateChain(root: string): void {
+  private invalidateChain(root: string, reason = 'Confirmed input conflict invalidated this transaction chain'): void {
     const invalid = new Set([root]);
     const pending = this.db.pendingAttempts();
     let changed = true;
@@ -710,7 +801,7 @@ export class BotRunner {
         attempt.record = {
           ...attempt.record,
           status: state,
-          error: 'Confirmed input conflict invalidated this transaction chain',
+          error: reason,
           updatedAt: Date.now(),
         };
         this.db.transition(
@@ -732,6 +823,7 @@ export class BotRunner {
       ownOrders: this.ownOrders,
       labels: this.labels,
       configVersion: this.control.configVersion,
+      marketBook: this.marketBook,
     }).filter((action) => action.kind === 'create-order' || !reserved.has(`order:${action.orderId}`));
   }
   private simulationAction(): StrategyAction | undefined {
@@ -798,8 +890,10 @@ export class BotRunner {
   }
   private simulationRetryReady(id: string): boolean {
     const attempt = this.db.getAttempt(this.control.executionMode === 'dry-run' ? `preview:${id}` : id);
-    return !attempt || !['draft', 'rejected', 'cancelled'].includes(attempt.record.status) ||
-      attempt.retryAt <= Date.now();
+    const ready = !attempt || !['draft', 'rejected', 'cancelled'].includes(attempt.record.status) ||
+      (this.executor ? this.executor.retryReady(attempt) : attempt.retryAt <= Date.now());
+    if (!ready && attempt.record.error) this.deferredReason ??= `${attempt.record.error}; retry after ${new Date(attempt.retryAt).toISOString()}`;
+    return ready;
   }
   private preparationPlan() {
     return createBranchPreparationPlan({
@@ -814,14 +908,15 @@ export class BotRunner {
     const records = this.db.listAttempts(100).map((attempt) => this.db.publicRecord(attempt.record));
     const stale = !this.lastSyncAt || Date.now() - this.lastSyncAt > this.options.staleAfterMs || this.failures > 0;
     const book = this.wallet
-      ? buildSyntheticBook(this.orders, this.config.baseToken, this.config.quoteToken, this.labels)
+      ? this.marketBook ? displayMarketBook(this.marketBook, this.config, this.labels)
+        : buildSyntheticBook(this.orders, this.config.baseToken, this.config.quoteToken, this.labels)
       : emptyBook();
     let actions: StrategyAction[] = [];
     let manualReferencePrice = this.config.referencePrice;
     try {
       actions = stale ? [] : this.actions();
       if (this.wallet && this.labels[this.config.baseToken] && this.labels[this.config.quoteToken]) {
-        const reference = referencePrice(this.orders, this.ownOrders, this.config, this.labels);
+        const reference = referencePrice(this.orders, this.ownOrders, this.config, this.labels, this.marketBook);
         manualReferencePrice =
           (Number(reference.n) / Number(reference.d)) *
           10 ** (this.labels[this.config.baseToken].decimals - this.labels[this.config.quoteToken].decimals);

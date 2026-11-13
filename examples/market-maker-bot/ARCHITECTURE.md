@@ -44,9 +44,12 @@ submitting → broadcasted / unknown → confirmed / conflicted.
 Preview attempts have separate idempotency keys and never reserve inputs or enter
 the recovery queue. Explicit rejection of a first submission releases its inputs;
 a transport failure or any ambiguous previous submission keeps them reserved.
-Retries resend the same bytes. Only a confirmed conflicting input spend invalidates
-a possibly submitted transaction and its dependent chain. Unsupported/missing
-lookup data never constitutes proof that inputs are free.
+Retries resend the same bytes. Canonical evidence of a different UTXO spender or
+an incompatible order state invalidates a possibly submitted transaction and its
+dependent chain. Account-command recovery scans canonical blocks from the first
+submission checkpoint, with durable bounded progress, so a candidate mined during
+indexer lag is confirmed rather than mistaken for a conflict. Unsupported/missing
+lookup data and timeouts never constitute proof that inputs are free.
 
 ## Control semantics
 
@@ -57,8 +60,12 @@ Every submit checks the current gate. Already submitted bytes remain tracked aft
 Stop. Automatic recovery only sends in running Live mode.
 
 Normal market making and explicit testnet self-fill simulation share execution and
-recovery. Own-order discovery scans address history and full pair pages, and keeps
-settlement flags separate from market liquidity. The strategy uses atom integers
+recovery. Own-order discovery scans address history and refreshes its SQLite
+registry directly. Price/reference data comes from the active aggregated book;
+external fill candidates are a bounded subset. Settlement flags remain separate
+from market liquidity. Reorg recovery persists a fork checkpoint and batch progress,
+only rolls back affected history, and preserves shared order fences during replay.
+The strategy uses atom integers
 and exact price ratios, includes open-order exposure and enforces fee/depth/pending
 limits. Public decimal/price numbers are display values.
 

@@ -203,7 +203,7 @@ export default function App() {
           >
             {history ? 'Show recent transactions' : `Browse all ${state.totals.transactions} transactions`}
           </button>
-          <TransactionPanel records={history ?? state.records} />
+          <TransactionPanel records={history ?? state.records} onAbandon={attemptId => void command({ kind: 'abandon-attempt', attemptId })} />
           {history && historyCursor && <button onClick={() => void loadHistory(true)}>Load older transactions</button>}
         </div>
         <TradesPanel trades={state.trades} tokenLabels={state.tokenLabels} baseToken={state.config.baseToken} />

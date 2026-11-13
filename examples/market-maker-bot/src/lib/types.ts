@@ -86,6 +86,8 @@ export type MarketOrder = {
 };
 
 export type BookSide = 'bid' | 'ask';
+export type MarketBookLevel = { numerator: string; denominator: string; baseAtoms: string };
+export type MarketBook = { bids: MarketBookLevel[]; asks: MarketBookLevel[] };
 
 export type BookLevel = {
   side: BookSide;

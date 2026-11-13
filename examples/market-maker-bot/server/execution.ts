@@ -6,6 +6,7 @@ import type { ExecutionRequest, MarketMakerConfig } from '../src/lib/types';
 import { orderIdFromInputs } from './orderId';
 import type { ServerOptions } from './config';
 import { BroadcastRejection, InvalidTransactionRejection } from './chain';
+export class PolicyPause extends Error {}
 
 export class Executor {
   constructor(
@@ -15,6 +16,15 @@ export class Executor {
     private readonly account: string,
     private readonly policy?: Pick<ServerOptions, 'dailyFeeLimitAtoms' | 'maxTxFeeAtoms'>,
   ) {}
+
+  retryReady(attempt: Attempt): boolean {
+    if (attempt.retryAt <= Date.now()) return true;
+    // A raised budget (or expired spend window) makes an old budget cooldown
+    // obsolete when even the maximum permitted transaction now fits.
+    return !!(attempt.record.error?.startsWith('Rolling daily fee budget exhausted') &&
+      this.policy?.dailyFeeLimitAtoms && this.policy?.maxTxFeeAtoms &&
+      this.db.reservedFeesSince(Date.now() - 86_400_000) + BigInt(this.policy.maxTxFeeAtoms) <= BigInt(this.policy.dailyFeeLimitAtoms));
+  }
 
   async execute(
     request: ExecutionRequest,
@@ -28,7 +38,7 @@ export class Executor {
     if (
       existing &&
       (!['draft', 'rejected', 'cancelled'].includes(existing.record.status) ||
-        existing.retryAt > Date.now())
+        !this.retryReady(existing))
     )
       return existing;
     const now = Date.now();
@@ -174,6 +184,7 @@ export class Executor {
     const previouslySubmitted = attempt.submittedAt !== undefined;
     attempt.record = { ...attempt.record, status: 'submitting', updatedAt: Date.now() };
     attempt.submittedAt ??= Date.now();
+    attempt.submittedCursor ??= this.db.cursor(this.account) ?? undefined;
     this.db.saveAttempt(attempt);
     // There is no await between this gate check and invoking broadcast.
     if (!canSend()) return this.submit(attempt, () => false);

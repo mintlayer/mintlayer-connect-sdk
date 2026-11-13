@@ -14,7 +14,8 @@ import { BotRunner } from '../server/runtime';
 import { createHttpServer } from '../server/http';
 import { DEFAULT_CONFIG } from '../src/lib/config';
 import type { ServerOptions } from '../server/config';
-import { planServerActions } from '../server/strategy';
+import { planServerActions, referencePrice, displayMarketBook } from '../server/strategy';
+import { reconcileOrderAttempt } from '../server/reconciliation';
 
 const seed = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const address = 'tmt1qx5p4r2en7c99mpmg2tz9hucxfarf4k6dyyvsahr';
@@ -63,8 +64,17 @@ function fixture(overrides: Partial<ServerOptions> = {}) {
       new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
     if (path === '/chain/tip') return json({ block_height: 100, block_id: chainHash });
     if (path === '/chain/100') return json(chainHash);
+    if (path === '/chain/0') return json('0'.repeat(64));
     if (path.startsWith('/block/')) return json({ height: 100 });
     if (path.startsWith('/token/')) return json({ number_of_decimals: 6, token_ticker: { string: 'XYZ' } });
+    if (path.endsWith('/book')) {
+      const asksBase = new URL(String(url)).searchParams.get('side') === 'ask';
+      return json({ items: orders.filter(o => BigInt(o.ask_balance.atoms) > 0n && BigInt(o.give_balance.atoms) > 0n &&
+        (o.ask_currency.type !== 'Coin') === asksBase).map(o => ({
+          amount: asksBase ? o.ask_balance : o.give_balance,
+          price: { atoms: asksBase ? `${o.give_balance.atoms}/${o.ask_balance.atoms}` : `${o.ask_balance.atoms}/${o.give_balance.atoms}` },
+        })), next_cursor: null });
+    }
     if (path.startsWith('/order/pair/')) return json(orders);
     if (path.startsWith('/order/')) {
       const found =
@@ -101,7 +111,7 @@ function fixture(overrides: Partial<ServerOptions> = {}) {
     history,
     reorg: () => {
       chainHash = 'd'.repeat(64);
-      observed.get(funding).block_id = chainHash;
+      for (const tx of observed.values()) if (tx.block_id) tx.block_id = chainHash;
     },
     fail: () => {
       failBroadcast = true;
@@ -869,6 +879,7 @@ test('real Node WASM runs create → self-fill → conclude using newly persiste
   const confirm = (attempt: Attempt) => {
     const raw = 'JSONRepresentation' in attempt.tx! ? attempt.tx.JSONRepresentation : attempt.tx!;
     f.observed.set(raw.id, { ...raw, block_id: block });
+    f.history.push(raw.id);
     const consumed = new Set(
       (raw.inputs as any[])
         .filter((entry) => entry.input?.input_type === 'UTXO')
@@ -906,6 +917,15 @@ test('real Node WASM runs create → self-fill → conclude using newly persiste
   await runner.tick();
   assert.equal(f.submissions.length, 3);
   assert.equal(runner.snapshot().control.executionMode, 'dry-run');
+  confirm(conclusion);
+  await runner.tick();
+  assert.equal(db.pendingAttempts().length, 0);
+  f.reorg();
+  await runner.tick();
+  assert.equal(runner.snapshot().stale, false);
+  assert.equal(db.pendingAttempts().length, 0);
+  assert.equal(db.ownOrders().length, 0);
+  assert.ok(!db.events().some(event => event.message.includes('UNIQUE constraint')));
   await runner.close();
   db.close();
 });
@@ -1223,6 +1243,262 @@ test('address history repairs a stale local conflict when the canonical transact
   assert.equal(db.reservedResources().size, 0);
   await runner.close();
   db.close();
+});
+
+test('reorg bootstrap with over 200 transactions converges across a process restart', async () => {
+  const f = fixture();
+  for (let i = 1; i <= 201; i++) {
+    const id = i.toString(16).padStart(64, '0');
+    f.history.push(id);
+    f.observed.set(id, { id, inputs: [], outputs: [], block_id: block });
+  }
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  for (let i = 0; i < 4; i++) await runner.tick();
+  assert.equal(runner.snapshot().stale, false);
+  f.reorg();
+  await runner.tick();
+  assert.match(runner.snapshot().pauseReason!, /Bootstrapping/);
+  assert.equal(db.cursor(db.getSetting('account')!)?.height, 0);
+  const remaining = db.transactions(db.getSetting('account')!).filter(tx => tx.state === 'orphaned').length;
+  assert.ok(remaining > 0 && remaining < 202);
+  await runner.close();
+  const restored = new BotRunner(db, f.api, f.opts, log);
+  for (let i = 0; i < 4; i++) await restored.tick();
+  assert.equal(restored.snapshot().stale, false);
+  assert.equal(db.getSetting('reorgRecovery'), null);
+  assert.equal(db.transactions(db.getSetting('account')!).filter(tx => tx.state === 'orphaned').length, 0);
+  await restored.close();
+  db.close();
+});
+
+test('a reorg never resurrects a rejected create placeholder', async () => {
+  const { BroadcastRejection } = await import('../server/chain');
+  const f = fixture();
+  f.api.broadcastTransaction = async () => { throw new BroadcastRejection('Disabled'); };
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  runner.accept({ id: 'live', command: { kind: 'mode', mode: 'live' } });
+  runner.accept({ id: 'start', command: { kind: 'start' } });
+  await runner.tick();
+  assert.equal(db.listAttempts()[0].record.status, 'rejected');
+  runner.accept({ id: 'stop', command: { kind: 'stop' } });
+  await runner.tick();
+  f.reorg();
+  await runner.tick();
+  assert.equal(runner.snapshot().stale, false);
+  assert.equal(db.ownOrders().length, 0);
+  assert.equal(db.getSetting('reorgRecovery'), null);
+  await runner.close();
+  db.close();
+});
+
+test('active book and bounded fill candidates ignore an arbitrarily large closed history', async () => {
+  const calls: string[] = [];
+  const closed = { order_id: 'closed', conclude_destination: address, ask_currency: { type: 'Coin' },
+    give_currency: { type: 'Token', token_id: token }, initially_asked: { atoms: '100' },
+    initially_given: { atoms: '100' }, ask_balance: { atoms: '0' }, give_balance: { atoms: '0' } };
+  const api = new ChainApi(options(), async url => {
+    calls.push(String(url));
+    const parsed = new URL(String(url));
+    const result = parsed.pathname.endsWith('/book')
+      ? { items: [{ price: { atoms: '2/5' }, amount: { atoms: '1000' } }], next_cursor: null }
+      : Array.from({ length: 100 }, (_, i) => ({ ...closed, order_id: `${parsed.searchParams.get('offset')}:${i}` }));
+    return new Response(JSON.stringify(result));
+  });
+  const [candidates, book] = await Promise.all([api.pairOrders(options().config), api.openBook(options().config)]);
+  assert.equal(candidates.length, 0);
+  assert.equal(book.asks.length, 1);
+  assert.equal(book.bids.length, 1);
+  assert.equal(calls.length, 5);
+  assert.ok(!calls.some(url => /offset=300/.test(url)));
+  const truncated = new ChainApi(options(), async () => new Response(JSON.stringify({ items: [], next_cursor: null, truncated: true })));
+  await assert.rejects(truncated.openBook(options().config), /Incomplete active/);
+});
+
+test('node validation reasons are retained and signed payloads/secrets are redacted', async () => {
+  const opts = options({ apiKey: 'secret-key' });
+  const reason = 'Mempool error: order not found secret-key ' + 'ab'.repeat(300);
+  const api = new ChainApi(opts, async () => new Response(JSON.stringify({ error: reason }), { status: 500 }));
+  await assert.rejects(api.broadcastTransaction('abcd'), error => {
+    assert.match((error as Error).message, /order not found/);
+    assert.ok(!(error as Error).message.includes('secret-key'));
+    assert.ok(!(error as Error).message.includes('ab'.repeat(300)));
+    return true;
+  });
+  const rpc = new ChainApi(options({ rpcUrl: 'http://node.test' }), async () => new Response(JSON.stringify({ error: { code: -32000, message: 'Mempool error: order not found' } })));
+  await assert.rejects(rpc.broadcastTransaction('abcd'), /order not found/);
+});
+
+test('DNS rebinding Host headers are rejected even without an admin password', async () => {
+  const { app } = createHttpServer(options());
+  assert.equal((await app.inject({ url: '/api/session', headers: { host: 'attacker.test' } })).statusCode, 403);
+  assert.equal((await app.inject({ url: '/api/session', headers: { host: 'localhost:3001' } })).statusCode, 200);
+  assert.equal((await app.inject({ url: '/api/session', headers: { host: '127.0.0.1:3001' } })).statusCode, 200);
+  await app.close();
+});
+
+test('order races require canonical proof and recover mined candidates during indexer lag', async () => {
+  const f = fixture();
+  const db = new BotDatabase(':memory:');
+  const id = 'c'.repeat(64), orderId = 'order';
+  const attempt: Attempt = {
+    record: { id: 'race', kind: 'fill-order', status: 'unknown', description: 'race', idempotencyKey: 'race', createdAt: Date.now(), updatedAt: Date.now(), txId: id },
+    request: { id: 'race', kind: 'fill-order', orderId, amount: '5', destination: address, description: 'race', idempotencyKey: 'race',
+      tradeMeta: { side: 'buy', orderId, fillAmount: 5, price: 1, expectedBaseAmount: 5, expectedQuoteAmount: 5, isOwnOrder: false } },
+    tx: { id, inputs: [{ input: { input_type: 'AccountCommand', command: 'FillOrder', order_id: orderId, fill_atoms: '5' }, utxo: null }, input()], outputs: [output()] },
+    submittedAt: Date.now(), submittedCursor: { height: 100, blockHash: block, updatedAt: Date.now() }, retries: 1, retryAt: 0,
+  };
+  db.saveAttempt(attempt);
+  let transactions: any[] = [];
+  const get = f.api.get.bind(f.api);
+  f.api.get = async path => path.startsWith('/block/') ? { height: 100, body: { transactions } } : get(path);
+  const tip = { height: 100, blockHash: block, updatedAt: Date.now() };
+  // A disappearing order and a 500 alone cannot free an uncertain transaction.
+  assert.deepEqual(await reconcileOrderAttempt(f.api, db, 'bot', attempt, tip), {});
+  transactions = [{ id: 'd'.repeat(64), inputs: [{ input: { command: 'ConcludeOrder', order_id: orderId } }], outputs: [] }];
+  delete attempt.orderScan;
+  assert.match((await reconcileOrderAttempt(f.api, db, 'bot', attempt, tip)).conflict!, /concluded/);
+  // If the candidate itself mined first, a later conclusion is not a conflict.
+  transactions.unshift(attempt.tx);
+  delete attempt.orderScan;
+  const recovered = await reconcileOrderAttempt(f.api, db, 'bot', attempt, tip);
+  assert.equal(recovered.confirmed?.state, 'confirmed');
+  assert.equal(recovered.conflict, undefined);
+  db.close();
+});
+
+test('ordinary mode skips an action in backoff and executes the next proposal', async () => {
+  const f = fixture();
+  const tokenOutput = { type: 'Transfer', destination: address,
+    value: { type: 'TokenV1', token_id: token, amount: { atoms: '1000000', decimal: '1' } } };
+  f.observed.get(funding).outputs.push(tokenOutput);
+  f.api.getAccountUtxos = async () => [
+    { outpoint: { source_type: 'Transaction', source_id: funding, index: 0 }, utxo: output() },
+    { outpoint: { source_type: 'Transaction', source_id: funding, index: 1 }, utxo: tokenOutput },
+  ] as any;
+  const send = f.api.broadcastTransaction.bind(f.api);
+  let fail = true;
+  f.api.broadcastTransaction = async tx => {
+    if (fail) { fail = false; const { BroadcastRejection } = await import('../server/chain'); throw new BroadcastRejection('Temporary endpoint rejection'); }
+    return send(tx);
+  };
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  runner.accept({ id: 'live', command: { kind: 'mode', mode: 'live' } });
+  runner.accept({ id: 'start', command: { kind: 'start' } });
+  await runner.tick();
+  const first = db.listAttempts()[0];
+  assert.equal(first.record.status, 'rejected');
+  await runner.tick();
+  assert.equal(f.submissions.length, 1);
+  assert.equal(db.listAttempts()[0].record.status, 'broadcasted');
+  assert.notEqual(db.listAttempts()[0].record.idempotencyKey, first.record.idempotencyKey);
+  await runner.close(); db.close();
+});
+
+test('fee budget exhaustion keeps sync fresh and automatically resumes when the budget is available', async () => {
+  const f = fixture({ dailyFeeLimitAtoms: '1', maxTxFeeAtoms: '200000000000' });
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  runner.accept({ id: 'live', command: { kind: 'mode', mode: 'live' } });
+  runner.accept({ id: 'start', command: { kind: 'start' } });
+  await runner.tick();
+  assert.equal(runner.snapshot().stale, false);
+  assert.match(runner.snapshot().pauseReason!, /Rolling daily fee budget/);
+  await runner.tick();
+  assert.equal(runner.snapshot().stale, false);
+  assert.match(runner.snapshot().pauseReason!, /retry after/);
+  f.opts.dailyFeeLimitAtoms = '10000000000000';
+  await runner.tick();
+  assert.equal(f.submissions.length, 1);
+  await runner.close(); db.close();
+});
+
+test('active book reference excludes our own entire price level and preserves decimal scaling', () => {
+  const config = options().config;
+  const labels = { Coin: { tokenId: 'Coin', ticker: 'TML', decimals: 11 }, [token]: { tokenId: token, ticker: 'XYZ', decimals: 6 } };
+  const book = { bids: [{ numerator: '100000', denominator: '1', baseAtoms: '2000000' }],
+    asks: [{ numerator: '120000', denominator: '1', baseAtoms: '1000000' }] };
+  const ours: any = { order_id: 'ours', conclude_destination: address, ask_currency: { type: 'Coin' },
+    give_currency: { type: 'Token', token_id: token }, ask_balance: { atoms: '120000000000' },
+    initially_asked: { atoms: '120000000000' }, give_balance: { atoms: '1000000' }, initially_given: { atoms: '1000000' } };
+  const price = referencePrice([], [ours], config, labels, book);
+  assert.equal(price.n / price.d, 100000n);
+  assert.ok(Math.abs(displayMarketBook(book, config, labels).bestAsk! - 1.2) < 1e-12);
+});
+
+test('reorg recovers a disappeared fill/conclude chain with a shared order lock', async () => {
+  const f = fixture();
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  await runner.tick();
+  const account = db.getSetting<string>('account')!;
+  for (const [index, kind] of ['fill-order', 'conclude-order'].entries()) {
+    const id = (index === 0 ? 'c' : 'e').repeat(64);
+    const tx: any = { id, inputs: [{ input: { input_type: 'AccountCommand', command: index === 0 ? 'FillOrder' : 'ConcludeOrder', order_id: 'order', fill_atoms: '1' }, utxo: null },
+      input(index === 0 ? funding : 'c'.repeat(64))], outputs: [output()] };
+    const attempt: Attempt = { record: { id, kind: kind as any, status: 'confirmed', description: kind, idempotencyKey: id, txId: id, createdAt: Date.now(), updatedAt: Date.now() },
+      request: { ...request, kind, orderId: 'order' } as any, tx, signedHex: 'abcd', retries: 1, retryAt: Date.now() + 60000 };
+    db.saveAttempt(attempt);
+    db.putWalletTx(account, { txId: id, tx, state: 'confirmed', blockHeight: 100, blockHash: block, createdByWallet: true });
+  }
+  f.reorg();
+  await runner.tick();
+  assert.equal(runner.snapshot().stale, false);
+  assert.equal(db.pendingAttempts().length, 2);
+  assert.equal(db.getSetting('reorgRecovery'), null);
+  assert.ok(db.reservedResources().has('order:order'));
+  const parent = db.pendingAttempts()[0];
+  f.observed.set(parent.record.txId!, { ...parent.tx, block_id: 'd'.repeat(64) });
+  await runner.tick();
+  assert.equal(db.pendingAttempts().length, 1);
+  assert.ok(db.reservedResources().has('order:order'));
+  await runner.close(); db.close();
+});
+
+test('reorg finds the shared parent and leaves older confirmed wallet history intact', async () => {
+  const f = fixture();
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  await runner.tick();
+  const account = db.getSetting<string>('account')!;
+  const oldId = 'e'.repeat(64), shared = 'f'.repeat(64);
+  db.putWalletTx(account, { txId: oldId, tx: { id: oldId, inputs: [], outputs: [] }, state: 'confirmed', blockHeight: 50, blockHash: shared });
+  const get = f.api.get.bind(f.api), blockId = f.api.blockId.bind(f.api);
+  f.api.get = async path => path === `/block/${block}` ? { height: 100, header: { previous_block_id: shared } } : get(path);
+  f.api.blockId = async height => height === 99 ? shared : blockId(height);
+  f.reorg();
+  await runner.tick();
+  assert.equal(runner.snapshot().stale, false);
+  assert.equal(db.transactions(account).find(tx => tx.txId === oldId)?.state, 'confirmed');
+  assert.equal(db.events().find(event => event.kind === 'reorg')?.context.forkHeight, 99);
+  await runner.close(); db.close();
+});
+
+test('operator abandon never frees an uncertain submission without canonical evidence', async () => {
+  const f = fixture(); f.fail();
+  const db = new BotDatabase(':memory:');
+  const runner = new BotRunner(db, f.api, f.opts, log);
+  runner.accept({ id: 'live', command: { kind: 'mode', mode: 'live' } });
+  runner.accept({ id: 'start', command: { kind: 'start' } });
+  await runner.tick();
+  const attempt = db.pendingAttempts()[0];
+  assert.equal(attempt.record.status, 'unknown');
+  runner.accept({ id: 'stop', command: { kind: 'stop' } });
+  runner.accept({ id: 'abandon', command: { kind: 'abandon-attempt', attemptId: attempt.record.id } });
+  await runner.tick();
+  assert.equal(db.command('abandon')?.status, 'failed');
+  assert.match(db.command('abandon')?.error!, /canonical rejection evidence/);
+  assert.ok(db.reservedResources().size > 0);
+  f.observed.set(attempt.record.txId!, { ...attempt.tx, block_id: block });
+  f.orders.push(attempt.createdOrder);
+  runner.accept({ id: 'resolved', command: { kind: 'abandon-attempt', attemptId: attempt.record.id } });
+  await runner.tick();
+  assert.equal(db.command('resolved')?.status, 'applied');
+  assert.equal(db.getAttempt(attempt.record.id)?.record.status, 'confirmed');
+  assert.equal(db.reservedResources().size, 0);
+  await runner.close(); db.close();
 });
 
 test('outer quote levels are retained when the market has not moved', () => {

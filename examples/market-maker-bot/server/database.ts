@@ -14,6 +14,8 @@ export type Attempt = {
   retryAt: number;
   preview?: boolean;
   submittedAt?: number;
+  submittedCursor?: SyncCursor;
+  orderScan?: { nextHeight: number; anchor?: SyncCursor; concluded: string[] };
   createdOrder?: import('../src/lib/types').MarketOrder & { originTxId: string };
 };
 type JsonRow = { json: string };
@@ -176,11 +178,15 @@ export class BotDatabase {
       );
   }
   /** Signed bytes and the SDK wallet reservation become durable together. */
-  reserve(account: string, attempt: Attempt): void {
+  reserve(account: string, attempt: Attempt, recovering = false): void {
     if (!attempt.tx || !attempt.signedHex) throw new Error('Cannot reserve an unsigned transaction');
     this.atomic(() => {
       this.saveAttempt(attempt);
       for (const resource of inputResources(attempt.tx!)) {
+        if (recovering) {
+          const owner = this.db.prepare('SELECT attempt_id FROM reservations WHERE resource=?').get(resource) as { attempt_id: string } | undefined;
+          if (owner?.attempt_id === attempt.record.id || (owner && resource.startsWith('order:'))) continue;
+        }
         this.db.prepare('INSERT INTO reservations VALUES (?,?)').run(resource, attempt.record.id);
       }
       this.putWalletTx(account, {
@@ -213,9 +219,16 @@ export class BotDatabase {
     });
   }
   reservedResources(): Set<string> {
-    return new Set(
+    const resources = new Set(
       (this.db.prepare('SELECT resource FROM reservations').all() as { resource: string }[]).map((row) => row.resource),
     );
+    // Recovered fill/conclude chains can share an order reservation. Keep the
+    // order fenced until every pending command is settled, even if its first
+    // reservation owner confirms before the rest of the chain.
+    for (const attempt of this.pendingAttempts())
+      if (attempt.request.kind === 'fill-order' || attempt.request.kind === 'conclude-order')
+        resources.add(`order:${attempt.request.orderId}`);
+    return resources;
   }
   listAttempts(limit = 200, before = Number.MAX_SAFE_INTEGER): Attempt[] {
     return (

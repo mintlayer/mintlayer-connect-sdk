@@ -1,6 +1,6 @@
 import { Client, MnemonicAccountProvider, type ApiProvider, type SyncCursor, type WalletTx } from '@mintlayer/sdk';
 import { getPairOrdersPath } from '../src/lib/orders';
-import type { MarketMakerConfig, MarketOrder } from '../src/lib/types';
+import type { MarketMakerConfig, MarketOrder, MarketBook, MarketBookLevel } from '../src/lib/types';
 import type { TokenMetadata } from '../src/lib/tokens';
 type UtxoEntry = Pick<import('@mintlayer/sdk').WalletUtxo, 'outpoint' | 'utxo'>;
 import type { ServerOptions } from './config';
@@ -20,6 +20,16 @@ export class InvalidTransactionRejection extends BroadcastRejection {}
 function checkIntrinsicRejection(message: unknown): void {
   if (typeof message === 'string' && message.includes('Zero amount token transfers are not allowed'))
     throw new InvalidTransactionRejection('Node rejected an invalid zero-amount token transfer');
+}
+export function nodeErrorReason(value: unknown, options?: Partial<ServerOptions>): string {
+  let text = typeof value === 'string' ? value : typeof (value as any)?.message === 'string' ? (value as any).message : '';
+  for (const secret of [options?.walletSeed, options?.apiKey, options?.rpcPassword, options?.adminPassword])
+    if (secret) text = text.split(secret).join('[redacted]');
+  // Nodes sometimes reflect submitted payloads in diagnostics. Preserve the
+  // useful reason without exposing signed bytes, credentials or log controls.
+  return text.replace(/[0-9a-f]{128,}/gi, '[transaction bytes]')
+    .replace(/https?:\/\/[^\s"<>]+/gi, '[endpoint]')
+    .replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 1000);
 }
 export type TransactionObservation = {
   id: string;
@@ -63,9 +73,45 @@ export class ChainApi implements ApiProvider {
     throw new Error(`Incomplete order pagination: ${path}`);
   }
   async pairOrders(config: MarketMakerConfig): Promise<MarketOrder[]> {
-    const orders = await this.all<MarketOrder>(getPairOrdersPath(config));
+    // Fill candidates are opportunistic and bounded. Closed pair history is
+    // never a prerequisite for quoting or discovering our own orders.
+    const orders: MarketOrder[] = [];
+    for (let offset = 0; offset < 300; offset += 100) {
+      const page = await this.get(`${getPairOrdersPath(config)}?items=100&offset=${offset}`);
+      if (!Array.isArray(page)) throw new Error('Malformed fill candidate page');
+      orders.push(...page);
+      if (page.length < 100) break;
+    }
     for (const order of orders) this.validateOrder(order);
-    return [...new Map(orders.map((order) => [order.order_id, order])).values()];
+    return [...new Map(orders.filter(order => BigInt(order.ask_balance.atoms!) > 0n && BigInt(order.give_balance.atoms!) > 0n)
+      .map((order) => [order.order_id, order])).values()];
+  }
+  async openBook(config: MarketMakerConfig): Promise<MarketBook> {
+    const side = async (side: 'ask' | 'bid'): Promise<MarketBookLevel[]> => {
+      const levels: MarketBookLevel[] = [];
+      const seen = new Set<string>();
+      let cursor = '';
+      for (let page = 0; page < 10; page++) {
+        const result = await this.get(`${getPairOrdersPath(config)}/book?side=${side}&items=100&cursor=${encodeURIComponent(cursor)}`);
+        if (!Array.isArray(result.items) || result.truncated) throw new Error('Incomplete active order book');
+        for (const level of result.items) {
+          const match = /^(\d+)\/([1-9]\d*)$/.exec(level?.price?.atoms ?? '');
+          if (!match || typeof level?.amount?.atoms !== 'string' || !/^\d+$/.test(level.amount.atoms))
+            throw new Error('Malformed active price level');
+          if (BigInt(match[1]) > 0n && BigInt(level.amount.atoms) > 0n)
+            levels.push({ numerator: match[1], denominator: match[2], baseAtoms: level.amount.atoms });
+        }
+        if (result.next_cursor === null) return levels;
+        if (typeof result.next_cursor !== 'string' || seen.has(result.next_cursor)) throw new Error('Invalid active book cursor');
+        cursor = result.next_cursor;
+        seen.add(cursor);
+      }
+      throw new Error('Active book exceeds the bounded level budget');
+    };
+    // The indexer calls a side "ask" when the ORDER asks for base. In the
+    // conventional quote/base UI that is a bid (it gives quote to buy base).
+    const [bids, asks] = await Promise.all([side('ask'), side('bid')]);
+    return { bids, asks };
   }
   validateOrder(order: MarketOrder): void {
     if (!order || typeof order.order_id !== 'string' || typeof order.conclude_destination !== 'string')
@@ -165,7 +211,7 @@ export class ChainApi implements ApiProvider {
     const payload = (await response.json()) as any;
     if (payload.error) {
       if (method === 'p2p_submit_transaction') checkIntrinsicRejection(payload.error.message);
-      const message = `Node RPC ${method} failed (${payload.error.code})`;
+      const message = `Node RPC ${method} failed (${payload.error.code}): ${nodeErrorReason(payload.error.message, this.options)}`;
       if (method === 'p2p_submit_transaction' && [-32601, -32602].includes(payload.error.code))
         throw new BroadcastRejection(message);
       throw new Error(message);
@@ -227,11 +273,14 @@ export class ChainApi implements ApiProvider {
     if (!response.ok) {
       // The public indexer wraps node validation errors in HTTP 500. Only a
       // specific invariant failure proves that durable bytes cannot be mined.
-      const payload = await response.json().catch(() => null) as any;
-      checkIntrinsicRejection(payload?.error);
+      const payload = await response.text().catch(() => '');
+      let reason: unknown = payload;
+      try { const json = JSON.parse(payload); reason = json.error ?? json.message ?? ''; } catch { /* Plain node error. */ }
+      checkIntrinsicRejection(reason);
+      const detail = nodeErrorReason(reason, this.options);
       if ([400, 401, 403, 404, 405, 413, 415, 422].includes(response.status))
-        throw new BroadcastRejection(`Broadcast rejected with HTTP ${response.status}`);
-      throw new HttpError(response.status, `Broadcast returned HTTP ${response.status}; reconciliation required`);
+        throw new BroadcastRejection(`Broadcast rejected with HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+      throw new HttpError(response.status, `Broadcast returned HTTP ${response.status}; reconciliation required${detail ? `: ${detail}` : ''}`);
     }
     // Some nodes return an empty body after accepting. HTTP success is enough.
     return { accepted: true };
