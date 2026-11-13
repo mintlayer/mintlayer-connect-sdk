@@ -1,4 +1,4 @@
-import type { Client, CreateOrderArgs, WalletBalance, WalletTx, WalletUtxo } from '@mintlayer/sdk';
+import type { CreateOrderArgs, WalletBalance, WalletTx, WalletUtxo } from '@mintlayer/sdk';
 
 export type NetworkName = 'testnet' | 'mainnet';
 
@@ -6,17 +6,22 @@ export type TokenRef = 'Coin' | string;
 
 export type BotMode = 'idle' | 'initializing' | 'ready' | 'running' | 'error';
 
-export type ExecutionStatus = 'draft' | 'signed' | 'local' | 'broadcasted' | 'confirmed' | 'rejected';
+export type ExecutionStatus =
+  | 'draft'
+  | 'signed'
+  | 'local'
+  | 'submitting'
+  | 'unknown'
+  | 'broadcasted'
+  | 'confirmed'
+  | 'rejected'
+  | 'cancelled'
+  | 'conflicted';
 
 export type ExecutionKind = 'create-order' | 'fill-order' | 'conclude-order' | 'prepare-utxo';
 
 export type MarketMakerConfig = {
   network: NetworkName;
-  apiUrl?: string;
-  /** Mojito-compatible batch endpoint serving spendable UTXOs for apiUrl's chain. */
-  batchApiUrl?: string;
-  apiKey?: string;
-  walletSeed?: string;
   pair: string;
   baseToken: TokenRef;
   quoteToken: TokenRef;
@@ -81,6 +86,8 @@ export type MarketOrder = {
 };
 
 export type BookSide = 'bid' | 'ask';
+export type MarketBookLevel = { numerator: string; denominator: string; baseAtoms: string };
+export type MarketBook = { bids: MarketBookLevel[]; asks: MarketBookLevel[] };
 
 export type BookLevel = {
   side: BookSide;
@@ -230,7 +237,7 @@ export type BranchPreparationPlan = {
 
 export type BotRuntime = {
   mode: BotMode;
-  client: Client | null;
+  initialized: boolean;
   initializedAt: number | null;
   error: string | null;
 };

@@ -912,9 +912,9 @@ type BuildTransactionParams =
   | {
       type: 'CreateOrder';
       params: {
-        ask_amount: number;
+        ask_amount: string | number;
         ask_token: string;
-        give_amount: number;
+        give_amount: string | number;
         give_token: string;
         conclude_destination: string;
         ask_token_details?: TokenDetails;
@@ -926,6 +926,7 @@ type BuildTransactionParams =
       type: 'ConcludeOrder';
       params: {
         order: OrderData;
+        askDecimals?: number;
       };
       opts?: TransactionOpts;
     }
@@ -1076,9 +1077,9 @@ export type DelegationStakeArgs =
 export type CreateOrderArgs = {
   conclude_destination: string;
   ask_token: string;
-  ask_amount: number;
+  ask_amount: string | number;
   give_token: string;
-  give_amount: number;
+  give_amount: string | number;
 };
 
 export type FillOrderArgs = {
@@ -2145,7 +2146,10 @@ class Client {
         utxo: null,
       });
 
-      outputs.push({
+      // Zero-amount token transfers are invalid, including the remainder of
+      // fully filled orders and ask proceeds of orders that never traded.
+      const proceeds = BigInt(initially_asked.atoms) - BigInt(ask_balance.atoms);
+      if (ask_currency.type === 'Coin' || proceeds > 0n) outputs.push({
         type: 'Transfer',
         destination: conclude_destination,
         value: {
@@ -2156,13 +2160,13 @@ class Client {
                 token_id: ask_currency.token_id,
               }),
           amount: {
-            decimal: (parseInt(initially_asked.decimal) - parseInt(ask_balance.decimal)).toString(),
-            atoms: (parseInt(initially_asked.atoms) - parseInt(ask_balance.atoms)).toString(),
+            decimal: atomsToDecimal(proceeds.toString(), params.askDecimals ?? 11),
+            atoms: proceeds.toString(),
           },
         },
       });
 
-      outputs.push({
+      if (give_currency.type === 'Coin' || BigInt(give_balance.atoms) > 0n) outputs.push({
         type: 'Transfer',
         destination: conclude_destination,
         value: {
@@ -2185,7 +2189,7 @@ class Client {
 
       const give_amount = amount; // Amount to fill in the order. Give _to_ order as counterpart of ask
       const give_amount_atoms =
-        order_details.ask_currency.type === 'Token'
+        order_details.ask_currency.type !== 'Coin'
           ? decimalsToAtoms(give_amount!, ask_token_details!.number_of_decimals)
           : decimalsToAtoms(give_amount!, 11); // Coin decimal
       if (order_details.ask_currency.type === 'Coin') {
@@ -2208,7 +2212,7 @@ class Client {
 
       const ask_amount_atoms = ask_amount_atoms_bigint.toString();
       const ask_amount =
-        order_details.give_currency.type === 'Token'
+        order_details.give_currency.type !== 'Coin'
           ? atomsToDecimal(ask_amount_atoms, give_token_details!.number_of_decimals)
           : atomsToDecimal(ask_amount_atoms, 11); // Coin decimal
 
@@ -3861,7 +3865,9 @@ class Client {
     this.validateRawId(order_id, 'conclude order', 'order_id');
     const order: OrderData = await this.apiProvider.getOrder(order_id);
 
-    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order }, opts });
+    const askDecimals = order.ask_currency.type === 'Coin' ? 11 : (await this.apiProvider.getToken(order.ask_currency.token_id)).number_of_decimals;
+    this.validateTokenDecimals(askDecimals, `Order ${order_id}`);
+    const tx = await this.buildTransaction({ type: 'ConcludeOrder', params: { order, askDecimals }, opts });
     tx.orderInfo = {
       [order.order_id]: Signer.orderAdditionalInfoFromOrder(order),
     };

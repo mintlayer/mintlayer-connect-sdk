@@ -1,47 +1,88 @@
-# Market Maker SPA Architecture
-
-## Overview
-
-The app is a browser-run market-maker control panel and execution surface. It uses React for visualization and control, while the SDK performs all wallet, transaction, signing, broadcast, and chain/order queries.
+# Server architecture
 
 ```mermaid
 flowchart LR
-  user["User"] --> ui["React SPA"]
-  ui --> hook["useMarketMakerBot"]
-  hook --> sdkClient["SDK Client"]
-  hook --> strategy["Strategy Engine"]
-  hook --> execution["Execution Queue"]
-  execution --> walletState["WalletState"]
-  execution --> branches["UTXO Branch Manager"]
-  sdkClient --> api["Mintlayer API"]
-  walletState --> graph["Chain Visualizer"]
-  branches --> graph
+  UI[React panels] -->|HTTP commands| API[Fastify]
+  API -->|snapshot GET / SSE invalidation| UI
+  API --> Commands[(SQLite commands)]
+  Runner[Sequential BotRunner] --> Commands
+  Runner --> Sync[Indexer / mempool reconciliation]
+  Runner --> Strategy[Atom-based strategy]
+  Runner --> Exec[Durable executor]
+  Exec --> SDK[SDK + Node WASM]
+  SDK --> Chain[Indexer / node RPC]
+  Sync --> Chain
+  Exec --> DB[(SQLite attempts / reservations)]
+  Wallet[SDK WalletState] --> Store[SQLite WalletTxStore]
+  Runner --> Wallet
 ```
 
-## State Model
+One Node process owns one database/wallet runtime. All trade commands and automatic
+cycles use one serialized executor. A separate SQLite owner-lock connection holds
+an OS file lock for the process lifetime; main-database transactions remain short.
+A killed process releases its lock automatically.
 
-- SDK state: client instance, network, addresses, balances, available orders, and account orders.
-- Strategy state: configured pair, spread, order size, max orders, inventory target, max position, and circuit breaker status.
-- Execution state: draft, signed, broadcasted, mempool, confirmed, rejected, and rebuild-required transaction records.
-- Wallet state: local transaction log persisted in the browser and interpreted by SDK `WalletState`.
-- Branch state: branch labels over wallet UTXOs, unconfirmed depth, remaining depth budget, and reservation status.
+## Wallet model
 
-## Transaction Lifecycle
+`WalletState` stays in the SDK and continues deriving UTXOs from the transaction
+journal. Its storage adapter writes rows to SQLite instead of rewriting a browser
+JSON blob. Network observations feed `applySyncDiff`, reorg handling calls
+`rollbackTo`. No independent SQL UTXO projection is maintained.
 
-1. A strategy or branch action creates an execution request.
-2. The execution queue signs/builds the transaction through the SDK.
-3. The transaction is inserted into `WalletState` as local so its inputs are reserved.
-4. If broadcasting is enabled, `broadcastTx()` submits it and the local record moves to mempool.
-5. If broadcast fails, the transaction is marked rejected and dependent local transactions require rebuild.
-6. Chain polling reconciles visible orders, balances, and transaction state where the SDK exposes enough information.
+An authoritative spendable set combines confirmed indexer outputs with accepted
+own mempool outputs derived by `WalletState`, excludes durable reservations, and
+respects the branch depth budget. Confirmed sources are checked against actual
+block metadata. Unconfirmed change is usable only with mempool visibility.
+The executor first attempts the shallowest funding set and expands it only when
+necessary; the SDK still performs selection, fee convergence and encoding.
 
-## UTXO Branch Policy
+## Transaction lifecycle
 
-- The app warns before any branch approaches the network mempool chain limit of 30.
-- The default branch spend policy allows only wallet-created unconfirmed outputs and caps depth below 30.
-- Branch preparation creates multiple self-transfer outputs from a selected funding asset and address.
-- Strategy execution prefers the branch with the most remaining depth budget and no local reservation.
+Intent → build → sign → atomic signed bytes + WalletTx + reservations commit →
+submitting → broadcasted / unknown → confirmed / conflicted.
 
-## Browser Storage
+Preview attempts have separate idempotency keys and never reserve inputs or enter
+the recovery queue. Explicit rejection of a first submission releases its inputs;
+a transport failure or any ambiguous previous submission keeps them reserved.
+Retries resend the same bytes. Canonical evidence of a different UTXO spender or
+an incompatible order state invalidates a possibly submitted transaction and its
+dependent chain. Account-command recovery scans canonical blocks from the first
+submission checkpoint, with durable bounded progress, so a candidate mined during
+indexer lag is confirmed rather than mistaken for a conflict. Unsupported/missing
+lookup data and timeouts never constitute proof that inputs are free.
 
-The first implementation uses a localStorage-backed `WalletTxStore` because it is dependency-free and easy to inspect. The storage adapter is isolated so it can be replaced with IndexedDB without changing wallet logic.
+## Control semantics
+
+Desired running state, execution mode and versioned config are durable. Stop and
+mode downgrades fence in-flight work immediately; older queued Start/Live commands
+cannot override them. Applied control state and its command result commit together.
+Every submit checks the current gate. Already submitted bytes remain tracked after
+Stop. Automatic recovery only sends in running Live mode.
+
+Normal market making and explicit testnet self-fill simulation share execution and
+recovery. Own-order discovery scans address history and refreshes its SQLite
+registry directly. Price/reference data comes from the active aggregated book;
+external fill candidates are a bounded subset. Settlement flags remain separate
+from market liquidity. Reorg recovery persists a fork checkpoint and batch progress,
+only rolls back affected history, and preserves shared order fences during replay.
+The strategy uses atom integers
+and exact price ratios, includes open-order exposure and enforces fee/depth/pending
+limits. Public decimal/price numbers are display values.
+
+## Client boundary
+
+The browser imports no account provider or network/signing client. It uses
+`/api/state`, `/api/commands`, paginated history and SSE state invalidation. SSE
+reconnect always fetches an authoritative snapshot. No signing keys or signed bytes
+are returned by normal DTOs. Only PUBLIC_ environment variables are exposed by Vite.
+
+## Operational data
+
+SQLite WAL + FULL commits, schema migration version 1, periodic checkpoint and
+retention for diagnostic events/finished commands. Financial attempts, WalletTx
+history and unresolved reservations do not expire. Online Backup is available as
+a CLI command. Runtime logs include cycle duration, config version and pending
+count; durable events include action/tx/command identifiers.
+
+See [Readme.md](Readme.md) for runtime settings and recovery behavior, and
+[PROGRESS.md](PROGRESS.md) for completed checks and remaining operational acceptance.

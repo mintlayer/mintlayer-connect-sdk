@@ -1,13 +1,22 @@
+import type { TokenLabelMap } from './tokens';
 import type { BookLevel, MarketOrder, SyntheticBook, TokenRef } from './types';
 
-function decimalAmount(amount: { decimal?: string; atoms?: string | number } | undefined): number {
-  const value = amount?.decimal ?? amount?.atoms;
+function decimalAmount(
+  amount: { decimal?: string; atoms?: string | number } | undefined,
+  token?: string,
+  labels?: TokenLabelMap,
+): number {
+  const value =
+    amount?.decimal ??
+    (amount?.atoms !== undefined && token && labels?.[token]
+      ? Number(amount.atoms) / 10 ** labels[token].decimals
+      : undefined);
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
 export function isActiveOrder(order: MarketOrder): boolean {
-  return decimalAmount(order.ask_balance) > 0 && decimalAmount(order.give_balance) > 0;
+  return BigInt(order.ask_balance.atoms ?? '0') > 0n && BigInt(order.give_balance.atoms ?? '0') > 0n;
 }
 
 function currencyKey(currency: MarketOrder['ask_currency']): TokenRef {
@@ -22,14 +31,19 @@ function sameToken(currency: MarketOrder['ask_currency'], token: TokenRef): bool
   return currencyKey(currency) === token;
 }
 
-function toBookLevel(order: MarketOrder, baseToken: TokenRef, quoteToken: TokenRef): BookLevel | null {
+function toBookLevel(
+  order: MarketOrder,
+  baseToken: TokenRef,
+  quoteToken: TokenRef,
+  labels?: TokenLabelMap,
+): BookLevel | null {
   const askMatchesQuote = sameToken(order.ask_currency, quoteToken);
   const askMatchesBase = sameToken(order.ask_currency, baseToken);
   const giveMatchesBase = sameToken(order.give_currency, baseToken);
   const giveMatchesQuote = sameToken(order.give_currency, quoteToken);
 
-  const askAmount = decimalAmount(order.ask_balance);
-  const giveAmount = decimalAmount(order.give_balance);
+  const askAmount = decimalAmount(order.ask_balance, currencyKey(order.ask_currency), labels);
+  const giveAmount = decimalAmount(order.give_balance, currencyKey(order.give_currency), labels);
 
   if (askAmount <= 0 || giveAmount <= 0) {
     return null;
@@ -64,10 +78,15 @@ function toBookLevel(order: MarketOrder, baseToken: TokenRef, quoteToken: TokenR
   return null;
 }
 
-export function buildSyntheticBook(orders: MarketOrder[], baseToken: TokenRef, quoteToken: TokenRef): SyntheticBook {
+export function buildSyntheticBook(
+  orders: MarketOrder[],
+  baseToken: TokenRef,
+  quoteToken: TokenRef,
+  labels?: TokenLabelMap,
+): SyntheticBook {
   const levels = orders
     .filter(isActiveOrder)
-    .map((order) => toBookLevel(order, baseToken, quoteToken))
+    .map((order) => toBookLevel(order, baseToken, quoteToken, labels))
     .filter((level): level is BookLevel => level !== null);
 
   const bids = levels.filter((level) => level.side === 'bid').sort((a, b) => b.price - a.price);
@@ -80,7 +99,7 @@ export function buildSyntheticBook(orders: MarketOrder[], baseToken: TokenRef, q
     asks,
     bestBid,
     bestAsk,
-    midPrice: bestBid !== null && bestAsk !== null ? (bestBid + bestAsk) / 2 : bestBid ?? bestAsk,
+    midPrice: bestBid !== null && bestAsk !== null ? (bestBid + bestAsk) / 2 : (bestBid ?? bestAsk),
   };
 }
 

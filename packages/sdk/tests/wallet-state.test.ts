@@ -196,6 +196,21 @@ test('releases inputs and rejects dependent local chain when broadcast requires 
   expect(rejectedUtxos.find((utxo) => utxo.txId === 'child-local-spend')?.status).toBe('rejected');
 });
 
+test('a confirmed descendant shields its change from a stale rejected ancestor', async () => {
+  const ancestor = coinTransfer(ADDRESS, '100');
+  const confirmed = coinTransfer(ADDRESS, '99');
+  const change = coinTransfer(ADDRESS, '98');
+  const store = createMemoryWalletTxStore({ transactions: { bot: [
+    walletTx('ancestor', [ancestor], 'conflicted'),
+    walletTx('mined', [confirmed], 'confirmed', [utxoInput('ancestor', 0, ancestor)]),
+    { ...walletTx('pending', [change], 'mempool', [utxoInput('mined', 0, confirmed)]), createdByWallet: true },
+  ] } });
+  const state = await WalletState.create({ accountId: 'bot', store, isMineOutput });
+  const available = state.getSpendableUtxos({ allowUnconfirmed: true, allowOwnChangeOnly: true });
+  expect(available.map(u => u.txId)).toEqual(['pending']);
+  expect(available[0].unconfirmedChainDepth).toBe(1);
+});
+
 test('sync diff can confirm local transactions and mark external spends', async () => {
   const fundingOutput = coinTransfer(ADDRESS, '100');
   const store = createMemoryWalletTxStore({
@@ -268,4 +283,22 @@ test('treats api confirmation 0 as confirmed and -1 as mempool', async () => {
   expect(utxos.find((utxo) => utxo.txId === 'confirmed-zero')?.status).toBe('confirmed');
   expect(utxos.find((utxo) => utxo.txId === 'api-mempool')?.status).toBe('unconfirmed');
   expect(walletState.getSpendableUtxos().map((utxo) => utxo.txId)).toEqual(['confirmed-zero']);
+});
+
+test('chain depth does not depend on storage order', async () => {
+  const root = walletTx('root', [coinTransfer(ADDRESS, '100')]);
+  const parent = walletTx('parent', [coinTransfer(ADDRESS, '99')], 'mempool', [utxoInput('root', 0, coinTransfer(ADDRESS, '100'))]);
+  const child = walletTx('child', [coinTransfer(ADDRESS, '98')], 'local', [utxoInput('parent', 0, coinTransfer(ADDRESS, '99'))]);
+  const state = await WalletState.create({ accountId: 'bot', store: createMemoryWalletTxStore({ transactions: { bot: [child, parent, root] } }), isMineOutput });
+  expect(state.getUtxos().find(utxo => utxo.txId === 'child')?.unconfirmedChainDepth).toBe(2);
+  expect(state.getSpendableUtxos({ allowUnconfirmed: true, allowOwnChangeOnly: false, maxUnconfirmedChainDepth: 1 })).toHaveLength(0);
+});
+
+test('rollback overrides stale confirmations in persisted API metadata', async () => {
+  const tx = { ...walletTx('confirmed', [coinTransfer(ADDRESS, '100')]), confirmations: '10' };
+  const store = createMemoryWalletTxStore({ transactions: { bot: [tx] } });
+  const state = await WalletState.create({ accountId: 'bot', store, isMineOutput });
+  await state.rollbackTo(0);
+  expect(state.getSpendableUtxos()).toHaveLength(0);
+  expect(state.getUtxos({ includeOrphaned: true })[0].status).toBe('orphaned');
 });

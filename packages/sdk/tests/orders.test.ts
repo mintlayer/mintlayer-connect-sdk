@@ -389,3 +389,47 @@ test('fill order subsequent', async () => {
   });
 
 })
+
+test('conclude preserves large token proceeds in atoms and the token decimal scale', async () => {
+  const orderId = 'tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu';
+  fetchMock.mockResponse(async req => {
+    if (req.url.includes('/order/')) return JSON.stringify({
+      order_id: orderId, nonce: 1,
+      conclude_destination: 'tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py',
+      ask_currency: { type: 'Token', token_id: MOCK_TOKEN_ID },
+      give_currency: { type: 'Coin' },
+      initially_asked: { atoms: '9007199254740995', decimal: '90071992.54740995' },
+      ask_balance: { atoms: '2', decimal: '0.00000002' },
+      initially_given: { atoms: '100000000000', decimal: '1' },
+      give_balance: { atoms: '100000000000', decimal: '1' },
+    });
+    return mocks.defaultRouter(req);
+  });
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+  const built = await client.buildConcludeOrder({ order_id: orderId });
+  const tokenOutput = built.JSONRepresentation.outputs.find((output: any) => output.value?.token_id === MOCK_TOKEN_ID) as any;
+  expect(tokenOutput.value.amount.atoms).toBe('9007199254740993');
+  expect(tokenOutput.value.amount.decimal).toBe('90071992.54740993');
+});
+
+test.each([true, false])('conclude omits zero token outputs (fully filled: %s)', async (fullyFilled) => {
+  const orderId = 'tordr1thu5ykcdl0uj30g97wqkam7kart50lgzaq60edh8nq6zrn366lmql50gnu';
+  fetchMock.mockResponse(async req => {
+    if (req.url.includes('/order/')) return JSON.stringify({
+      order_id: orderId, nonce: 1,
+      conclude_destination: 'tmt1qxf50ffxunjw557a9zf2et0vywkwjszyxyppa0py',
+      ask_currency: fullyFilled ? { type: 'Coin' } : { type: 'Token', token_id: MOCK_TOKEN_ID },
+      give_currency: fullyFilled ? { type: 'Token', token_id: MOCK_TOKEN_ID } : { type: 'Coin' },
+      initially_asked: { atoms: '100000000000', decimal: '1' },
+      ask_balance: { atoms: fullyFilled ? '0' : '100000000000', decimal: fullyFilled ? '0' : '1' },
+      initially_given: { atoms: '100000000000', decimal: '1' },
+      give_balance: { atoms: fullyFilled ? '0' : '100000000000', decimal: fullyFilled ? '0' : '1' },
+    });
+    return mocks.defaultRouter(req);
+  });
+  const client = await Client.create({ network: 'testnet', autoRestore: false });
+  await client.connect();
+  const built = await client.buildConcludeOrder({ order_id: orderId });
+  expect(built.JSONRepresentation.outputs.some((output: any) => output.value?.token_id === MOCK_TOKEN_ID)).toBe(false);
+});

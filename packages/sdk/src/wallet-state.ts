@@ -214,6 +214,7 @@ function getTxId(tx: WalletTxInput): string {
 }
 
 function getWalletTxState(tx: WalletTx): TxState {
+  if (tx.state === 'rejected' || tx.state === 'conflicted' || tx.state === 'orphaned') return tx.state;
   const confirmation = tx.confirmation ?? tx.confirmations;
 
   if (confirmation === undefined) {
@@ -381,6 +382,8 @@ export class WalletState {
   private outputs = new Map<string, WalletUtxo>();
   private spentBy = new Map<string, WalletTx>();
   private spentOutpoints = new Set<string>();
+  private transactionsById = new Map<string, WalletTx>();
+  private depthCache = new Map<string, number>();
 
   private constructor(options: WalletStateOptions) {
     this.accountId = options.accountId;
@@ -649,6 +652,8 @@ export class WalletState {
   private rebuild(): void {
     this.outputs = new Map();
     this.spentBy = new Map();
+    this.transactionsById = new Map(this.transactions.map(tx => [tx.txId, tx]));
+    this.depthCache.clear();
     const rejectedTxIds = this.getRejectedTxIds();
 
     for (const tx of this.transactions) {
@@ -724,18 +729,21 @@ export class WalletState {
     return 'unconfirmed';
   }
 
-  private getUnconfirmedChainDepth(tx: WalletTx): number {
-    if (getWalletTxState(tx) === 'confirmed') {
-      return 0;
+  private getUnconfirmedChainDepth(tx: WalletTx, visiting = new Set<string>()): number {
+    if (getWalletTxState(tx) === 'confirmed') return 0;
+    const cached = this.depthCache.get(tx.txId);
+    if (cached !== undefined) return cached;
+    if (visiting.has(tx.txId)) throw new Error(`Cyclic transaction dependency: ${tx.txId}`);
+    visiting.add(tx.txId);
+    let depth = 1;
+    for (const input of getTxJson(tx.tx).inputs) {
+      const outpoint = getInputOutPoint(input);
+      const parent = outpoint && this.transactionsById.get(outpoint.txId);
+      if (parent) depth = Math.max(depth, this.getUnconfirmedChainDepth(parent, visiting) + 1);
     }
-
-    const txJson = getTxJson(tx.tx);
-    const parentDepths = txJson.inputs
-      .map(getInputOutPoint)
-      .filter((outpoint): outpoint is OutPoint => outpoint !== null)
-      .map((outpoint) => this.outputs.get(outPointKey(outpoint))?.unconfirmedChainDepth ?? 0);
-
-    return Math.max(1, ...parentDepths.map((depth) => depth + 1));
+    visiting.delete(tx.txId);
+    this.depthCache.set(tx.txId, depth);
+    return depth;
   }
 
   private assertNoDoubleSpend(tx: WalletTx): void {
@@ -774,6 +782,11 @@ export class WalletState {
         if (rejectedTxIds.has(tx.txId)) {
           continue;
         }
+
+        // Canonical confirmation proves this transaction and its ancestry are
+        // valid. A stale local rejection of an ancestor cannot poison it or
+        // the unconfirmed change chains built on top of it.
+        if (getWalletTxState(tx) === 'confirmed') continue;
 
         const txJson = getTxJson(tx.tx);
         const dependsOnRejectedTx = txJson.inputs

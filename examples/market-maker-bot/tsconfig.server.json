@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "@mintlayer/sdk": [
+        "../../packages/sdk/src/mintlayer-connect-sdk.ts"
+      ],
+      "@mintlayer/wasm-lib": [
+        "../../packages/wasm-lib/wasm_wrappers.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "server",
+    "shared",
+    "tests",
+    "../../packages/sdk/src/types/global.d.ts"
+  ]
+}

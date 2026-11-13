@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/dist
+**/dist-server
+**/.env*
+**/data
+**/*.sqlite*
+**/*.owner*
+.pnpm-store
+**/*.db*
+.aws
+.agents
+.codex

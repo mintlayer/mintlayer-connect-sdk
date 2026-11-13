@@ -32,11 +32,7 @@ export function analyzeBranches(snapshot: WalletSnapshot | null, maxDepth: numbe
       const depth = utxo.status === 'confirmed' ? 0 : utxo.unconfirmedChainDepth;
       const remainingDepth = Math.max(0, maxDepth - depth);
       const warning =
-        remainingDepth <= 0
-          ? 'Depth budget exhausted'
-          : remainingDepth <= 3
-            ? 'Depth budget is low'
-            : null;
+        remainingDepth <= 0 ? 'Depth budget exhausted' : remainingDepth <= 3 ? 'Depth budget is low' : null;
 
       return {
         id: `branch-${index + 1}`,
@@ -89,7 +85,9 @@ export function createBranchPreparationPlan(args: {
   }
 
   if (missingBranches > 1) {
-    warnings.push('Prepare branches one at a time unless the API confirms each prior transaction in mempool to avoid accidental double-spends.');
+    warnings.push(
+      'Prepare branches one at a time unless the API confirms each prior transaction in mempool to avoid accidental double-spends.',
+    );
   }
 
   for (let index = 0; index < missingBranches; index += 1) {
